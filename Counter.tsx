@@ -1,10 +1,11 @@
 import * as React from 'React';
 import { reduce } from './reduction';
 import { action, Action } from './action';
-import { reduced } from './mobx-extensions';
+import { reduced, actions } from './mobx-extensions';
 import { computed } from 'mobx';
 import { observer } from 'mobx-react';
 
+@actions
 class RootActions {
     addCounter = action();
     removeCounter = action<{ id: number }>();
@@ -30,6 +31,7 @@ class RootModel {
     }
 }
 
+@actions
 class CounterActions {
     constructor(private _parent: RootActions, private _id: number) { }
 

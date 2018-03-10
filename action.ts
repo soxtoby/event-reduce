@@ -21,6 +21,6 @@ function scope<TIn extends object, TOut extends TIn, TScope extends Partial<TIn>
     return makeObservableAction(scopedAction, scopedObservable);
 }
 
-function makeObservableAction<TIn, TOut>(action: Action<TIn>, observable: IObservable<TOut>): IObservableAction<TIn, TOut> {
+export function makeObservableAction<TIn, TOut>(action: Action<TIn>, observable: IObservable<TOut>): IObservableAction<TIn, TOut> {
     return Object.assign(action, observable, { scope });
 }

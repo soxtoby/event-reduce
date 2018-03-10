@@ -6,6 +6,7 @@ export interface IObservable<T> {
     map<U>(select: (value: T) => U): IObservable<U>;
     resolved<P>(this: IObservable<Promise<P>>): IObservable<P>;
     rejected(this: IObservable<Promise<any>>): IObservable<any>;
+    asObservable(): IObservable<T>;
 }
 
 export interface IObserver<T> {
@@ -34,6 +35,10 @@ export class Observable<T> implements IObservable<T> {
     rejected(this: IObservable<Promise<any>>) {
         return new Observable<any>(observer => this.subscribe(value => value.catch(error => observer.next(error))));
     }
+
+    asObservable() {
+        return new Observable<T>(observer => this.subscribe(v => observer.next(v)));
+    }
 }
 
 export class Subject<T> extends Observable<T> implements IObserver<T> {
@@ -47,6 +52,4 @@ export class Subject<T> extends Observable<T> implements IObserver<T> {
     }
 
     next(value: T) { this._observers.forEach(o => o.next(value)); }
-
-    asObservable() { return new Observable<T>(observer => this.subscribe(v => observer.next(v))); }
 }
