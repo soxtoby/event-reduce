@@ -1,14 +1,32 @@
 {
-  "name": "reduction",
-  "version": "1.0.0",
-  "main": "index.js",
+  "//name": "downstate",
+  "///name": "stateable",
+  "name": "event-reduce",
+  "////name": "causation",
+  "/////name": "reobserve",
+  "description": "State management based on reducing Observables into state",
+  "version": "0.1.0",
+  "main": "lib/index",
+  "types": "lib/index",
   "author": "Simon Oxtoby",
   "license": "MIT",
+  "files": [
+    "lib"
+  ],
   "devDependencies": {
     "@types/react": "^16.0.40",
-    "mobx": "^3.6.1",
-    "mobx-react": "^4.4.2",
+    "@types/sinon-chai": "^2.7.29",
+    "chai": "^4.1.2",
+    "mobx-react": "^5.0.0",
     "react": "^16.2.0",
+    "sinon": "^4.4.6",
+    "sinon-chai": "^3.0.0",
+    "synchronous-promise": "^2.0.4",
+    "typescript": "^2.8.1",
+    "wattle": "^0.3.1"
+  },
+  "optionalDependencies": {
+    "mobx": "^4.1.1",
     "rxjs": "^5.5.6"
   }
 }

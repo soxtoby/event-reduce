@@ -1,4 +1,5 @@
-import { IObservable, Observable, Subject } from "./observable";
+import { IObservable, Observable } from "./observable";
+import { Subject } from "./subject";
 
 export function reduce<TValue>(initial: TValue): Reduction<TValue>;
 export function reduce<TValue, TActions>(initial: TValue, actions: TActions): BoundReduction<TValue, TActions>;

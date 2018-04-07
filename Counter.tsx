@@ -1,18 +1,18 @@
 import * as React from 'React';
-import { reduce } from './reduction';
-import { action, Action } from './action';
-import { reduced, actions } from './mobx-extensions';
+import { reduce } from './src/reduction';
+import { event, Event } from './src/event';
+import { reduced, events } from './src/mobx-extensions';
 import { computed } from 'mobx';
 import { observer } from 'mobx-react';
 
-@actions
+@events
 class RootActions {
-    addCounter = action();
-    removeCounter = action<{ id: number }>();
-    increment = action<{ id: number }>();
-    decrement = action<{ id: number }>();
-    reset = action<{ id: number }>();
-    deserialize = action<RootModel>();
+    addCounter = event();
+    removeCounter = event<{ id: number }>();
+    increment = event<{ id: number }>();
+    decrement = event<{ id: number }>();
+    reset = event<{ id: number }>();
+    deserialize = event<RootModel>();
 }
 
 let uid = 1;
@@ -31,14 +31,14 @@ class RootModel {
     }
 }
 
-@actions
+@events
 class CounterActions {
     constructor(private _parent: RootActions, private _id: number) { }
 
     increment = this._parent.increment.scope({ id: this._id });
     decrement = this._parent.decrement.scope({ id: this._id });
     reset = this._parent.reset.scope({ id: this._id });;
-    fetchValue = action<Promise<number>>();
+    fetchValue = event<Promise<number>>();
 }
 
 class CounterModel {
@@ -58,10 +58,10 @@ class CounterModel {
 }
 
 interface ICounterProps {
-    increment?: Action;
-    decrement?: Action;
-    reset?: Action;
-    fetchValue?: Action<Promise<number>>;
+    increment?: Event;
+    decrement?: Event;
+    reset?: Event;
+    fetchValue?: Event<Promise<number>>;
 
     count?: number;
 }

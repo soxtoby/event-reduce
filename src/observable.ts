@@ -1,4 +1,4 @@
-export type Unsubscribe = () => void;
+export type ObservableConstructor<T> = new (subscribe: (observer: IObserver<T>) => Unsubscribe) => IObservable<T>;
 
 export interface IObservable<T> {
     subscribe(next: (value: T) => void): Unsubscribe;
@@ -9,11 +9,13 @@ export interface IObservable<T> {
     asObservable(): IObservable<T>;
 }
 
+export type Unsubscribe = () => void;
+
 export interface IObserver<T> {
     next(value: T): void;
 }
 
-export class Observable<T> implements IObservable<T> {
+class SimpleObservable<T> implements IObservable<T> {
     constructor(private _subscribe: (observer: IObserver<T>) => Unsubscribe) { }
 
     subscribe(next: (value: T) => void) {
@@ -41,15 +43,16 @@ export class Observable<T> implements IObservable<T> {
     }
 }
 
-export class Subject<T> extends Observable<T> implements IObserver<T> {
-    private _observers = [] as IObserver<T>[];
+export let Observable: { new <T>(subscribe: (observer: IObserver<T>) => Unsubscribe): IObservable<T> } = SimpleObservable;
 
-    constructor() {
-        super(observer => {
-            this._observers.push(observer);
-            return () => this._observers = this._observers.filter(o => o != observer);
-        });
-    }
+export function useObservableType(observableImplementation: typeof Observable) {
+    Observable = observableImplementation;
+    Object.getOwnPropertyNames(SimpleObservable.prototype).forEach(prop => {
+        if (!(prop in Observable.prototype))
+            Observable.prototype[prop] = SimpleObservable.prototype[prop as keyof IObservable<any>];
+    });
+}
 
-    next(value: T) { this._observers.forEach(o => o.next(value)); }
+export function resetObservableType() {
+    Observable = SimpleObservable;
 }

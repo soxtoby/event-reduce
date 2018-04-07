@@ -1,5 +1,5 @@
-import { reduce } from "./reduction";
-import { Subject } from "./observable";
+import { reduce } from "./src/reduction";
+import { Subject } from "./src/observable";
 
 class Actions {
     increment = new Subject<void>();
