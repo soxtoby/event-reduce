@@ -1,6 +1,7 @@
 import * as sinon from 'sinon';
 import { describe, it, test, then, when } from 'wattle';
-import { event } from './../src/event';
+import { event } from '../src/events';
+import './setup';
 
 describe("action", function () {
     type TestType = { foo: string, bar: number };

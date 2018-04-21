@@ -1,5 +1,5 @@
 import { action, observable } from 'mobx';
-import { IObservableEvent, makeObservableEvent } from "./event";
+import { IObservableEvent, combineEventAndObservable } from "./events";
 import { state } from "./experimental/state";
 import { lastReduction } from "./reduction";
 
@@ -23,7 +23,7 @@ export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
         Object.keys(instance).forEach(key => {
             let prop = instance[key];
             if (isObservableEvent(prop))
-                instance[key] = makeObservableEvent(action(key, prop), prop.asObservable());
+                instance[key] = combineEventAndObservable(action(key, prop), prop.asObservable());
         });
         return instance;
     }

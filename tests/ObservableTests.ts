@@ -1,9 +1,8 @@
-import './setup';
-import { describe, when, then, test, it } from 'wattle';
-import { Observable, IObservable } from '../src/observable';
-import { SynchronousPromise } from 'synchronous-promise';
 import * as sinon from 'sinon';
+import { describe, then, when } from 'wattle';
+import { Observable } from '../src/observable';
 import { testObservableOperators } from './ObservableOperatorTests';
+import './setup';
 
 describe("Observable", function () {
     when("subscribing", () => {

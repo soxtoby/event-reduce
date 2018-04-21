@@ -2,7 +2,8 @@ import { autorun } from "mobx";
 import { describe, test, then, when } from "wattle";
 import { events, reduced } from "../src/mobx";
 import { reduce } from "../src/reduction";
-import { event } from "./../src/event";
+import { event } from "./../src/events";
+import './setup';
 
 describe("reduced decorator", function () {
     let increment = event();

@@ -1,6 +1,7 @@
-import { test, it } from "wattle";
 import { SynchronousPromise } from "synchronous-promise";
-import { Observable, IObservable } from "../src/observable";
+import { it, test } from "wattle";
+import { IObservable, Observable } from "../src/observable";
+import './setup';
 
 export function testObservableOperators() {
     test("filter", () => {

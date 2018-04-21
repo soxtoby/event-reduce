@@ -3,6 +3,7 @@ import { describe, it } from "wattle";
 import { reduced } from "../src/mobx";
 import { reduce } from "../src/reduction";
 import { plainState, state } from "./../src/experimental/state";
+import './setup';
 
 describe("serialize", function () {
     class TestModel {

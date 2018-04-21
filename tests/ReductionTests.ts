@@ -1,7 +1,8 @@
-import { describe, it, when, then, test } from 'wattle';
-import { reduce, lastReduction } from '../src/reduction';
-import { Subject } from '../src/subject';
 import * as sinon from 'sinon';
+import { describe, it, test, then, when } from 'wattle';
+import { lastReduction, reduce } from '../src/reduction';
+import { Subject } from '../src/subject';
+import './setup';
 
 describe("reduce", function () {
     when("unbound", () => {

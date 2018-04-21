@@ -1,7 +1,7 @@
-import './setup';
-import { describe, when, it } from 'wattle';
-import { Subject } from '../src/subject';
 import * as sinon from 'sinon';
+import { describe, it, when } from 'wattle';
+import { Subject } from '../src/subject';
+import './setup';
 
 describe("Subject", function () {
     let sut = new Subject<number>();

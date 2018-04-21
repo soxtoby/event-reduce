@@ -1,18 +1,21 @@
 {
-  "//name": "downstate",
-  "///name": "stateable",
   "name": "event-reduce",
-  "////name": "causation",
-  "/////name": "reobserve",
-  "description": "State management based on reducing Observables into state",
+  "description": "State management based on reducing observable events into state",
   "version": "0.1.0",
   "main": "lib/index",
   "types": "lib/index",
   "author": "Simon Oxtoby",
   "license": "MIT",
+  "scripts": {
+    "test": "wattle ./tests/**",
+    "prepublish": "tsc"
+  },
   "files": [
     "lib"
   ],
+  "dependencies": {
+    "mobx": "^4.2.0"
+  },
   "devDependencies": {
     "@types/react": "^16.0.40",
     "@types/sinon-chai": "^2.7.29",
@@ -24,9 +27,5 @@
     "synchronous-promise": "^2.0.4",
     "typescript": "^2.8.1",
     "wattle": "^0.3.1"
-  },
-  "optionalDependencies": {
-    "mobx": "^4.1.1",
-    "rxjs": "^5.5.6"
   }
 }
