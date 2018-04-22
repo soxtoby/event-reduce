@@ -1,14 +1,15 @@
 {
   "name": "event-reduce",
   "description": "State management based on reducing observable events into state",
-  "version": "0.1.0",
+  "version": "0.1.1",
+  "author": "Simon Oxtoby",
+  "homepage": "https://github.com/soxtoby/event-reduce",
+  "license": "MIT",
   "main": "lib/index",
   "types": "lib/index",
-  "author": "Simon Oxtoby",
-  "license": "MIT",
   "scripts": {
     "test": "wattle ./tests/**",
-    "prepublish": "tsc"
+    "prepare": "tsc"
   },
   "files": [
     "lib"
