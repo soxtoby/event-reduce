@@ -1,6 +1,6 @@
 import * as sinon from 'sinon';
 import { describe, it, test, then, when } from 'wattle';
-import { lastReduction, reduce } from '../src/reduction';
+import { last, reduce } from '../src/reduction';
 import { Subject } from '../src/subject';
 import './setup';
 
@@ -69,9 +69,9 @@ describe("reduce", function () {
         let r2 = reduce(2);
 
         r1.value;
-        lastReduction!.should.equal(r1);
+        last.reduction!.should.equal(r1);
 
         r2.value;
-        lastReduction!.should.equal(r2);
+        last.reduction!.should.equal(r2);
     });
 });

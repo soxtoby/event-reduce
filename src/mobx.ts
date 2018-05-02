@@ -1,7 +1,7 @@
 import { action, observable } from 'mobx';
 import { IObservableEvent, combineEventAndObservable } from "./events";
 import { state } from "./experimental/state";
-import { lastReduction } from "./reduction";
+import { last } from "./reduction";
 
 export let reduced: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
     if (typeof key == 'string')
@@ -9,10 +9,11 @@ export let reduced: PropertyDecorator = (target: Object, key: string | symbol): 
         
     return {
         set(this: any, value: any) {
-            let reduction = lastReduction!;
+            let reduction = last.reduction!;
             let box = observable.box(reduction.value, { name: String(key), deep: false });
             reduction.subscribe(value => box.set(value));
             Object.defineProperty(this, key, { get: () => box.get(), enumerable: true });
+            last.reduction = undefined; // Stops Reduction from throwing because of accessed value
         }
     };
 }

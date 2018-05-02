@@ -1,6 +1,5 @@
 import { IObservable, Observable } from "./observable";
 import { Subject } from "./subject";
-import { values } from "mobx";
 
 export function reduce<TValue>(initial: TValue): Reduction<TValue>;
 export function reduce<TValue, TEvents>(initial: TValue, events: TEvents): BoundReduction<TValue, TEvents>;
@@ -8,8 +7,7 @@ export function reduce<TValue, TEvents>(initial: TValue, events: TEvents = {} as
     return events ? new BoundReduction(initial, events) : new Reduction(initial);
 }
 
-export let lastReduction: Reduction<any> | undefined;
-let insideReducer = false;
+export let last: { reduction?: Reduction<any> } = {};
 
 export interface IReduction<TValue> extends IObservable<TValue> {
     on<TEvent>(observable: IObservable<TEvent>, reduce: (current: TValue, event: TEvent) => TValue): this;
@@ -27,18 +25,17 @@ export class Reduction<TValue> extends Observable<TValue> implements IReduction<
 
     on<TEvent>(observable: IObservable<TEvent>, reduce: (current: TValue, event: TEvent) => TValue): this {
         observable.subscribe(value => {
-            insideReducer = true;
+            last.reduction = undefined;
             this._current = reduce(this._current, value);
-            insideReducer = false;
+            if (last.reduction)
+                throw new Error("Can't access a reduction value from inside a reducer: behaviour is undefined.");
             this._subject.next(this._current);
         });
         return this;
     }
 
     get value() {
-        if (insideReducer)
-            throw new Error("Can't access a reduction value from inside a reducer: behaviour is undefined.");
-        lastReduction = this;
+        last.reduction = this;
         return this._current;
     }
 }
