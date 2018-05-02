@@ -10,7 +10,7 @@ export type Event<T> = T extends void
     ? () => void
     : (item: T) => void;
     
-export type IObservableEvent<TIn, TOut> = Event<TIn> & IEventMethods<TIn, TOut> & IObservable<TOut>;
+export type IObservableEvent<TIn, TOut = TIn> = Event<TIn> & IEventMethods<TIn, TOut> & IObservable<TOut>;
 
 /**
  * Creates an observable event function.

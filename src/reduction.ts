@@ -1,9 +1,9 @@
 import { IObservable, Observable } from "./observable";
 import { Subject } from "./subject";
 
-export function reduce<TValue>(initial: TValue): Reduction<TValue>;
-export function reduce<TValue, TEvents>(initial: TValue, events: TEvents): BoundReduction<TValue, TEvents>;
-export function reduce<TValue, TEvents>(initial: TValue, events: TEvents = {} as TEvents): Reduction<TValue> {
+export function reduce<TValue>(initial: TValue): IReduction<TValue>;
+export function reduce<TValue, TEvents>(initial: TValue, events: TEvents): IBoundReduction<TValue, TEvents>;
+export function reduce<TValue, TEvents>(initial: TValue, events: TEvents = {} as TEvents): IReduction<TValue> {
     return events ? new BoundReduction(initial, events) : new Reduction(initial);
 }
 
