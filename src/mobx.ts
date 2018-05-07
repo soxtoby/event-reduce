@@ -19,17 +19,18 @@ export let reduced: PropertyDecorator = (target: Object, key: string | symbol): 
 }
 
 export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
-    function EventsClass(...args: any[]) {
-        let instance = new target(...args);
-        Object.keys(instance).forEach(key => {
-            let prop = instance[key];
-            if (isObservableEvent(prop))
-                instance[key] = combineEventAndObservable(action(key, prop), prop.asObservable());
-        });
-        return instance;
+    class EventsClass extends target {
+        constructor(...args: any[]) {
+            super(...args);
+            Object.keys(this).forEach(key => {
+                let prop = this[key];
+                if (isObservableEvent(prop))
+                    this[key] = combineEventAndObservable(action(key, prop), prop.asObservable());
+            });
+        }
     }
-    EventsClass.prototype = target.prototype;
-    return EventsClass as any;
+    (EventsClass as any).displayName = (target as any).displayName || target.name
+    return EventsClass;
 }
 
 function isObservableEvent(o: any): o is IObservableEvent<any, any> {
