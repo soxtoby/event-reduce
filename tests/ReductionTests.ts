@@ -45,19 +45,19 @@ describe("reduce", function () {
         });
     });
 
-    when("bound to actions object", () => {
-        let actions = {};
-        let sut = reduce(1, actions);
+    when("bound to events object", () => {
+        let events = {};
+        let sut = reduce(1, events);
 
         when("subscribing to an observable", () => {
             let subject = new Subject<string>();
-            let getAction = sinon.spy(() => subject);
+            let getEvent = sinon.spy(() => subject);
             let reducer = sinon.stub();
-            sut.on(getAction, reducer);
+            sut.on(getEvent, reducer);
 
-            then("action getter called with bound actions", () => getAction.should.have.been.calledWith(actions));
+            then("event getter called with bound events", () => getEvent.should.have.been.calledWith(events));
 
-            then("reduction subscribed to result of action getter", () => {
+            then("reduction subscribed to result of event getter", () => {
                 subject.next('foo');
                 reducer.should.have.been.calledWith(1, 'foo');
             });
