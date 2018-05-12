@@ -6,7 +6,7 @@ import { last } from "./reduction";
 export let reduced: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
     if (typeof key == 'string')
         state(target, key);
-        
+
     return {
         set(this: any, value: any) {
             let reduction = last.reduction!;
@@ -19,20 +19,40 @@ export let reduced: PropertyDecorator = (target: Object, key: string | symbol): 
 }
 
 export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
-    class EventsClass extends target {
-        constructor(...args: any[]) {
-            super(...args);
-            Object.keys(this).forEach(key => {
-                let prop = this[key];
-                if (isObservableEvent(prop))
-                    this[key] = combineEventAndObservable(action(key, prop), prop.asObservable());
-            });
+    const className = (target as any).displayName || target.name;
+    return {
+        [className]: class extends target {
+            constructor(...args: any[]) {
+                super(...args);
+                Object.keys(this).forEach(key => {
+                    let prop = this[key];
+                    if (isObservableEvent(prop)) {
+                        let wrappedEvent = action(key, (item: any) => prop(wrapPromise(key, item)));
+                        this[key] = combineEventAndObservable(wrappedEvent, prop.asObservable());
+                    }
+                });
+            }
         }
-    }
-    (EventsClass as any).displayName = (target as any).displayName || target.name
-    return EventsClass;
+    }[className];
 }
 
 function isObservableEvent(o: any): o is IObservableEvent<any, any> {
     return typeof o == 'function' && !!o.subscribe;
+}
+
+function wrapPromise(name: string, promise: any): any {
+    if (typeof promise != 'object' || typeof promise.then != 'function')
+        return promise; // Not a promise
+
+    return {
+        then(onfulfilled?: (value: any) => any, onrejected?: (reason: any) => any): Promise<any> {
+            return wrapPromise(name, promise.then(
+                onfulfilled && action(name + '.resolved', onfulfilled),
+                onrejected && action(name + '.rejected', onrejected)));
+        },
+
+        catch(onrejected?: (reason: any) => any): Promise<any> {
+            return this.then(undefined, onrejected);
+        }
+    };
 }
