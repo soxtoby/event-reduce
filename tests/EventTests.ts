@@ -20,6 +20,13 @@ describe("event", function () {
         });
     });
 
+    when("handler calls another event", () => {
+        let otherEvent = event();
+        sut.subscribe(() => otherEvent());
+
+        it("throws", () => (() => sut({ foo: 'foo', bar: 1 })).should.throw("Fired an event in response to another event."));
+    });
+
     test("scope", () => {
         let scoped = sut.scope({ foo: 'foo' });
         let rootSubscriber = sinon.stub();

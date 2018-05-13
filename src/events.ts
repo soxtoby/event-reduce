@@ -9,15 +9,28 @@ export interface IEventMethods<TIn, TOut> {
 export type Event<T> = T extends void
     ? () => void
     : (item: T) => void;
-    
+
 export type IObservableEvent<TIn, TOut = TIn> = Event<TIn> & IEventMethods<TIn, TOut> & IObservable<TOut>;
+
+let insideEvent = false;
 
 /**
  * Creates an observable event function.
  */
 export function event<T = void>(): IObservableEvent<T, T> {
     let subject = new Subject<T>();
-    return combineEventAndObservable((value => subject.next(value)) as Event<T>, subject);
+    return combineEventAndObservable((value => {
+        try {
+            if (insideEvent)
+                throw new Error("Fired an event in response to another event.");
+
+            insideEvent = true;
+            subject.next(value);
+        }
+        finally {
+            insideEvent = false;
+        }
+    }) as Event<T>, subject);
 }
 
 class ObservableEvent<TIn, TOut> extends Observable<TOut> {
