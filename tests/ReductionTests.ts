@@ -1,6 +1,6 @@
 import * as sinon from 'sinon';
 import { describe, it, test, then, when } from 'wattle';
-import { last, reduce } from '../src/reduction';
+import { accessed, reduce } from '../src/reduction';
 import { Subject } from '../src/subject';
 import './setup';
 
@@ -41,7 +41,15 @@ describe("reduce", function () {
             let subject = new Subject<number>();
             sut.on(subject, () => other.value);
 
-            it("throws", () => (() => subject.next(0)).should.throw("Can't access a reduction value from inside a reducer: behaviour is undefined."));
+            when("other value based on same event", () => {
+                other.on(subject, () => 0);
+
+                it("throws", () => (() => subject.next(0)).should.throw("Accessed a reduced value derived from the same event being fired."));
+            });
+
+            when("other value not based on same event", () => {
+                it("doesn't throw", () => subject.next(0));
+            });
         });
     });
 
@@ -64,14 +72,13 @@ describe("reduce", function () {
         });
     });
 
-    test("last reduction updated when value is accessed", () => {
+    test("accessed reductions updated when value is accessed", () => {
         let r1 = reduce(1);
         let r2 = reduce(2);
 
         r1.value;
-        last.reduction!.should.equal(r1);
-
         r2.value;
-        last.reduction!.should.equal(r2);
+        
+        accessed.reductions.should.have.members([r1, r2]);
     });
 });

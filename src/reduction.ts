@@ -7,7 +7,7 @@ export function reduce<TValue, TEvents>(initial: TValue, events: TEvents = {} as
     return events ? new BoundReduction(initial, events) : new Reduction(initial);
 }
 
-export let last: { reduction?: Reduction<any> } = {};
+export let accessed: { reductions: Reduction<any>[] } = { reductions: [] };
 
 export interface IReduction<TValue> extends IObservable<TValue> {
     on<TEvent>(observable: IObservable<TEvent>, reduce: (current: TValue, event: TEvent) => TValue): this;
@@ -16,6 +16,7 @@ export interface IReduction<TValue> extends IObservable<TValue> {
 
 export class Reduction<TValue> extends Observable<TValue> implements IReduction<TValue> {
     protected _subject = new Subject<TValue>();
+    protected _subscriptions = [] as [IObservable<any>, () => void][];
     protected _current: TValue;
 
     constructor(public initial: TValue) {
@@ -24,18 +25,19 @@ export class Reduction<TValue> extends Observable<TValue> implements IReduction<
     }
 
     on<TEvent>(observable: IObservable<TEvent>, reduce: (current: TValue, event: TEvent) => TValue): this {
-        observable.subscribe(value => {
-            last.reduction = undefined;
+        this._subscriptions.push([observable, observable.subscribe(value => {
+            accessed.reductions.length = 0;
             this._current = reduce(this._current, value);
-            if (last.reduction)
-                throw new Error("Can't access a reduction value from inside a reducer: behaviour is undefined.");
+            if (accessed.reductions.some(r => r._subscriptions.some(s => s[0] == observable)))
+                throw new Error("Accessed a reduced value derived from the same event being fired.");
+            accessed.reductions.length = 0;
             this._subject.next(this._current);
-        });
+        })]);
         return this;
     }
 
     get value() {
-        last.reduction = this;
+        accessed.reductions.push(this);
         return this._current;
     }
 }
