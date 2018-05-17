@@ -53,7 +53,10 @@ export function testObservableOperators() {
     function observableOf<T>(...args: T[]) {
         return new Observable<T>(observer => {
             args.forEach(a => observer.next(a));
-            return () => { };
+            return {
+                unsubscribe: () => { },
+                closed: false
+            };
         });
     }
 

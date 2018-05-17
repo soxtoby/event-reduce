@@ -22,7 +22,7 @@ describe("Subject", function () {
         });
 
         when("unsubscribed", () => {
-            unsub1();
+            unsub1.unsubscribe();
 
             when("provided a value", () => {
                 sut.next(2);

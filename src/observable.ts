@@ -1,12 +1,19 @@
 export type ObservableConstructor<T> = new (subscribe: (observer: IObserver<T>) => Unsubscribe) => IObservable<T>;
 
-export interface IObservable<T> {
-    subscribe(next: (value: T) => void): Unsubscribe;
+// Based on https://github.com/tc39/proposal-observable
+export interface ObservableSpec<T> {
+    subscribe(next: (value: T) => void): Subscription;
+}
+
+export interface IObservable<T> extends ObservableSpec<T> {
     filter(condition: (value: T) => boolean): IObservable<T>;
     map<U>(select: (value: T) => U): IObservable<U>;
     resolved<P>(this: IObservable<Promise<P>>): IObservable<P>;
     rejected(this: IObservable<Promise<any>>): IObservable<any>;
     asObservable(): IObservable<T>;
+export interface Subscription {
+    unsubscribe(): void;
+    closed: boolean;
 }
 
 export type Unsubscribe = () => void;
@@ -16,7 +23,7 @@ export interface IObserver<T> {
 }
 
 class SimpleObservable<T> implements IObservable<T> {
-    constructor(private _subscribe: (observer: IObserver<T>) => Unsubscribe) { }
+    constructor(private _subscribe: (observer: IObserver<T>) => Subscription) { }
 
     subscribe(next: (value: T) => void) {
         return this._subscribe({ next });
@@ -43,7 +50,7 @@ class SimpleObservable<T> implements IObservable<T> {
     }
 }
 
-export let Observable: { new <T>(subscribe: (observer: IObserver<T>) => Unsubscribe): IObservable<T> } = SimpleObservable;
+export let Observable: { new <T>(subscribe: (observer: IObserver<T>) => Subscription): IObservable<T> } = SimpleObservable;
 
 export function useObservableType(observableImplementation: typeof Observable) {
     Observable = observableImplementation;

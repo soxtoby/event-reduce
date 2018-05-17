@@ -1,4 +1,4 @@
-import { IObservable, Observable } from "./observable";
+import { IObservable, Observable, Subscription } from "./observable";
 import { Subject } from "./subject";
 
 export function reduce<TValue>(initial: TValue): IReduction<TValue>;
@@ -16,7 +16,7 @@ export interface IReduction<TValue> extends IObservable<TValue> {
 
 export class Reduction<TValue> extends Observable<TValue> implements IReduction<TValue> {
     protected _subject = new Subject<TValue>();
-    protected _subscriptions = [] as [IObservable<any>, () => void][];
+    protected _subscriptions = [] as [IObservable<any>, Subscription][];
     protected _current: TValue;
 
     constructor(public initial: TValue) {
@@ -25,14 +25,17 @@ export class Reduction<TValue> extends Observable<TValue> implements IReduction<
     }
 
     on<TEvent>(observable: IObservable<TEvent>, reduce: (current: TValue, event: TEvent) => TValue): this {
-        this._subscriptions.push([observable, observable.subscribe(value => {
-            accessed.reductions.length = 0;
-            this._current = reduce(this._current, value);
-            if (accessed.reductions.some(r => r._subscriptions.some(s => s[0] == observable)))
-                throw new Error("Accessed a reduced value derived from the same event being fired.");
-            accessed.reductions.length = 0;
-            this._subject.next(this._current);
-        })]);
+        this._subscriptions.push([
+            observable, 
+            observable.subscribe(value => {
+                accessed.reductions.length = 0;
+                this._current = reduce(this._current, value);
+                if (accessed.reductions.some(r => r._subscriptions.some(s => s[0] == observable)))
+                    throw new Error("Accessed a reduced value derived from the same event being fired.");
+                accessed.reductions.length = 0;
+                this._subject.next(this._current);
+            })
+        ]);
         return this;
     }
 
