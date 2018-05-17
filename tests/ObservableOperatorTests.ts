@@ -50,6 +50,18 @@ export function testObservableOperators() {
         });
     });
 
+    test("subscribeInner", () => {
+        let source = observableOf(
+            observableOf(1),
+            observableOf(2),
+            observableOf(3),
+            observableOf(4)
+        );
+        let result = source.subscribeInner();
+
+        values(result).should.have.members([1, 2, 3, 4]);
+    });
+
     function observableOf<T>(...args: T[]) {
         return new Observable<T>(observer => {
             args.forEach(a => observer.next(a));

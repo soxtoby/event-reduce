@@ -11,6 +11,9 @@ export interface IObservable<T> extends ObservableSpec<T> {
     resolved<P>(this: IObservable<Promise<P>>): IObservable<P>;
     rejected(this: IObservable<Promise<any>>): IObservable<any>;
     asObservable(): IObservable<T>;
+    subscribeInner<P>(this: IObservable<ObservableSpec<P>>): IObservable<P>;
+}
+
 export interface Subscription {
     unsubscribe(): void;
     closed: boolean;
@@ -47,6 +50,17 @@ class SimpleObservable<T> implements IObservable<T> {
 
     asObservable() {
         return new Observable<T>(observer => this.subscribe(v => observer.next(v)));
+    }
+
+    subscribeInner<P>(this: IObservable<ObservableSpec<P>>) {
+        return new Observable<P>(observer => {
+            let subscriptions = [] as Subscription[];
+            this.subscribe(value => subscriptions.push(value.subscribe(v => observer.next(v))));
+            return {
+                unsubscribe: () => subscriptions.forEach(u => u.unsubscribe()),
+                closed: subscriptions.every(u => u.closed)
+            }
+        });
     }
 }
 
