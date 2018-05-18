@@ -64,6 +64,17 @@ describe("events decorator", function () {
         listener.should.have.been.calledWith(sinon.match({ type: 'action', name: 'someEvent' }));
     });
 
+    test("extended promises keep extra properties", () => {
+        let promise = SynchronousPromise.unresolved<string>();
+        (promise as any).foo = 'bar';
+        let onstarted = sinon.stub();
+        sut.someEvent.subscribe(onstarted);
+
+        sut.someEvent(promise);
+
+        onstarted.should.have.been.calledWith(sinon.match({ foo: 'bar', then: sinon.match.func }));
+    });
+
     test("promise resolved as action", () => {
         let onfulfilled = sinon.stub();
         sut.someEvent.resolved().subscribe(onfulfilled);

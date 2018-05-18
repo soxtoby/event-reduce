@@ -43,7 +43,7 @@ function wrapPromise(name: string, promise: any): any {
     if (typeof promise != 'object' || typeof promise.then != 'function')
         return promise; // Not a promise
 
-    return {
+    return Object.assign(Object.create(promise), {
         then(onfulfilled?: (value: any) => any, onrejected?: (reason: any) => any): Promise<any> {
             return wrapPromise(name, promise.then(
                 onfulfilled && action(name + '.resolved', onfulfilled),
@@ -53,5 +53,5 @@ function wrapPromise(name: string, promise: any): any {
         catch(onrejected?: (reason: any) => any): Promise<any> {
             return this.then(undefined, onrejected);
         }
-    };
+    });
 }
