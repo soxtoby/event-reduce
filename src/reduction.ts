@@ -1,4 +1,4 @@
-import { IObservable, Observable, Subscription } from "./observable";
+import { IObservable, Observable, ISubscription } from "./observable";
 import { Subject } from "./subject";
 
 export function reduce<TValue>(initial: TValue): IReduction<TValue>;
@@ -16,7 +16,7 @@ export interface IReduction<TValue> extends IObservable<TValue> {
 
 export class Reduction<TValue> extends Observable<TValue> implements IReduction<TValue> {
     protected _subject = new Subject<TValue>();
-    protected _subscriptions = [] as [IObservable<any>, Subscription][];
+    protected _subscriptions = [] as [IObservable<any>, ISubscription][];
     protected _current: TValue;
 
     constructor(public initial: TValue) {

@@ -1,20 +1,22 @@
 export type ObservableConstructor<T> = new (subscribe: (observer: IObserver<T>) => Unsubscribe) => IObservable<T>;
 
 // Based on https://github.com/tc39/proposal-observable
-export interface ObservableSpec<T> {
-    subscribe(next: (value: T) => void): Subscription;
+export interface IBaseObservable<T> {
+    subscribe(next: (value: T) => void, error?: (err: any) => void, complete?: () => void): ISubscription;
 }
 
-export interface IObservable<T> extends ObservableSpec<T> {
+export interface IObservable<T> extends IBaseObservable<T> {
     filter(condition: (value: T) => boolean): IObservable<T>;
     map<U>(select: (value: T) => U): IObservable<U>;
     resolved<P>(this: IObservable<Promise<P>>): IObservable<P>;
     rejected(this: IObservable<Promise<any>>): IObservable<any>;
     asObservable(): IObservable<T>;
-    subscribeInner<P>(this: IObservable<ObservableSpec<P>>): IObservable<P>;
+    merge<O>(this: IObservable<IBaseObservable<O>>): IObservable<O>;
+    errored(this: IObservable<IBaseObservable<any>>): IObservable<any>;
+    completed(this: IObservable<IBaseObservable<any>>): IObservable<void>
 }
 
-export interface Subscription {
+export interface ISubscription {
     unsubscribe(): void;
     closed: boolean;
 }
@@ -23,12 +25,18 @@ export type Unsubscribe = () => void;
 
 export interface IObserver<T> {
     next(value: T): void;
+    error?(err: any): void;
+    complete?(): void;
+    closed?: boolean;
 }
 
-class SimpleObservable<T> implements IObservable<T> {
-    constructor(private _subscribe: (observer: IObserver<T>) => Subscription) { }
+export type SubscriberFunction<T> = (observer: IObserver<T>) => ISubscription;
 
-    subscribe(next: (value: T) => void) {
+class SimpleObservable<T> implements IObservable<T> {
+    constructor(private _subscribe: SubscriberFunction<T>) { }
+
+
+    subscribe(next: (value: T, error?: (err: any) => void, complete?: () => void) => void) {
         return this._subscribe({ next });
     }
 
@@ -52,10 +60,41 @@ class SimpleObservable<T> implements IObservable<T> {
         return new Observable<T>(observer => this.subscribe(v => observer.next(v)));
     }
 
-    subscribeInner<P>(this: IObservable<ObservableSpec<P>>) {
-        return new Observable<P>(observer => {
-            let subscriptions = [] as Subscription[];
-            this.subscribe(value => subscriptions.push(value.subscribe(v => observer.next(v))));
+    merge<O>(this: IObservable<IBaseObservable<O>>) {
+        return new Observable<O>(observer => {
+            let subscriptions = [] as ISubscription[];
+            this.subscribe(value => subscriptions.push(value.subscribe(
+                v => observer.next(v)
+            )));
+            return {
+                unsubscribe: () => subscriptions.forEach(u => u.unsubscribe()),
+                closed: subscriptions.every(u => u.closed)
+            }
+        });
+    }
+
+    errored(this: IObservable<IBaseObservable<any>>) {
+        return new Observable<any>(observer => {
+            let subscriptions = [] as ISubscription[];
+            this.subscribe(value => subscriptions.push(value.subscribe(
+                () => {},
+                e => observer.next(e)
+            )));
+            return {
+                unsubscribe: () => subscriptions.forEach(u => u.unsubscribe()),
+                closed: subscriptions.every(u => u.closed)
+            }
+        });
+    }
+
+    completed(this: IObservable<IBaseObservable<any>>) {
+        return new Observable<void>(observer => {
+            let subscriptions = [] as ISubscription[];
+            this.subscribe(value => subscriptions.push(value.subscribe(
+                () => {},
+                () => {},
+                () => observer.next(void 0)
+            )));
             return {
                 unsubscribe: () => subscriptions.forEach(u => u.unsubscribe()),
                 closed: subscriptions.every(u => u.closed)
@@ -64,7 +103,7 @@ class SimpleObservable<T> implements IObservable<T> {
     }
 }
 
-export let Observable: { new <T>(subscribe: (observer: IObserver<T>) => Subscription): IObservable<T> } = SimpleObservable;
+export let Observable: { new <T>(subscribe: (observer: IObserver<T>) => ISubscription): IObservable<T> } = SimpleObservable;
 
 export function useObservableType(observableImplementation: typeof Observable) {
     Observable = observableImplementation;
