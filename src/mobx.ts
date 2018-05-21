@@ -41,7 +41,7 @@ function wrapAsync(name: string, async: any): any {
         return Object.assign(Object.create(async), {
             subscribe(next: (value: any) => void, error?: (err: any) => void, complete?: () => void): ISubscription {
                 return wrapAsync(name, async.subscribe(
-                    next && action(name + '.next', next),
+                    next && action(name + '.merge', next),
                     error && action(name + '.errored', error),
                     complete && action(name + '.completed', complete)
                 ));
