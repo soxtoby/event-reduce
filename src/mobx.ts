@@ -2,6 +2,7 @@ import { action, observable } from 'mobx';
 import { IObservableEvent, combineEventAndObservable } from "./events";
 import { state } from "./experimental/state";
 import { accessed } from "./reduction";
+import { ISubscription } from './observable';
 
 export let reduced: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
     if (typeof key == 'string')
@@ -26,7 +27,7 @@ export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
                 Object.keys(this).forEach(key => {
                     let prop = this[key];
                     if (isObservableEvent(prop)) {
-                        let wrappedEvent = action(key, (item: any) => prop(wrapPromise(key, item)));
+                        let wrappedEvent = action(key, (item: any) => prop(wrapAsync(key, item)));
                         this[key] = combineEventAndObservable(wrappedEvent, prop.asObservable());
                     }
                 });
@@ -35,17 +36,25 @@ export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
     }[className];
 }
 
-function isObservableEvent(o: any): o is IObservableEvent<any, any> {
-    return typeof o == 'function' && !!o.subscribe;
-}
+function wrapAsync(name: string, async: any): any {    
+    if(isObservableEvent(async)) {
+        return Object.assign(Object.create(async), {
+            subscribe(next: (value: any) => void, error?: (err: any) => void, complete?: () => void): ISubscription {
+                return wrapAsync(name, async.subscribe(
+                    next && action(name + '.next', next),
+                    error && action(name + '.errored', error),
+                    complete && action(name + '.completed', complete)
+                ));
+            }
+        });
+    }
 
-function wrapPromise(name: string, promise: any): any {
-    if (typeof promise != 'object' || typeof promise.then != 'function')
-        return promise; // Not a promise
+    if (typeof async != 'object' || typeof async.then != 'function')
+        return async; // Not a promise
 
-    return Object.assign(Object.create(promise), {
+    return Object.assign(Object.create(async), {
         then(onfulfilled?: (value: any) => any, onrejected?: (reason: any) => any): Promise<any> {
-            return wrapPromise(name, promise.then(
+            return wrapAsync(name, async.then(
                 onfulfilled && action(name + '.resolved', onfulfilled),
                 onrejected && action(name + '.rejected', onrejected)));
         },
@@ -54,4 +63,8 @@ function wrapPromise(name: string, promise: any): any {
             return this.then(undefined, onrejected);
         }
     });
+}
+
+function isObservableEvent(o: any): o is IObservableEvent<any, any> {
+    return typeof o == 'function' && !!o.subscribe;
 }

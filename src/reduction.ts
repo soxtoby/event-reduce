@@ -1,4 +1,4 @@
-import { IObservable, Observable, ISubscription } from "./observable";
+import { IObservable, ISubscription, Observable } from "./observable";
 import { Subject } from "./subject";
 
 export function reduce<TValue>(initial: TValue): IReduction<TValue>;
@@ -26,7 +26,7 @@ export class Reduction<TValue> extends Observable<TValue> implements IReduction<
 
     on<TEvent>(observable: IObservable<TEvent>, reduce: (current: TValue, event: TEvent) => TValue): this {
         this._subscriptions.push([
-            observable, 
+            observable,
             observable.subscribe(value => {
                 accessed.reductions.length = 0;
                 this._current = reduce(this._current, value);
