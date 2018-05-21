@@ -35,7 +35,7 @@ export function event<T = void>(): IObservableEvent<T, T> {
 
 class ObservableEvent<TIn, TOut> extends Observable<TOut> {
     constructor(source: ISimpleObservable<TOut>) {
-        super(observer => source.subscribe(v => observer.next(v)));
+        super(observer => source.subscribe(v => observer.next && observer.next(v)));
     }
 
     scope<TIn extends object, TOut extends TIn, TScope extends Partial<TIn>>(this: IObservableEvent<TIn, TOut>, scope: TScope): IObservableEvent<ObjectDiff<TIn, TScope>, TOut> {

@@ -13,5 +13,5 @@ export class Subject<T> extends Observable<T> implements IObserver<T> {
         });
     }
 
-    next(value: T) { this._observers.forEach(o => o.next(value)); }
+    next(value: T) { this._observers.forEach(o => o.next && o.next(value)); }
 }
