@@ -16,7 +16,6 @@
   ],
   "dependencies": {
     "mobx": "^4.2.0",
-    "symbol-observable": "*"
   },
   "devDependencies": {
     "@types/react": "^16.0.40",

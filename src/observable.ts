@@ -1,4 +1,4 @@
-import "symbol-observable";
+import "./symbol";
 
 // Based on https://github.com/tc39/proposal-observable
 export interface IObservable<T> {
