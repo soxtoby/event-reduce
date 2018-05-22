@@ -1,4 +1,4 @@
-import { ISimpleObservable, Observable } from './observable';
+import { IObservable, Observable, ISimpleObservable } from './observable';
 import { Subject } from "./subject";
 import { ObjectDiff } from "./types";
 
@@ -34,8 +34,8 @@ export function event<T = void>(): IObservableEvent<T, T> {
 }
 
 class ObservableEvent<TIn, TOut> extends Observable<TOut> {
-    constructor(source: ISimpleObservable<TOut>) {
-        super(observer => source.subscribe(v => observer.next && observer.next(v)));
+    constructor(source: IObservable<TOut>) {
+        super(observer => source.subscribe(v => observer.next(v)));
     }
 
     scope<TIn extends object, TOut extends TIn, TScope extends Partial<TIn>>(this: IObservableEvent<TIn, TOut>, scope: TScope): IObservableEvent<ObjectDiff<TIn, TScope>, TOut> {
@@ -46,7 +46,7 @@ class ObservableEvent<TIn, TOut> extends Observable<TOut> {
     }
 }
 
-export function combineEventAndObservable<TIn, TOut>(event: Event<TIn>, observable: ISimpleObservable<TOut>): IObservableEvent<TIn, TOut> {
+export function combineEventAndObservable<TIn, TOut>(event: Event<TIn>, observable: IObservable<TOut>): IObservableEvent<TIn, TOut> {
     Object.setPrototypeOf(event, new ObservableEvent(observable));
     event.apply = Function.prototype.apply;
     return event as IObservableEvent<TIn, TOut>;

@@ -20,7 +20,7 @@ export class Reduction<TValue> extends Observable<TValue> implements IReduction<
     protected _current: TValue;
 
     constructor(public initial: TValue) {
-        super(o => this._subject.subscribe(o.next));
+        super(o => this._subject.subscribe((value => o.next(value))));
         this._current = initial;
     }
 

@@ -1,14 +1,16 @@
 import * as sinon from 'sinon';
-import { describe, it, when } from 'wattle';
+import { describe, it, test, then, when } from 'wattle';
 import { Subject } from '../src/subject';
 import './setup';
+import { IObserver, SubscriptionObserver } from '../src/observable';
 
 describe("Subject", function () {
     let sut = new Subject<number>();
 
     when("subscribed to", () => {
-        let observer1 = sinon.stub();
-        let observer2 = sinon.stub();
+        let observer1 = { next: sinon.spy() };
+        let observer2Spy = sinon.spy();
+        let observer2 = new SubscriptionObserver({ next: observer2Spy } as IObserver<any>);
         let unsub1 = sut.subscribe(observer1);
         let unsub2 = sut.subscribe(observer2);
 
@@ -16,8 +18,8 @@ describe("Subject", function () {
             sut.next(1);
 
             it("passes value to subscribers", () => {
-                observer1.should.have.been.calledWithExactly(1);
-                observer2.should.have.been.calledWithExactly(1);
+                observer1.next.should.have.been.calledWithExactly(1);
+                observer2Spy.should.have.been.calledWithExactly(1);
             });
         });
 
@@ -28,8 +30,8 @@ describe("Subject", function () {
                 sut.next(2);
 
                 it("doesn't pass value to unsubscribed subscriber", () => {
-                    observer1.should.not.have.been.called;
-                    observer2.should.have.been.calledWithExactly(2);
+                    observer1.next.should.not.have.been.called;
+                    observer2Spy.should.have.been.calledWithExactly(2);
                 });
             });
         });

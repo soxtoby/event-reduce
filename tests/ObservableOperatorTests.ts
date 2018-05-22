@@ -67,7 +67,7 @@ export function testObservableOperators() {
         let errorMessage = "error message";
         let source = observableOf(
             new Observable<number>(observer => {
-                observer.error && observer.error(errorMessage)
+                observer.error(errorMessage);
                 return emptyUnsubscribe();
             }),
             observableOf(2));
@@ -80,7 +80,7 @@ export function testObservableOperators() {
         let unresolvedPromise = SynchronousPromise.unresolved<number>();
         let completedSpy = sinon.spy();
         let source = observableOf(new Observable<number>(observer => {
-            unresolvedPromise.then(v => observer.complete && observer.complete());
+            unresolvedPromise.then(v => observer.complete());
             return emptyUnsubscribe();
         }));
 
@@ -93,7 +93,7 @@ export function testObservableOperators() {
 
     function observableOf<T>(...args: T[]) {
         return new Observable<T>(observer => {
-            args.forEach(a => observer.next && observer.next(a));
+            args.forEach(a => observer.next(a));
             return emptyUnsubscribe();
         });
     }
