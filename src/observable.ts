@@ -2,8 +2,8 @@ import "./symbol";
 
 // Based on https://github.com/tc39/proposal-observable
 export interface IObservable<T> {
-    subscribe(observer: IObserver<T>): ISubscription;
     subscribe(next: (value: T) => void, error?: (error: any) => void, complete?: () => void): ISubscription;
+    subscribe(observer: IObserver<T>): ISubscription;
     subscribe(nextOrObserver: IObserver<T> | ((value: T) => void), error?: (error: any) => void, complete?: () => void): ISubscription;
     [Symbol.observable](): IObservable<T>;
 }
@@ -105,30 +105,31 @@ class SimpleObservable<T> implements ISimpleObservable<T> {
         return new Observable<O>(observer => {
             let subs = [] as ISubscription[];
             subs.push(this.subscribe(value => subs.push(value.subscribe(observer))));
-            return {
-                unsubscribe: () => subs.forEach(s => s.unsubscribe),
-                get closed() { return subs.every(s => s.closed) }
-            }
+            return mergeSubscriptions(subs);
         });
     }
 
     errored(this: ISimpleObservable<IObservable<any>>) {
-        return new Observable<any>(observer =>
-            this.subscribe(value => value.subscribe(
+        return new Observable<any>(observer => {
+            let subs = [] as ISubscription[];
+            subs.push(this.subscribe(value => subs.push(value.subscribe(
                 () => { },
                 error => observer.next(error)
-            ))
-        );
+            ))));
+            return mergeSubscriptions(subs);
+        });
     }
 
     completed(this: ISimpleObservable<IObservable<any>>) {
-        return new Observable<void>(observer =>
-            this.subscribe(value => value.subscribe(
+        return new Observable<void>(observer => {
+            let subs = [] as ISubscription[];
+            subs.push(this.subscribe(value => subs.push(value.subscribe(
                 () => { },
                 () => { },
                 () => observer.next(void 0)
-            ))
-        );
+            ))));
+            return mergeSubscriptions(subs);
+        });
     }
 }
 
@@ -144,4 +145,11 @@ export function useObservableType(observableImplementation: typeof Observable) {
 
 export function resetObservableType() {
     Observable = SimpleObservable;
+}
+
+export function mergeSubscriptions(subs: ISubscription[]) {
+    return {
+        unsubscribe: () => subs.forEach(s => s.unsubscribe),
+        get closed() { return subs.every(s => s.closed) }
+    }
 }
