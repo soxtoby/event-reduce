@@ -4,7 +4,6 @@ import "./symbol";
 export interface IObservable<T> {
     subscribe(next: (value: T) => void, error?: (error: any) => void, complete?: () => void): ISubscription;
     subscribe(observer: IObserver<T>): ISubscription;
-    subscribe(nextOrObserver: IObserver<T> | ((value: T) => void), error?: (error: any) => void, complete?: () => void): ISubscription;
     [Symbol.observable](): IObservable<T>;
 }
 
@@ -21,7 +20,6 @@ export interface ISimpleObservable<T> extends IObservable<T> {
 
 export interface ISubscription {
     unsubscribe(): void;
-    readonly closed: boolean;
 }
 
 export type Unsubscribe = () => void;
@@ -32,28 +30,21 @@ export interface IObserver<T> {
     complete?(): void;
 }
 
-export class SubscriptionObserver<T> implements IObserver<T> {
-    private _closed = false;
+export interface ISubscriptionObserver<T> extends IObserver<T> {
+    next(value: T): void;
+    error(error: any): void;
+    complete(): void;
+}
 
-    constructor(private _observer: IObserver<T>) { }
+export function createSubscriptionObserver<T>(nextOrObserver: IObserver<T> | ((value: T) => void), error?: (error: any) => void, complete?: () => void): ISubscriptionObserver<T> {
+    let observer = isObserver(nextOrObserver)
+        ? nextOrObserver
+        : { next: nextOrObserver, error, complete };
 
-    next(value: T) {
-        if (!this._closed)
-            this._observer.next && this._observer.next(value);
-    }
-
-    error(error: any) {
-        this._observer.error && this._observer.error(error);
-        this._closed = true;
-    };
-
-    complete() {
-        this._observer.complete && this._observer.complete();
-        this._closed = true;
-    };
-
-    get closed() {
-        return this._closed;
+    return {
+        next: observer.next || (() => { }),
+        error: observer.error || (() => { }),
+        complete: observer.complete || (() => { })
     }
 }
 
@@ -65,7 +56,7 @@ export function isObserver<T>(value?: any): value is IObserver<T> {
             || "closed" in value);
 }
 
-export type SubscriberFunction<T> = (observer: SubscriptionObserver<T>) => ISubscription;
+export type SubscriberFunction<T> = (observer: ISubscriptionObserver<T>) => ISubscription;
 
 class SimpleObservable<T> implements ISimpleObservable<T> {
     constructor(private _subscribe: SubscriberFunction<T>) { }
@@ -75,10 +66,7 @@ class SimpleObservable<T> implements ISimpleObservable<T> {
     subscribe(observer: IObserver<T>): ISubscription;
     subscribe(next: (value: T) => void, error?: (error: any) => void, complete?: () => void): ISubscription;
     subscribe(nextOrObserver: IObserver<T> | ((value: T) => void), error?: (error: any) => void, complete?: () => void): ISubscription {
-        let observer = isObserver(nextOrObserver)
-            ? new SubscriptionObserver(nextOrObserver)
-            : new SubscriptionObserver({ next: nextOrObserver, error, complete });
-        return this._subscribe(observer);
+        return this._subscribe(createSubscriptionObserver(nextOrObserver, error, complete));
     }
 
     filter(condition: (value: T) => boolean) {
@@ -133,7 +121,7 @@ class SimpleObservable<T> implements ISimpleObservable<T> {
     }
 }
 
-export let Observable: { new <T>(subscribe: (observer: SubscriptionObserver<T>) => ISubscription): ISimpleObservable<T> } = SimpleObservable;
+export let Observable: { new <T>(subscribe: (observer: ISubscriptionObserver<T>) => ISubscription): ISimpleObservable<T> } = SimpleObservable;
 
 export function useObservableType(observableImplementation: typeof Observable) {
     Observable = observableImplementation;
@@ -150,6 +138,5 @@ export function resetObservableType() {
 export function mergeSubscriptions(subs: ISubscription[]) {
     return {
         unsubscribe: () => subs.forEach(s => s.unsubscribe),
-        get closed() { return subs.every(s => s.closed) }
     }
 }

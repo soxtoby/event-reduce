@@ -100,8 +100,7 @@ export function testObservableOperators() {
 
     function emptyUnsubscribe() {
         return {
-            unsubscribe: () => { },
-            closed: false
+            unsubscribe: () => { }
         }
     }
 

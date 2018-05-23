@@ -1,8 +1,7 @@
 import * as sinon from 'sinon';
-import { describe, it, test, then, when } from 'wattle';
+import { describe, it, when } from 'wattle';
 import { Subject } from '../src/subject';
 import './setup';
-import { IObserver, SubscriptionObserver } from '../src/observable';
 
 describe("Subject", function () {
     let sut = new Subject<number>();
@@ -10,7 +9,7 @@ describe("Subject", function () {
     when("subscribed to", () => {
         let observer1 = { next: sinon.spy() };
         let observer2Spy = sinon.spy();
-        let observer2 = new SubscriptionObserver({ next: observer2Spy } as IObserver<any>);
+        let observer2 = { next: observer2Spy };
         let unsub1 = sut.subscribe(observer1);
         let unsub2 = sut.subscribe(observer2);
 

@@ -1,15 +1,14 @@
-import { IObserver, Observable, SubscriptionObserver } from "./observable";
+import { IObserver, ISubscriptionObserver, Observable } from "./observable";
 
 export class Subject<T> extends Observable<T> implements IObserver<T> {
-    private _observers = [] as SubscriptionObserver<T>[];
+    private _observers = [] as ISubscriptionObserver<T>[];
 
     constructor() {
         super(observer => {
             this._observers.push(observer);
 
             return {
-                unsubscribe: () => this._observers = this._observers.filter(o => o != observer),
-                get closed() { return observer.closed }
+                unsubscribe: () => this._observers = this._observers.filter(o => o != observer)
             }
         });
     }
