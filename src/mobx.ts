@@ -1,7 +1,7 @@
 import { action, observable } from 'mobx';
 import { IObservableEvent, combineEventAndObservable } from "./events";
 import { state } from "./experimental/state";
-import { IObservable, IObserver, ISubscription, isObserver, mergeSubscriptions } from './observable';
+import { IObservable, IObserver, ISubscription, isObserver, mergeSubscriptions, createSubscriptionObserver } from './observable';
 import { accessed } from "./reduction";
 
 export let reduced: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
@@ -40,20 +40,15 @@ function wrapAsync(name: string, async: any): any {
     if (isObservable(async)) {
         return Object.assign(Object.create(async), {
             subscribe(nextOrObserver: IObserver<any> | ((value: any) => void), error?: (error: any) => void, complete?: () => void): ISubscription {
-                if (isObserver<any>(nextOrObserver)) {
-                    let subs = [] as ISubscription[];
-                    nextOrObserver && subs.push(async.subscribe(action(name + '.merge', () => nextOrObserver)));
-                    subs.push(async.subscribe(nextOrObserver));
-                    return mergeSubscriptions(subs);
-                } else
-                    return async.subscribe(
-                        value => isObservable(value)
-                            ? wrapAsync(name, value)
-                            : action(name + '.merge', nextOrObserver)
-                        ,
-                        error && action(name + '.errored', error),
-                        complete && action(name + '.completed', complete)
-                    );
+                let observer = createSubscriptionObserver(nextOrObserver, error, complete);                
+                return async.subscribe(
+                    value => isObservable(value)
+                        ? wrapAsync(name, value)
+                        : action(name + '.merge', observer.next)(value)
+                    ,
+                    action(name + '.errored', observer.error),
+                    action(name + '.completed', observer.complete)
+                );
             }
         });
     }
