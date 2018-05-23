@@ -15,7 +15,7 @@
     "lib"
   ],
   "dependencies": {
-    "mobx": "^4.2.0",
+    "mobx": "^4.2.0"
   },
   "devDependencies": {
     "@types/react": "^16.0.40",

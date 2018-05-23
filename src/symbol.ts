@@ -8,3 +8,5 @@ declare global {
 export interface Symbol {
     [Symbol.observable]: symbol;
 }
+
+export const observable = Symbol.observable || '@@observable';
