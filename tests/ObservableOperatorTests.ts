@@ -2,6 +2,7 @@ import { SynchronousPromise } from "synchronous-promise";
 import { it, test } from "wattle";
 import { IObservable, Observable } from "../src/observable";
 import './setup';
+import sinon = require("sinon");
 
 export function testObservableOperators() {
     test("filter", () => {
@@ -50,11 +51,57 @@ export function testObservableOperators() {
         });
     });
 
+    test("merge", () => {
+        let source = observableOf(
+            observableOf(1),
+            observableOf(2),
+            observableOf(3),
+            observableOf(4)
+        );
+        let result = source.merge();
+
+        values(result).should.have.members([1, 2, 3, 4]);
+    });
+
+    test("errored", () => {
+        let errorMessage = "error message";
+        let source = observableOf(
+            new Observable<number>(observer => {
+                observer.error(errorMessage);
+                return emptyUnsubscribe();
+            }),
+            observableOf(2));
+        let result = source.errored();
+
+        values(result).should.have.members([errorMessage]);
+    });
+
+    test("completed", () => {
+        let unresolvedPromise = SynchronousPromise.unresolved<number>();
+        let completedSpy = sinon.spy();
+        let source = observableOf(new Observable<number>(observer => {
+            unresolvedPromise.then(v => observer.complete());
+            return emptyUnsubscribe();
+        }));
+
+        let result = source.completed();
+        result.subscribe(o => completedSpy());
+        completedSpy.should.not.have.been.called;
+        unresolvedPromise.resolve();
+        completedSpy.should.have.been.called;
+    });
+
     function observableOf<T>(...args: T[]) {
         return new Observable<T>(observer => {
             args.forEach(a => observer.next(a));
-            return () => { };
+            return emptyUnsubscribe();
         });
+    }
+
+    function emptyUnsubscribe() {
+        return {
+            unsubscribe: () => { }
+        }
     }
 
     function values<T>(observable: IObservable<T>) {

@@ -2,6 +2,7 @@ import { autorun, spy } from "mobx";
 import { SynchronousPromise } from "synchronous-promise";
 import { describe, it, test, then, when } from "wattle";
 import { events, reduced } from "../src/mobx";
+import { IObservable, ISubscription, Observable } from "../src/observable";
 import { reduce } from "../src/reduction";
 import { event } from "./../src/events";
 import './setup';
@@ -52,7 +53,10 @@ describe("reduced decorator", function () {
 
 describe("events decorator", function () {
     @events
-    class TestEvents { someEvent = event<Promise<string>>(); }
+    class TestEvents { 
+        promiseEvent = event<Promise<string>>();
+        observableEvent = event<IObservable<string>>();
+    }
     let listener = sinon.stub();
     let unspy = spy(listener);
     let sut = new TestEvents();
@@ -60,37 +64,82 @@ describe("events decorator", function () {
     it("keeps class name", () => TestEvents.name.should.equal('TestEvents'));
 
     test("property is a mobx action", () => {
-        sut.someEvent(SynchronousPromise.unresolved());
-        listener.should.have.been.calledWith(sinon.match({ type: 'action', name: 'someEvent' }));
+        sut.promiseEvent(SynchronousPromise.unresolved());
+        listener.should.have.been.calledWith(sinon.match({ type: 'action', name: 'promiseEvent' }));
     });
 
     test("extended promises keep extra properties", () => {
         let promise = SynchronousPromise.unresolved<string>();
         (promise as any).foo = 'bar';
         let onstarted = sinon.stub();
-        sut.someEvent.subscribe(onstarted);
+        sut.promiseEvent.subscribe(onstarted);
 
-        sut.someEvent(promise);
+        sut.promiseEvent(promise);
 
         onstarted.should.have.been.calledWith(sinon.match({ foo: 'bar', then: sinon.match.func }));
     });
 
     test("promise resolved as action", () => {
         let onfulfilled = sinon.stub();
-        sut.someEvent.resolved().subscribe(onfulfilled);
-        sut.someEvent(SynchronousPromise.resolve('foo'));
+        sut.promiseEvent.resolved().subscribe(onfulfilled);
+        sut.promiseEvent(SynchronousPromise.resolve('foo'));
 
         onfulfilled.should.have.been.calledWith('foo');
-        listener.should.have.been.calledWith(sinon.match({ type: 'action', name: 'someEvent.resolved' }));
+        listener.should.have.been.calledWith(sinon.match({ type: 'action', name: 'promiseEvent.resolved' }));
     });
 
     test("promise rejected as action", () => {
         let onrejected = sinon.stub();
-        sut.someEvent.rejected().subscribe(onrejected);
-        sut.someEvent(SynchronousPromise.reject<string>('foo'));
+        sut.promiseEvent.rejected().subscribe(onrejected);
+        sut.promiseEvent(SynchronousPromise.reject<string>('foo'));
 
         onrejected.should.have.been.calledWith('foo');
-        listener.should.have.been.calledWith(sinon.match({ type: 'action', name: 'someEvent.rejected' }));
+        listener.should.have.been.calledWith(sinon.match({ type: 'action', name: 'promiseEvent.rejected' }));
+    });
+
+    test("observable next called as merge action", () => {
+        let onNext = sinon.stub();
+        let nextOb = new Observable<string>(observer => {
+            observer.next("test");
+            return {} as ISubscription;
+        });
+
+        sut.observableEvent.merge().subscribe(onNext);
+        sut.observableEvent(nextOb);
+        sut.observableEvent.subscribe(observer => ({} as ISubscription));
+
+        onNext.should.have.been.calledWith("test");
+        listener.should.have.been.calledWith(sinon.match({ type: 'action', name: 'observableEvent.merge' }))
+    });
+
+    test("observable error called as action", () => {
+        let onError = sinon.stub();
+        let errorOb = new Observable<string>(observer => {
+            observer.error("error");
+            return {} as ISubscription;
+        });
+
+        sut.observableEvent.errored().subscribe(onError);
+        sut.observableEvent(errorOb);
+        sut.observableEvent.subscribe(observer => ({} as ISubscription));
+
+        onError.should.have.been.calledWith("error");
+        listener.should.have.been.calledWith(sinon.match({ type: 'action', name: 'observableEvent.errored' }))
+    });
+
+    test("observable complete called as action", () => {
+        let onError = sinon.stub();
+        let completeOb = new Observable<string>(observer => {
+            observer.complete()
+            return {} as ISubscription;
+        });
+
+        sut.observableEvent.completed().subscribe(onError);
+        sut.observableEvent(completeOb);
+        sut.observableEvent.subscribe(observer => ({} as ISubscription));
+
+        onError.should.have.been.called;
+        listener.should.have.been.calledWith(sinon.match({ type: 'action', name: 'observableEvent.completed' }))
     });
 
     unspy();

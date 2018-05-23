@@ -1,4 +1,4 @@
-import { IObservable, Observable } from './observable';
+import { IObservable, Observable, ISimpleObservable } from './observable';
 import { Subject } from "./subject";
 import { ObjectDiff } from "./types";
 
@@ -10,7 +10,7 @@ export type Event<T> = T extends void
     ? () => void
     : (item: T) => void;
 
-export type IObservableEvent<TIn, TOut = TIn> = Event<TIn> & IEventMethods<TIn, TOut> & IObservable<TOut>;
+export type IObservableEvent<TIn, TOut = TIn> = Event<TIn> & IEventMethods<TIn, TOut> & ISimpleObservable<TOut>;
 
 let insideEvent = false;
 

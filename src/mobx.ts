@@ -1,6 +1,7 @@
 import { action, observable } from 'mobx';
 import { IObservableEvent, combineEventAndObservable } from "./events";
 import { state } from "./experimental/state";
+import { IObservable, IObserver, ISubscription, isObserver, mergeSubscriptions, createSubscriptionObserver } from './observable';
 import { accessed } from "./reduction";
 
 export let reduced: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
@@ -26,7 +27,7 @@ export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
                 Object.keys(this).forEach(key => {
                     let prop = this[key];
                     if (isObservableEvent(prop)) {
-                        let wrappedEvent = action(key, (item: any) => prop(wrapPromise(key, item)));
+                        let wrappedEvent = action(key, (item: any) => prop(wrapAsync(key, item)));
                         this[key] = combineEventAndObservable(wrappedEvent, prop.asObservable());
                     }
                 });
@@ -35,23 +36,48 @@ export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
     }[className];
 }
 
-function isObservableEvent(o: any): o is IObservableEvent<any, any> {
-    return typeof o == 'function' && !!o.subscribe;
+function wrapAsync(name: string, async: any): any {
+    if (isObservable(async)) {
+        return Object.assign(Object.create(async), {
+            subscribe(nextOrObserver: IObserver<any> | ((value: any) => void), error?: (error: any) => void, complete?: () => void): ISubscription {
+                let observer = createSubscriptionObserver(nextOrObserver, error, complete);                
+                return async.subscribe(
+                    value => isObservable(value)
+                        ? wrapAsync(name, value)
+                        : action(name + '.merge', observer.next)(value)
+                    ,
+                    action(name + '.errored', observer.error),
+                    action(name + '.completed', observer.complete)
+                );
+            }
+        });
+    }
+
+    if (isPromise(async))
+        return Object.assign(Object.create(async), {
+            then(onfulfilled?: (value: any) => any, onrejected?: (reason: any) => any): Promise<any> {
+                return wrapAsync(name, async.then(
+                    onfulfilled && action(name + '.resolved', onfulfilled),
+                    onrejected && action(name + '.rejected', onrejected)));
+            },
+
+            catch(onrejected?: (reason: any) => any): Promise<any> {
+                return this.then(undefined, onrejected);
+            }
+        });
+
+    return async;
 }
 
-function wrapPromise(name: string, promise: any): any {
-    if (typeof promise != 'object' || typeof promise.then != 'function')
-        return promise; // Not a promise
+function isObservableEvent(e: any): e is IObservableEvent<any, any> {
+    return typeof e === 'function' && !!e.subscribe;
+}
 
-    return Object.assign(Object.create(promise), {
-        then(onfulfilled?: (value: any) => any, onrejected?: (reason: any) => any): Promise<any> {
-            return wrapPromise(name, promise.then(
-                onfulfilled && action(name + '.resolved', onfulfilled),
-                onrejected && action(name + '.rejected', onrejected)));
-        },
 
-        catch(onrejected?: (reason: any) => any): Promise<any> {
-            return this.then(undefined, onrejected);
-        }
-    });
+function isObservable(o: any): o is IObservable<any> {
+    return typeof o === 'object' && typeof o.subscribe === 'function';
+}
+
+function isPromise(p: any): p is Promise<any> {
+    return typeof p === 'object' && typeof p.then === 'function'
 }
