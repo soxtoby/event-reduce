@@ -2,9 +2,8 @@ import "./symbol";
 
 // Based on https://github.com/tc39/proposal-observable
 export interface IObservable<T> {
-    subscribe(next: (value: T) => void, error?: (error: any) => void, complete?: () => void): ISubscription;
-    subscribe(observer: IObserver<T>): ISubscription;
-    [Symbol.observable](): IObservable<T>;
+    subscribe(next?: (value: T) => void, error?: (error: any) => void, complete?: () => void): ISubscription;
+    subscribe(observer?: IObserver<T>): ISubscription;
 }
 
 export interface ISimpleObservable<T> extends IObservable<T> {
@@ -16,6 +15,7 @@ export interface ISimpleObservable<T> extends IObservable<T> {
     merge<O>(this: ISimpleObservable<IObservable<O>>): ISimpleObservable<O>;
     errored(this: ISimpleObservable<IObservable<any>>): ISimpleObservable<any>;
     completed(this: ISimpleObservable<IObservable<any>>): ISimpleObservable<void>;
+    [Symbol.observable](): IObservable<T>; // not on IObservable as RxJS doesn't have it on their Observable implementation
 }
 
 export interface ISubscription {
@@ -36,7 +36,7 @@ export interface ISubscriptionObserver<T> extends IObserver<T> {
     complete(): void;
 }
 
-export function createSubscriptionObserver<T>(nextOrObserver: IObserver<T> | ((value: T) => void), error?: (error: any) => void, complete?: () => void): ISubscriptionObserver<T> {
+export function createSubscriptionObserver<T>(nextOrObserver?: IObserver<T> | ((value: T) => void), error?: (error: any) => void, complete?: () => void): ISubscriptionObserver<T> {
     let observer = isObserver(nextOrObserver)
         ? nextOrObserver
         : { next: nextOrObserver, error, complete };
@@ -63,9 +63,9 @@ class SimpleObservable<T> implements ISimpleObservable<T> {
 
     [Symbol.observable](): IObservable<T> { return this };
 
-    subscribe(observer: IObserver<T>): ISubscription;
-    subscribe(next: (value: T) => void, error?: (error: any) => void, complete?: () => void): ISubscription;
-    subscribe(nextOrObserver: IObserver<T> | ((value: T) => void), error?: (error: any) => void, complete?: () => void): ISubscription {
+    subscribe(observer?: IObserver<T>): ISubscription;
+    subscribe(next?: (value: T) => void, error?: (error: any) => void, complete?: () => void): ISubscription;
+    subscribe(nextOrObserver?: IObserver<T> | ((value: T) => void), error?: (error: any) => void, complete?: () => void): ISubscription {
         return this._subscribe(createSubscriptionObserver(nextOrObserver, error, complete));
     }
 
