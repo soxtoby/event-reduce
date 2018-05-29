@@ -1,4 +1,4 @@
-import { IObservable, ISubscription, Observable } from "./observable";
+import { IObservable, ISimpleObservable, ISubscription, Observable } from "./observable";
 import { Subject } from "./subject";
 
 export function reduce<TValue>(initial: TValue): IReduction<TValue>;
@@ -9,7 +9,7 @@ export function reduce<TValue, TEvents>(initial: TValue, events: TEvents = {} as
 
 export let accessed: { reductions: Reduction<any>[] } = { reductions: [] };
 
-export interface IReduction<TValue> extends IObservable<TValue> {
+export interface IReduction<TValue> extends ISimpleObservable<TValue> {
     on<TEvent>(observable: IObservable<TEvent>, reduce: (current: TValue, event: TEvent) => TValue): this;
     readonly value: TValue;
 }
