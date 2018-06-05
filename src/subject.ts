@@ -14,4 +14,6 @@ export class Subject<T> extends Observable<T> implements IObserver<T> {
     }
 
     next(value: T) { this._observers.forEach(o => o.next(value)); }
+    complete() { this._observers.forEach(o => o.complete()); }
+    error(error: any) { this._observers.forEach(o => o.error(error)); }
 }
