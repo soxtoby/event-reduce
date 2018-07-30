@@ -1,12 +1,11 @@
-// Custom implementation due to https://github.com/ReactiveX/rxjs/issues/3697
-declare global {
-    export interface SymbolConstructor {
-        observable: symbol;
-    }
+declare interface SymbolConstructor {
+    readonly observable: symbol;
 }
 
-export interface Symbol {
-    [Symbol.observable]: symbol;
-}
-
-export const observable = Symbol.observable || '@@observable';
+if (!Symbol.observable)
+    Object.defineProperty(Symbol, 'observable', {
+        value: Symbol('observable'),
+        writable: false,
+        enumerable: false,
+        configurable: false
+    });
