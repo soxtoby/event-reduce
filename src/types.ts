@@ -8,8 +8,8 @@
 export declare type KeyDiff<T extends string | number | symbol, U extends string | number | symbol> = ({
     [K in T]: K;
 } & {
-    [K in U]: never;
-} & {
+        [K in U]: never;
+    } & {
     [K: string]: never;
 })[T];
 /**
@@ -25,3 +25,5 @@ export declare type ObjectOmit<T extends object, K extends keyof T> = Pick<T, Ke
 export declare type ObjectDiff<T extends object, U extends object> = ObjectOmit<T, keyof U & keyof T> & {
     [K in (keyof U & keyof T)]?: T[K];
 };
+
+export declare type StringKey<T> = string & keyof T;

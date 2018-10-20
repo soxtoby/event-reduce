@@ -1,21 +1,29 @@
 import { action, observable } from 'mobx';
-import { IObservableEvent, combineEventAndObservable } from "./events";
-import { state } from "./experimental/state";
-import { IObservable, IObserver, ISubscription, isObserver, mergeSubscriptions, createSubscriptionObserver } from './observable';
-import { accessed } from "./reduction";
+import { combineEventAndObservable, IObservableEvent } from "./events";
+import { createSubscriptionObserver, IObservable, IObserver, ISubscription } from './observable';
+import { accessed, IReduction } from "./reduction";
 
 export let reduced: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
-    if (typeof key == 'string')
-        state(target, key);
-
     return {
         set(this: any, value: any) {
             let reduction = accessed.reductions.pop()!;
+            if (typeof key == 'string')
+                setReducedProperty(this, key, reduction);
             let box = observable.box(reduction.value, { name: String(key), deep: false });
             reduction.subscribe(value => box.set(value));
             Object.defineProperty(this, key, { get: () => box.get(), enumerable: true });
         }
     };
+}
+
+let reducedProperties = Symbol('ReducedProperties');
+
+export function getReducedProperties(target: any) {
+    return target[reducedProperties] as { [key: string]: IReduction<any> };
+}
+
+export function setReducedProperty(target: any, key: string, reduction: IReduction<any>) {
+    (target[reducedProperties] || (target[reducedProperties] = {}))[key] = reduction;
 }
 
 export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
@@ -40,7 +48,7 @@ function wrapAsync(name: string, async: any): any {
     if (isObservable(async)) {
         return Object.assign(Object.create(async), {
             subscribe(nextOrObserver: IObserver<any> | ((value: any) => void), error?: (error: any) => void, complete?: () => void): ISubscription {
-                let observer = createSubscriptionObserver(nextOrObserver, error, complete);                
+                let observer = createSubscriptionObserver(nextOrObserver, error, complete);
                 return async.subscribe(
                     value => isObservable(value)
                         ? wrapAsync(name, value)

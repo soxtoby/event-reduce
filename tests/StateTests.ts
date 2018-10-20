@@ -1,11 +1,11 @@
 import { computed } from "mobx";
 import { describe, it } from "wattle";
+import { getState, setState, State, state } from "../src/experimental/state";
 import { reduced } from "../src/mobx";
 import { reduce } from "../src/reduction";
-import { plainState, state } from "./../src/experimental/state";
 import './setup';
 
-describe("serialize", function () {
+describe("state", function () {
     class TestModel {
         @reduced
         valueProperty = reduce(1).value;
@@ -18,18 +18,17 @@ describe("serialize", function () {
         func() { }
 
         @reduced
-        modelProperty = reduce(new ChildModel('child')).value;
+        reducedModel = reduce(new ChildModel('child')).value;
 
         @reduced
-        modelArray = reduce([
-            new ChildModel('one'),
-            new ChildModel('two')
-        ]).value;
-
-        plainValue = 'plain';
+        modelArray = reduce([new ChildModel('one'), new ChildModel('two')])
+            .onRestore((_, arr) => arr.map(c => new ChildModel(c.value)))
+            .value;
 
         @state
-        stateValue = 'state'
+        mergedModel = new ChildModel('merged');
+
+        ignoredValue = 'ignored';
     }
 
     class ChildModel {
@@ -41,15 +40,48 @@ describe("serialize", function () {
 
     let model = new TestModel();
 
-    let result = plainState(model);
+    describe(getState.name, () => {
+        let result = getState(model);
 
-    it("copies the correct properties", () => JSON.stringify(result).should.equal(JSON.stringify({
-        valueProperty: 1,
-        modelProperty: { value: 'child' },
-        modelArray: [
-            { value: 'one' },
-            { value: 'two' }
-        ],
-        stateValue: 'state'
-    })));
+        it("copies the correct properties", () => JSON.stringify(result).should.equal(JSON.stringify({
+            valueProperty: 1,
+            reducedModel: { value: 'child' },
+            modelArray: [
+                { value: 'one' },
+                { value: 'two' }
+            ],
+            mergedModel: { value: 'merged' }
+        })));
+    });
+
+    describe(setState.name, () => {
+        let originalMergedModel = model.mergedModel;
+        let state = {
+            valueProperty: 2,
+            reducedModel: { value: 'child*' },
+            modelArray: [
+                { value: 'one*' },
+                { value: 'two*' },
+                { value: 'three*' }
+            ],
+            mergedModel: { value: 'merged*' },
+            ignoredValue: 'ignored*'
+        } as State<TestModel>;
+        setState(model, state);
+
+        it("updates properties correctly", () => {
+            model.valueProperty.should.equal(2);
+            model.reducedModel.should.be.an.instanceOf(ChildModel);
+            model.reducedModel.value.should.equal('child*');
+            model.modelArray[0].should.be.an.instanceOf(ChildModel);
+            model.modelArray[1].should.be.an.instanceOf(ChildModel);
+            model.modelArray[2].should.be.an.instanceOf(ChildModel);
+            model.modelArray[0].value.should.equal('one*');
+            model.modelArray[1].value.should.equal('two*');
+            model.modelArray[2].value.should.equal('three*');
+            model.mergedModel.should.equal(originalMergedModel);
+            model.mergedModel.value.should.equal('merged*');
+            model.ignoredValue.should.equal('ignored');
+        });
+    });
 });
