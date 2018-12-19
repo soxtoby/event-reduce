@@ -19,8 +19,8 @@
             },
             "args": [
                 // Use the same command line arguments as the normal wattle command
-                "--errors-only",
-                "./tests/*"
+                "./tests/*",
+                "--errors-only"
             ],
             "presentation": {
                 "echo": true,
