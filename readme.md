@@ -42,7 +42,7 @@ console.log(counter.value); // 1
 ## What if my application is more complicated than a single counter?
 I'd recommend putting your events in their own class like this:
 ```ts
-import { event, reduce, events, reduced } from 'event-reduce';
+import { event, events } from 'event-reduce';
 
 @events // Marks event methods as mobx actions
 class CounterEvents {
@@ -52,6 +52,7 @@ class CounterEvents {
 ```
 and make a model class like this:
 ```ts
+import { reduce, reduced } from 'event-reduce';
 import { computed } from 'mobx';
 
 class CounterModel {
@@ -85,8 +86,8 @@ events.counterAdded();
 console.log(model.counters); // [0, 0]
 console.log(model.counterCount); // 2
 
-incremented({ counterIndex: 0, amount: 1 });
-incremented({ counterIndex: 1, amount: 2 });
+events.incremented({ counterIndex: 0, amount: 1 });
+events.incremented({ counterIndex: 1, amount: 2 });
 
 console.log(model.counters); // [1, 2]
 ```
