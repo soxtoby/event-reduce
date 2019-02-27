@@ -3,11 +3,11 @@
     "target": "es6",
     "module": "commonjs",
     "lib": ["es6"],
-    "jsx": "react",
     "declaration": true,
     "outDir": "./lib",
     "strict": true,
     "inlineSourceMap": true,
+    "inlineSources": true,
     "experimentalDecorators": true
   },
   "include": [
