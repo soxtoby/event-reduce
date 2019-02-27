@@ -1,7 +1,7 @@
 {
   "name": "event-reduce",
   "description": "State management based on reducing observable events into state",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "author": "Simon Oxtoby",
   "homepage": "https://github.com/soxtoby/event-reduce",
   "license": "MIT",
@@ -14,7 +14,7 @@
   "files": [
     "lib"
   ],
-  "dependencies": {
+  "peerDependencies": {
     "mobx": ">=4.2.0"
   },
   "devDependencies": {
