@@ -9,8 +9,8 @@ export interface IObservable<T> {
 export interface ISimpleObservable<T> extends IObservable<T> {
     filter(condition: (value: T) => boolean): ISimpleObservable<T>;
     map<U>(select: (value: T) => U): ISimpleObservable<U>;
-    resolved<P>(this: ISimpleObservable<Promise<P>>): ISimpleObservable<P>;
-    rejected(this: ISimpleObservable<Promise<any>>): ISimpleObservable<any>;
+    resolved<P>(this: ISimpleObservable<PromiseLike<P>>): ISimpleObservable<P>;
+    rejected(this: ISimpleObservable<PromiseLike<any>>): ISimpleObservable<any>;
     asObservable(): ISimpleObservable<T>;
     merge<O>(this: ISimpleObservable<IObservable<O>>): ISimpleObservable<O>;
     errored(this: ISimpleObservable<IObservable<any>>): ISimpleObservable<any>;
@@ -77,12 +77,12 @@ class SimpleObservable<T> implements ISimpleObservable<T> {
         return new Observable<U>(observer => this.subscribe(value => observer.next(select(value))));
     }
 
-    resolved<P>(this: ISimpleObservable<Promise<P>>) {
+    resolved<P>(this: ISimpleObservable<PromiseLike<P>>) {
         return new Observable<P>(observer => this.subscribe(value => value.then(result => observer.next(result))));
     }
 
-    rejected(this: ISimpleObservable<Promise<any>>) {
-        return new Observable<any>(observer => this.subscribe(value => value.catch(error => observer.next(error))));
+    rejected(this: ISimpleObservable<PromiseLike<any>>) {
+        return new Observable<any>(observer => this.subscribe(value => value.then(null, error => observer.next(error))));
     }
 
     asObservable() {
