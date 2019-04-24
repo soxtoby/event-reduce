@@ -33,18 +33,20 @@ export function event<T = void>(): IObservableEvent<T, T> {
     }) as Event<T>, subject);
 }
 
-class ObservableEvent<TIn, TOut> extends Observable<TOut> {
+class ObservableEvent<TIn extends object, TOut> extends Observable<TOut> {
     constructor(source: IObservable<TOut>) {
         super(observer => source.subscribe(v => observer.next(v)));
     }
 
-    scope<TIn2 extends TIn & object, TOut2 extends TIn2, TScope extends Partial<TIn>>(this: IObservableEvent<TIn2, TOut2>, scope: TScope): IObservableEvent<ObjectDiff<TIn2, TScope>, TOut2> {
-        let scopedEvent = (value: ObjectDiff<TIn2, TScope>) => this(Object.assign(value, scope));
+    scope<TScope extends Subset<TOut, TScope>>(this: IObservableEvent<TIn, TOut>, scope: TScope): IObservableEvent<ObjectDiff<TIn, TScope>, TOut> {
+        let scopedEvent = (value: ObjectDiff<TIn, TScope>) => this(Object.assign(value, scope));
         let scopedObservable = this.filter(value => Object.keys(scope)
-            .every(p => value[p as keyof TIn] == scope[p as keyof TIn]));
-        return combineEventAndObservable(scopedEvent, scopedObservable);
+            .every(p => value[p as keyof TOut] == scope[p as keyof TOut]));
+        return combineEventAndObservable(scopedEvent as Event<ObjectDiff<TIn, TScope>>, scopedObservable);
     }
 }
+
+type Subset<Super, Sub> = { [P in keyof Sub]: P extends keyof Super ? Super[P] : never };
 
 export function combineEventAndObservable<TIn, TOut>(event: Event<TIn>, observable: IObservable<TOut>): IObservableEvent<TIn, TOut> {
     Object.setPrototypeOf(event, new ObservableEvent(observable));
