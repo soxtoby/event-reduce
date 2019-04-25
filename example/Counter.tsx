@@ -1,7 +1,6 @@
-import * as React from 'React';
-import { event, events, reduce, reduced, Event } from '..';
-import { computed } from 'mobx';
 import { observer } from 'mobx-react';
+import * as React from 'React';
+import { derived, event, events, reduce, reduced } from '..';
 
 @events
 class RootEvents {
@@ -54,7 +53,7 @@ class CounterModel {
         .on(a => a.reset, () => 0)
         .value;
 
-    @computed
+    @derived
     get countPlusOne() { return this.count + 1; }
 }
 

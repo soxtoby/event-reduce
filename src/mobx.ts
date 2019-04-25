@@ -1,4 +1,4 @@
-import { action, observable } from 'mobx';
+import { action, observable, computed, IComputedValue } from 'mobx';
 import { combineEventAndObservable, IObservableEvent } from "./events";
 import { createSubscriptionObserver, IObservable, IObserver, ISubscription } from './observable';
 import { accessed, IReduction } from "./reduction";
@@ -11,9 +11,29 @@ export let reduced: PropertyDecorator = (target: Object, key: string | symbol): 
                 setReducedProperty(this, key, reduction);
             let box = observable.box(reduction.value, { name: String(key), deep: false });
             reduction.subscribe(value => box.set(value));
-            Object.defineProperty(this, key, { get: () => box.get(), enumerable: true });
+            Object.defineProperty(this, key, {
+                get: () => box.get(),
+                enumerable: true,
+                configurable: true
+            });
         }
     };
+}
+
+export let derived: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
+    let property = Object.getOwnPropertyDescriptor(target, key);
+
+    return {
+        get() { return getOrSetComputedProperty(this, key, () => computed(property!.get!.bind(this), { name: String(key) })).get(); },
+        configurable: true
+    };
+}
+
+let derivedProperties = Symbol('DerivedProperties');
+
+function getOrSetComputedProperty(target: any, key: string | symbol, createComputedValue: () => IComputedValue<any>): IComputedValue<any> {
+    let properties = target[derivedProperties] || (target[derivedProperties] = {}) as { [key: string]: IComputedValue<any> };
+    return properties[key] || (properties[key] = createComputedValue());
 }
 
 let reducedProperties = Symbol('ReducedProperties');
@@ -80,7 +100,6 @@ function wrapAsync(name: string, async: any): any {
 function isObservableEvent(e: any): e is IObservableEvent<any, any> {
     return typeof e === 'function' && !!e.subscribe;
 }
-
 
 function isObservable(o: any): o is IObservable<any> {
     return typeof o === 'object' && typeof o.subscribe === 'function';

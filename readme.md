@@ -52,8 +52,7 @@ class CounterEvents {
 ```
 and make a model class like this:
 ```ts
-import { reduce, reduced } from 'event-reduce';
-import { computed } from 'mobx';
+import { derived, reduce, reduced } from 'event-reduce';
 
 class CounterModel {
     constructor (public events: CounterEvents) { }
@@ -65,7 +64,7 @@ class CounterModel {
             .map((c, i) => i == counterIndex ? c + amount : c))
         .value; // Property will just be the value, rather than a Reduction object
 
-    @computed   // mobx will cache this until counters are changed
+    @derived   // mobx will cache this until counters are changed
     get counterCount() {
         return this.counters.length;
     }

@@ -1,7 +1,6 @@
-import { computed } from "mobx";
 import { describe, it } from "wattle";
 import { getState, setState, State, state } from "../src/experimental/state";
-import { reduced } from "../src/mobx";
+import { derived, reduced } from "../src/mobx";
 import { reduce } from "../src/reduction";
 import './setup';
 
@@ -10,7 +9,7 @@ describe("state", function () {
         @reduced
         valueProperty = reduce(1).value;
 
-        @computed
+        @derived
         get valuePlusOne() {
             return this.valueProperty + 1;
         }
