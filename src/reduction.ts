@@ -1,7 +1,6 @@
+import { setState, State, StateObject } from "./experimental/state";
 import { IObservable, ISimpleObservable, ISubscription, Observable } from "./observable";
 import { Subject } from "./subject";
-import { event, IObservableEvent } from "./events";
-import { State, setState, StateObject } from "./experimental/state";
 
 export function reduce<TValue>(initial: TValue): IReduction<TValue>;
 export function reduce<TValue, TEvents>(initial: TValue, events: TEvents): IBoundReduction<TValue, TEvents>;
@@ -10,9 +9,10 @@ export function reduce<TValue, TEvents>(initial: TValue, events: TEvents = {} as
 }
 
 export let accessed: { reductions: Reduction<any>[] } = { reductions: [] };
+let resetAccessed: number | undefined;
 
 export interface IReduction<TValue> extends ISimpleObservable<TValue> {
-    on<TEvent>(observable: IObservable<TEvent>, reduce: (current: TValue, event: TEvent) => TValue): this;
+    on<TEvent>(observable: IObservable<TEvent>, reduce: Reducer<TValue, TEvent>): this;
     onRestore(reduce: (current: TValue, state: State<TValue>) => TValue): this;
     restore(state: State<TValue>): void;
     readonly value: TValue;
@@ -20,7 +20,7 @@ export interface IReduction<TValue> extends ISimpleObservable<TValue> {
 
 export class Reduction<TValue> extends Observable<TValue> implements IReduction<TValue> {
     protected _subject = new Subject<TValue>();
-    protected _subscriptions = new Map<IObservable<any>, ISubscription>();
+    protected _subscriptions = new Map<IObservable<any>, { subscription: ISubscription, reducer: Reducer<TValue, any> }>();
     protected _current: TValue;
     private _restore = new Subject<State<TValue>>();
 
@@ -36,20 +36,29 @@ export class Reduction<TValue> extends Observable<TValue> implements IReduction<
         });
     }
 
-    on<TEvent>(observable: IObservable<TEvent>, reduce: (current: TValue, event: TEvent) => TValue): this {
+    clone() {
+        return Array.from(this._subscriptions)
+            .filter(([observable]) => observable != this._restore)
+            .reduce((reduction, [observable, sub]) => reduction.on(observable, sub.reducer), new Reduction(this._current));
+    }
+
+    on<TEvent>(observable: IObservable<TEvent>, reduce: Reducer<TValue, TEvent>): this {
         let existingSubscription = this._subscriptions.get(observable);
         if (existingSubscription)
-            existingSubscription.unsubscribe();
+            existingSubscription.subscription.unsubscribe();
 
         this._subscriptions.set(observable,
-            observable.subscribe(value => {
-                accessed.reductions.length = 0;
-                this._current = reduce(this._current, value);
-                if (accessed.reductions.some(r => r._subscriptions.has(observable)))
-                    throw new Error("Accessed a reduced value derived from the same event being fired.");
-                accessed.reductions.length = 0;
-                this._subject.next(this._current);
-            }));
+            {
+                reducer: reduce,
+                subscription: observable.subscribe(value => {
+                    accessed.reductions.length = 0;
+                    this._current = reduce(this._current, value);
+                    if (accessed.reductions.some(r => r._subscriptions.has(observable)))
+                        throw new Error("Accessed a reduced value derived from the same event being fired.");
+                    accessed.reductions.length = 0;
+                    this._subject.next(this._current);
+                })
+            });
         return this;
     }
 
@@ -63,18 +72,24 @@ export class Reduction<TValue> extends Observable<TValue> implements IReduction<
 
     get value() {
         accessed.reductions.push(this);
+        if (!resetAccessed) {
+            resetAccessed = setTimeout(() => {
+                resetAccessed = undefined;
+                accessed.reductions.length = 0;
+            });
+        }
         return this._current;
     }
 }
 
 export interface IBoundReduction<TValue, TEvents> extends IReduction<TValue> {
-    on<TEvent>(event: ((events: TEvents) => IObservable<TEvent>) | IObservable<TEvent>, reduce: (current: TValue, event: TEvent) => TValue): this;
+    on<TEvent>(event: ((events: TEvents) => IObservable<TEvent>) | IObservable<TEvent>, reduce: Reducer<TValue, TEvent>): this;
 }
 
 export class BoundReduction<TValue, TEvents> extends Reduction<TValue> implements IBoundReduction<TValue, TEvents> {
     constructor(public initial: TValue, private _events: TEvents = {} as TEvents) { super(initial); }
 
-    on<TEvent>(observable: ((events: TEvents) => IObservable<TEvent>) | IObservable<TEvent>, reduce: (current: TValue, event: TEvent) => TValue): this {
+    on<TEvent>(observable: ((events: TEvents) => IObservable<TEvent>) | IObservable<TEvent>, reduce: Reducer<TValue, TEvent>): this {
         return super.on(isObservable(observable) ? observable : observable(this._events), reduce);
     }
 }
@@ -82,3 +97,5 @@ export class BoundReduction<TValue, TEvents> extends Reduction<TValue> implement
 function isObservable(o: any): o is IObservable<any> {
     return !!o.subscribe;
 }
+
+type Reducer<TValue, TEvent> = (current: TValue, event: TEvent) => TValue;

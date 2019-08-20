@@ -1,6 +1,6 @@
-import { action, observable, computed, IComputedValue } from 'mobx';
+import { action, computed, IComputedValue, observable } from 'mobx';
 import { combineEventAndObservable, IObservableEvent } from "./events";
-import { createSubscriptionObserver, IObservable, IObserver, ISubscription } from './observable';
+import { createSubscriptionObserver, IObservable, IObserver, ISimpleObservable, ISubscription, Observable } from './observable';
 import { accessed, IReduction } from "./reduction";
 
 export let reduced: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
@@ -12,7 +12,10 @@ export let reduced: PropertyDecorator = (target: Object, key: string | symbol): 
             let box = observable.box(reduction.value, { name: String(key), deep: false });
             reduction.subscribe(value => box.set(value));
             Object.defineProperty(this, key, {
-                get: () => box.get(),
+                get: () => {
+                    accessed.reductions.push(reduction);
+                    return box.get();
+                },
                 enumerable: true,
                 configurable: true
             });
@@ -20,11 +23,43 @@ export let reduced: PropertyDecorator = (target: Object, key: string | symbol): 
     };
 }
 
+export function propertyChanged<T>(getProperty: () => T) {
+    accessed.reductions.length = 0;
+    accessedDerivedProperties.length = 0;
+    getProperty();
+    if (accessedDerivedProperties.length == 1)
+        return new Observable<T>(o => ({ unsubscribe: accessedDerivedProperties[0].observe(change => o.next(change.newValue)) }));
+    if (accessed.reductions.length == 1)
+        return (accessed.reductions[0] as ISimpleObservable<T>).asObservable();
+    throw new Error("'getProperty' must access a single derived or reduced property");
+}
+
+export function extend(getReducedProperty: () => any) {
+    accessed.reductions.length = 0;
+    getReducedProperty();
+    if (accessed.reductions.length == 1)
+        return accessed.reductions[0].clone();
+    throw new Error("'getReducedProperty' must access a single reduced property");
+}
+
+let accessedDerivedProperties = [] as IComputedValue<any>[];
+let resetAccessedDerivedProperties: number | undefined;
+
 export let derived: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
     let property = Object.getOwnPropertyDescriptor(target, key);
 
     return {
-        get() { return getOrSetComputedProperty(this, key, () => computed(property!.get!.bind(this), { name: String(key) })).get(); },
+        get() {
+            let computedProperty = getOrSetComputedProperty(this, key, () => computed(property!.get!.bind(this), { name: String(key) }));
+            accessedDerivedProperties.push(computedProperty);
+            if (!resetAccessedDerivedProperties) {
+                resetAccessedDerivedProperties = setTimeout(() => {
+                    resetAccessedDerivedProperties = undefined;
+                    accessedDerivedProperties.length = 0;
+                });
+            }
+            return computedProperty.get();
+        },
         configurable: true
     };
 }
