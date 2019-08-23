@@ -25,7 +25,7 @@ export class Reduction<TValue> extends Observable<TValue> implements IReduction<
     private _restore = new Subject<State<TValue>>();
 
     constructor(public initial: TValue) {
-        super(o => this._subject.subscribe((value => o.next(value))));
+        super(o => this._subject.subscribe(o));
         this._current = initial;
         this.onRestore((current, state) => {
             if (current && typeof current == 'object') {

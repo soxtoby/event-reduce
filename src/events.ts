@@ -1,9 +1,9 @@
 import { IObservable, ISimpleObservable, Observable } from './observable';
 import { Subject } from "./subject";
-import { ObjectDiff } from "./types";
+import { ObjectOmit } from "./types";
 
 type Scopable<TIn, TOut> = TIn extends object ? TOut extends TIn
-    ? { scope<TScope extends Partial<TIn>>(scope: TScope): IObservableEvent<ObjectDiff<TIn, TScope>, TOut> }
+    ? { scope<TScope extends Partial<TIn>>(scope: TScope): IObservableEvent<ObjectOmit<TIn, TScope>, TOut> }
     : {} : {};
 
 export type Event<T> = T extends void
@@ -38,11 +38,11 @@ class ObservableEvent<TIn extends object, TOut> extends Observable<TOut> {
         super(observer => source.subscribe(v => observer.next(v)));
     }
 
-    scope<TScope extends Subset<TOut, TScope>>(this: IObservableEvent<TIn, TOut>, scope: TScope): IObservableEvent<ObjectDiff<TIn, TScope>, TOut> {
-        let scopedEvent = (value: ObjectDiff<TIn, TScope>) => this(Object.assign(value, scope));
+    scope<TScope extends Subset<TOut, TScope>>(this: IObservableEvent<TIn, TOut>, scope: TScope): IObservableEvent<ObjectOmit<TIn, TScope>, TOut> {
+        let scopedEvent = (value: ObjectOmit<TIn, TScope>) => this(Object.assign(value, scope));
         let scopedObservable = this.filter(value => Object.keys(scope)
             .every(p => value[p as keyof TOut] == scope[p as keyof TOut]));
-        return combineEventAndObservable(scopedEvent as Event<ObjectDiff<TIn, TScope>>, scopedObservable);
+        return combineEventAndObservable(scopedEvent as Event<ObjectOmit<TIn, TScope>>, scopedObservable);
     }
 }
 
