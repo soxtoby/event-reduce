@@ -1,52 +1,48 @@
 import * as sinon from 'sinon';
-import { describe, it, then, when } from 'wattle';
-import { Observable, createSubscriptionObserver } from '../src/observable';
-import { testObservableOperators } from './ObservableOperatorTests';
+import { describe, test, then, when } from 'wattle';
+import { Observable, ObservableOperation } from '../src/observable';
 import './setup';
 
-describe("Observable", function () {
+describe("ObservableOperation", function () {
     when("subscribing", () => {
         let unsubscribe = sinon.spy();
         let subscribe = sinon.spy(() => unsubscribe);
-        let next = sinon.spy();
-        let observer = { next };
+        let observer = sinon.spy();
 
-        let sut = new Observable(subscribe);
-        let result = sut.subscribe(next);
+        let sut = new ObservableOperation('test', [], subscribe);
+        let result = sut.subscribe(observer);
 
-        then("subscribe function called with observer", () => subscribe.should.have.been.calledWith(sinon.match(observer)));
+        then("subscribe function called with observer", () => subscribe.should.have.been.calledWith(sinon.match.func));
 
-        then("unsubscribe function returned", () => result.should.equal(unsubscribe));
+        when("unsubscribed", () => {
+            result();
+
+            then("unsubscrived from inner subscription", () => unsubscribe.should.have.been.called);
+        })
     });
 
-    testObservableOperators();
-});
-
-describe("createSubscriptionObserver", function () {
-    let observer = {
-        next: sinon.spy(),
-        error: sinon.spy(),
-        complete: sinon.spy()
-    };
-
-    let sut = createSubscriptionObserver(observer);
-
-    when("next", () => {
-        let nextValue = { prop: "value" };
-
-        it("calls inner observer", () => observer.next.calledWith(nextValue));
+    test("filter", () => {
+        let source = observableOf(1, 2, 3, 2, 1);
+        let result = source.filter(v => v > 1);
+        values(result).should.have.members([2, 3, 2]);
     });
 
-    when("error", () => {
-        let error = "error message";
-        sut.error(error);
-
-        it("calls inner observer", () => observer.error.calledWith(error));
+    test("map", () => {
+        let source = observableOf(1, 2, 3);
+        let result = source.map(v => v * 2);
+        values(result).should.have.members([2, 4, 6]);
     });
 
-    when("complete", () => {
-        sut.complete();
+    function observableOf<T>(...args: T[]) {
+        return new ObservableOperation<T>('source', [], observer => {
+            args.forEach(a => observer.next(a));
+            return () => { }
+        });
+    }
 
-        it("calls inner observer", () => observer.error.called);
-    });
+    function values<T>(observable: Observable<T>) {
+        let values = [] as T[];
+        observable.subscribe(value => values.push(value));
+        return values;
+    }
 });

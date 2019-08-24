@@ -1,55 +1,108 @@
-import { IObservable, ISimpleObservable, Observable } from './observable';
-import { Subject } from "./subject";
+import { Subject, ISubject } from "./subject";
+import { Observable, ScopedObservable } from "./observable";
 import { ObjectOmit } from "./types";
 
-type Scopable<TIn, TOut> = TIn extends object ? TOut extends TIn
-    ? { scope<TScope extends Partial<TIn>>(scope: TScope): IObservableEvent<ObjectOmit<TIn, TScope>, TOut> }
-    : {} : {};
+export function event<T = void>(name = '(anonymous event)') {
+    let subject = new EventSubject<T>(name);
+    return makeEvent(subject.next.bind(subject), subject);
+}
 
-export type Event<T> = T extends void
-    ? () => void
-    : (item: T) => void;
+export function asyncEvent<Result = void, Context = void>(name = '(anonymous async event)') {
+    let asyncEvent = new AsyncEvent<Result, Context>(name);
+    return makeEvent(asyncEvent.next.bind(asyncEvent), asyncEvent);
+}
 
-export type IObservableEvent<TIn, TOut = TIn> = Event<TIn> & Scopable<TIn, TOut> & ISimpleObservable<TOut>;
+class EventSubject<T> extends Subject<T> {
+    scope<TObject extends object, Scope extends Partial<TObject>>(this: ISubject<TObject>, scope: Scope) {
+        let scopedEvent = new ScopedEventSubject<TObject, Scope>(this, scope);
+        return makeEvent(scopedEvent.next.bind(scopedEvent), scopedEvent);
+    }
+}
 
-let insideEvent = false;
+class ScopedEventSubject<T extends object, Scope extends Partial<T>> extends ScopedObservable<T, Scope> {
+    constructor(
+        private _source: ISubject<T>,
+        private _scope: Scope
+    ) {
+        super(_source, _scope);
+    }
 
-/**
- * Creates an observable event function.
- */
-export function event<T = void>(): IObservableEvent<T, T> {
-    let subject = new Subject<T>();
-    return combineEventAndObservable((value => {
+    next(partial: ObjectOmit<T, Scope>) {
+        this._source.next({ ...partial, ...this._scope } as any as T);
+    }
+
+    scope<TObject extends object, SubScope extends Partial<TObject>>(this: ISubject<TObject>, scope: SubScope) {
+        let scopedEvent = new ScopedEventSubject<TObject, SubScope>(this, scope);
+        return makeEvent(scopedEvent.next.bind(scopedEvent), scopedEvent);
+    }
+}
+
+class AsyncEvent<Result = void, Context = void> implements IEventBase {
+    private _displayName!: string;
+    private _started = new Subject<AsyncItem<Result, Context>>('');
+    private _resolved = new Subject<AsyncResult<Result, Context>>('');
+    private _rejected = new Subject<AsyncError<Context>>('');
+
+    constructor(displayName: string) {
+        this.displayName = displayName;
+    }
+
+    get displayName() { return this._displayName; }
+
+    set displayName(name: string) {
+        this._displayName = name;
+        this._started.displayName = `${name}.started`;
+        this._resolved.displayName = `${name}.resolved`;
+        this._rejected.displayName = `${name}.rejected`;
+    }
+
+    next(promise: PromiseLike<Result>, context: Context) {
+        promise.then(
+            result => this._resolved.next({ result, context }),
+            error => this._rejected.next({ error, context }));
+        this._started.next({ promise, context });
+    }
+
+    get started() { return this._started as Observable<AsyncItem<Result, Context>>; }
+    get resolved() { return this._resolved as Observable<AsyncResult<Result, Context>>; }
+    get rejected() { return this._rejected as Observable<AsyncError<Context>>; }
+}
+
+interface AsyncItem<Result, Context> {
+    promise: PromiseLike<Result>;
+    context: Context;
+}
+
+interface AsyncResult<Result, Context> {
+    result: Result;
+    context: Context;
+}
+
+interface AsyncError<Context> {
+    error: any;
+    context: Context;
+}
+
+export function makeEvent<Fn extends (...args: any[]) => void, Event extends IEventBase>(eventFn: Fn, prototype: Event) {
+    Object.setPrototypeOf(fireEvent, prototype);
+    fireEvent.apply = Function.prototype.apply;
+    return fireEvent as Fn & Event;
+
+    function fireEvent(...args: any[]) {
         try {
             if (insideEvent)
                 throw new Error("Fired an event in response to another event.");
 
             insideEvent = true;
-            subject.next(value);
-        }
-        finally {
+            eventFn(...args);
+        } finally {
             insideEvent = false;
         }
-    }) as Event<T>, subject);
-}
-
-class ObservableEvent<TIn extends object, TOut> extends Observable<TOut> {
-    constructor(source: IObservable<TOut>) {
-        super(observer => source.subscribe(v => observer.next(v)));
-    }
-
-    scope<TScope extends Subset<TOut, TScope>>(this: IObservableEvent<TIn, TOut>, scope: TScope): IObservableEvent<ObjectOmit<TIn, TScope>, TOut> {
-        let scopedEvent = (value: ObjectOmit<TIn, TScope>) => this(Object.assign(value, scope));
-        let scopedObservable = this.filter(value => Object.keys(scope)
-            .every(p => value[p as keyof TOut] == scope[p as keyof TOut]));
-        return combineEventAndObservable(scopedEvent as Event<ObjectOmit<TIn, TScope>>, scopedObservable);
     }
 }
 
-type Subset<Super, Sub> = { [P in keyof Sub]: P extends keyof Super ? Super[P] : never };
+let insideEvent = false;
 
-export function combineEventAndObservable<TIn, TOut>(event: Event<TIn>, observable: IObservable<TOut>): IObservableEvent<TIn, TOut> {
-    Object.setPrototypeOf(event, new ObservableEvent(observable));
-    event.apply = Function.prototype.apply;
-    return event as IObservableEvent<TIn, TOut>;
+export interface IEventBase {
+    displayName: string;
 }

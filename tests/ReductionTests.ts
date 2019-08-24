@@ -1,8 +1,9 @@
 import * as sinon from 'sinon';
 import { describe, it, test, then, when } from 'wattle';
-import { accessed, reduce } from '../src/reduction';
+import { reduce } from '../src/reduction';
 import { Subject } from '../src/subject';
 import './setup';
+import { collectAccessedValues } from '../src/observableValue';
 
 describe("reduce", function () {
     when("unbound", () => {
@@ -13,7 +14,7 @@ describe("reduce", function () {
         it("starts with initial value", () => sut.value.should.equal(1));
 
         when("subscribed to an observable", () => {
-            let subject = new Subject<string>();
+            let subject = new Subject<string>('test');
             let reducer = sinon.stub();
             sut.on(subject, reducer);
 
@@ -38,7 +39,7 @@ describe("reduce", function () {
 
         when("a reducer accesses a reduced value", () => {
             let other = reduce(0);
-            let subject = new Subject<number>();
+            let subject = new Subject<number>('test');
             sut.on(subject, () => other.value);
 
             when("other value based on same event", () => {
@@ -58,7 +59,7 @@ describe("reduce", function () {
         let sut = reduce(1, events);
 
         when("subscribing to an observable", () => {
-            let subject = new Subject<string>();
+            let subject = new Subject<string>('test');
             let getEvent = sinon.spy(() => subject);
             let reducer = sinon.stub();
             sut.on(getEvent, reducer);
@@ -76,9 +77,11 @@ describe("reduce", function () {
         let r1 = reduce(1);
         let r2 = reduce(2);
 
-        r1.value;
-        r2.value;
-        
-        accessed.reductions.should.have.members([r1, r2]);
+        let accessed = collectAccessedValues(() => {
+            r1.value;
+            r2.value;
+        });
+
+        Array.from(accessed).should.have.members([r1, r2]);
     });
 });

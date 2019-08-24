@@ -1,11 +1,9 @@
 import { match, spy } from "sinon";
 import { describe, test, then, when } from "wattle";
 import { event } from "../src/events";
-import { derived, events, reduced } from "../src/mobx";
 import { reduce } from "../src/reduction";
 import { eventProxy, mutable } from "../src/testing";
-
-debugger;
+import { events, reduced, derived } from "../src/decorators";
 
 describe("mutable", () => {
     @events

@@ -1,23 +1,11 @@
-import { IObserver, ISubscriptionObserver, Observable } from "./observable";
+import { Observable } from "./observable";
 
-export class Subject<T> extends Observable<T> implements IObserver<T> {
-    private _observers = [] as ISubscriptionObserver<T>[];
+export interface ISubject<TIn, TOut = TIn> extends Observable<TOut> {
+    next(value: TIn): void;
+}
 
-    constructor() {
-        super(observer => {
-            this._observers.push(observer);
-
-            return {
-                unsubscribe: () => this._observers = this._observers.filter(o => o != observer)
-            }
-        });
-    }
-
-    next(value: T) { this._observers.forEach(o => o.next(value)); }
-    complete() { this._observers.forEach(o => o.complete()); }
-    error(error: any) { this._observers.forEach(o => o.error(error)); }
-
-    get isObserved() {
-        return !!this._observers.length;
+export class Subject<T> extends Observable<T> implements ISubject<T> {
+    next(value: T) {
+        this.notifyObservers(value);
     }
 }

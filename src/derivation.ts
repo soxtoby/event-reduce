@@ -1,59 +1,50 @@
-import { accessed, Reduction } from "./reduction";
-import { mergeSubscriptions, ISubscription, Observable, IObserver, IObservable, ISimpleObservable } from "./observable";
-import { Subject } from "./subject";
+import { ObservableValue, collectAccessedValues } from "./observableValue";
+import { Observable, Unsubscribe } from "./observable";
 
-function derive<T>(getDerivedValue: () => T) {
-    return new Derivation(getDerivedValue);
+export function derive<T>(getDerivedValue: () => T, name?: string) {
+    return new Derivation(name || '(anonymous derivation)', getDerivedValue);
 }
 
-class Derivation<T> {
-    private _value: any;
-    private _observable: ISimpleObservable<void>;
+export class Derivation<T> extends ObservableValue<T> {
+    private _requiresUpdate = true;
+    private _sources = new Map<Observable<any>, Unsubscribe>();
 
-    constructor(private _getDerivedValue: () => T) {
-        this._observable = observe(() => { this._value = _getDerivedValue(); });
+    constructor(
+        public displayName: string,
+        private _deriveValue: () => T
+    ) {
+        super(displayName, undefined!);
     }
+
+    get sources() { return Array.from(this._sources.keys()); }
 
     get value() {
-        return this._value;
+        if (this._requiresUpdate)
+            this.update();
+        return super.value;
     }
 
-    forceUpdate() {
-        if (this._subscriptions)
-            this._subscriptions.unsubscribe();
+    private update() {
+        let value!: T;
 
-        accessed.reductions.length = 0;
-        this._value = this._getDerivedValue();
-        this._subscriptions = mergeSubscriptions(accessed.reductions.map(d => d.subscribe(() => this.forceUpdate())));
+        collectAccessedValues(() => value = this._deriveValue())
+            .forEach(o => this._sources.set(o, o.subscribe(() => this.invalidate(), this.displayName)));
+
+        this._requiresUpdate = false;
+        this._value = value;
+        this.notifyObservers(value);
     }
-}
 
-function observe(accessValues: () => void) {
-    let subject = new Subject();
-    let dependencySubscriptions: ISubscription;
+    private invalidate() {
+        this.unsubscribe();
+        this._requiresUpdate = true;
 
-    return new Observable<void>(observer => {
-        let wasObserved = subject.isObserved;
-        let subscription = subject.subscribe(observer);
+        if (this._observers.size)
+            this.update();
+    }
 
-        if (!wasObserved)
-            update();
-
-        return {
-            unsubscribe() {
-                subscription.unsubscribe();
-                if (!subject.isObserved)
-                    dependencySubscriptions.unsubscribe();
-            }
-        }
-    });
-
-    function update() {
-        if (dependencySubscriptions)
-            dependencySubscriptions.unsubscribe();
-        accessed.reductions.length = 0;
-        accessValues();
-        dependencySubscriptions = mergeSubscriptions(accessed.reductions.map(r => r.subscribe(update)));
-        subject.next(undefined);
+    unsubscribe() {
+        this._sources.forEach(unsub => unsub());
+        this._sources.clear();
     }
 }

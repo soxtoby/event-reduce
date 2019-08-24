@@ -1,8 +1,8 @@
 import { describe, it } from "wattle";
 import { getState, setState, State, state } from "../src/experimental/state";
-import { derived, reduced } from "../src/mobx";
 import { reduce } from "../src/reduction";
 import './setup';
+import { reduced, derived } from "../src/decorators";
 
 describe("state", function () {
     class TestModel {

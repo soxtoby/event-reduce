@@ -1,4 +1,4 @@
-import { getReducedProperties } from "../mobx";
+import { getReducedProperties } from "../decorators";
 import { StringKey } from "../types";
 
 export type State<T> =
