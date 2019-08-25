@@ -13,10 +13,10 @@ type Reducer<TValue, TEvent> = (previous: TValue, eventValue: TEvent) => TValue;
 
 export class Reduction<T> extends ObservableValue<T> {
     private _sources = new Map<Observable<any>, Unsubscribe>();
-    private _restore = new Subject<State<T>>('');
+    private _restore = new Subject<State<T>>(() => `${this.displayName}.restored`);
 
     constructor(initial: T) {
-        super('(anonymous reduction)', initial);
+        super(() => '(anonymous reduction)', initial);
 
         this.onRestore((current, state) => {
             if (current && typeof current == 'object') {
@@ -27,12 +27,7 @@ export class Reduction<T> extends ObservableValue<T> {
         });
     }
 
-    get displayName() { return super.displayName; }
-
-    set displayName(name: string) {
-        super.displayName = name;
-        this._restore.displayName = `${name}.restored`;
-    }
+    get sources() { return Array.from(this._sources.keys()); }
 
     restore(state: State<T>): void {
         this._restore.next(state);
@@ -53,9 +48,8 @@ export class Reduction<T> extends ObservableValue<T> {
             if (commonSource)
                 throw new Error("Accessed a reduced value derived from the same event being fired.")
 
-            this._value = value;
-            this.notifyObservers(value);
-        }, this.displayName));
+            this.setValue(value);
+        }, () => this.displayName));
 
         return this;
     }
@@ -68,6 +62,11 @@ export class Reduction<T> extends ObservableValue<T> {
 
     onRestore(reduce: (current: T, state: State<T>) => T): this {
         return this.on(this._restore, reduce);
+    }
+
+    unsubscribeFromSources() {
+        this._sources.forEach(unsub => unsub());
+        this._sources.clear();
     }
 }
 

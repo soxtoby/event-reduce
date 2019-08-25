@@ -3,7 +3,7 @@ import { Observable, ScopedObservable } from "./observable";
 import { ObjectOmit } from "./types";
 
 export function event<T = void>(name = '(anonymous event)') {
-    let subject = new EventSubject<T>(name);
+    let subject = new EventSubject<T>(() => name);
     return makeEvent(subject.next.bind(subject), subject);
 }
 
@@ -12,14 +12,14 @@ export function asyncEvent<Result = void, Context = void>(name = '(anonymous asy
     return makeEvent(asyncEvent.next.bind(asyncEvent), asyncEvent);
 }
 
-class EventSubject<T> extends Subject<T> {
+class EventSubject<T> extends Subject<T> implements IEventBase {
     scope<TObject extends object, Scope extends Partial<TObject>>(this: ISubject<TObject>, scope: Scope) {
         let scopedEvent = new ScopedEventSubject<TObject, Scope>(this, scope);
         return makeEvent(scopedEvent.next.bind(scopedEvent), scopedEvent);
     }
 }
 
-class ScopedEventSubject<T extends object, Scope extends Partial<T>> extends ScopedObservable<T, Scope> {
+class ScopedEventSubject<T extends object, Scope extends Partial<T>> extends ScopedObservable<T, Scope> implements IEventBase {
     constructor(
         private _source: ISubject<T>,
         private _scope: Scope
@@ -38,23 +38,11 @@ class ScopedEventSubject<T extends object, Scope extends Partial<T>> extends Sco
 }
 
 class AsyncEvent<Result = void, Context = void> implements IEventBase {
-    private _displayName!: string;
-    private _started = new Subject<AsyncItem<Result, Context>>('');
-    private _resolved = new Subject<AsyncResult<Result, Context>>('');
-    private _rejected = new Subject<AsyncError<Context>>('');
+    private _started = new Subject<AsyncItem<Result, Context>>(() => `${this.displayName}.started`);
+    private _resolved = new Subject<AsyncResult<Result, Context>>(() => `${this.displayName}.resolved`);
+    private _rejected = new Subject<AsyncError<Context>>(() => `${this.displayName}.rejected`);
 
-    constructor(displayName: string) {
-        this.displayName = displayName;
-    }
-
-    get displayName() { return this._displayName; }
-
-    set displayName(name: string) {
-        this._displayName = name;
-        this._started.displayName = `${name}.started`;
-        this._resolved.displayName = `${name}.resolved`;
-        this._rejected.displayName = `${name}.rejected`;
-    }
+    constructor(public displayName: string) { }
 
     next(promise: PromiseLike<Result>, context: Context) {
         promise.then(

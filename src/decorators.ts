@@ -48,13 +48,22 @@ function getOrSetDerivedProperty(target: any, key: string | symbol, createComput
     return properties[key] || (properties[key] = createComputedValue());
 }
 
+export function getDerivedProperty(target: any, key: string | symbol): Derivation<any> | undefined {
+    let properties = target[derivedProperties] || (target[derivedProperties] = {}) as { [key: string]: Derivation<any> };
+    return properties[key];
+}
+
 let reducedProperties = Symbol('ReducedProperties');
+
+export function getReducedProperty(target: any, key: string): Reduction<any> | undefined {
+    return (getReducedProperties(target) || {})[key];
+}
 
 export function getReducedProperties(target: any) {
     return target[reducedProperties] as { [key: string]: Reduction<any> };
 }
 
-export function setReducedProperty(target: any, key: string, reduction: Reduction<any>) {
+function setReducedProperty(target: any, key: string, reduction: Reduction<any>) {
     (target[reducedProperties] || (target[reducedProperties] = {}))[key] = reduction;
 }
 

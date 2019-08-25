@@ -2,23 +2,22 @@ export type Observe<T> = (value: T) => void;
 export type Unsubscribe = () => void;
 
 export interface IObserver<T> {
-    displayName: string;
+    getDisplayName(): string;
     next: Observe<T>;
 }
-
 
 export abstract class Observable<T> {
     protected _observers = new Set<IObserver<T>>();
 
-    constructor(private _displayName: string) { }
+    constructor(private _getDisplayName: () => string) { }
 
-    get displayName() { return this._displayName; }
-    set displayName(name: string) { this._displayName = name; }
+    get displayName() { return this._getDisplayName(); }
+    set displayName(name: string) { this._getDisplayName = () => name; }
 
     get sources() { return [] as readonly Observable<any>[]; }
 
-    subscribe(observe: Observe<T>, observerName: string = '(anonymous observer)'): Unsubscribe {
-        let observer = { displayName: observerName, next: observe };
+    subscribe(observe: Observe<T>, getObserverName = () => '(anonymous observer)'): Unsubscribe {
+        let observer = { getDisplayName: getObserverName, next: observe };
         this._observers.add(observer);
         return () => this.unsubscribe(observer);
     }
@@ -31,8 +30,10 @@ export abstract class Observable<T> {
         Array.from(this._observers).forEach(o => o.next(value));
     }
 
+    unsubscribeFromSources() { }
+
     filter(condition: (value: T) => boolean) {
-        let filterName = `${this.displayName}.filter(${nameOf(condition)})`;
+        let filterName = () => `${this.displayName}.filter(${nameOf(condition)})`;
         return new ObservableOperation<T>(filterName, [this],
             observer => this.subscribe(value => condition(value) && observer.next(value), filterName));
     }
@@ -42,7 +43,7 @@ export abstract class Observable<T> {
     }
 
     map<U>(select: (value: T) => U) {
-        let mapName = `${this.displayName}.map(${nameOf(select)})`;
+        let mapName = () => `${this.displayName}.map(${nameOf(select)})`;
         return new ObservableOperation<U>(mapName, [this],
             observer => this.subscribe(value => observer.next(select(value)), mapName));
     }
@@ -53,42 +54,47 @@ function nameOf(fn: any) {
 }
 
 export class ObservableOperation<T> extends Observable<T> {
-    private _unsubscribe?: Unsubscribe;
+    private _unsubscribeFromSources?: Unsubscribe;
 
     constructor(
-        public displayName: string,
+        getDisplayName: () => string,
         private _sources: readonly Observable<any>[],
         private readonly _subscribeToSources: (observer: IObserver<T>) => Unsubscribe
     ) {
-        super(displayName);
+        super(getDisplayName);
     }
 
     get sources() { return this._sources; }
 
-    subscribe(observer: Observe<T>, observerName = '(anonymous observer)'): Unsubscribe {
-        let unsubscribe = super.subscribe(observer, observerName);
+    subscribe(observer: Observe<T>, getObserverName = () => '(anonymous observer)'): Unsubscribe {
+        let unsubscribe = super.subscribe(observer, getObserverName);
         if (this._observers.size == 1)
-            this._unsubscribe = this._subscribeToSources({ displayName: this.displayName, next: this.notifyObservers.bind(this) });
+            this._unsubscribeFromSources = this._subscribeToSources({ getDisplayName: () => this.displayName, next: this.notifyObservers.bind(this) });
         return unsubscribe;
     }
 
     protected unsubscribe(observer: IObserver<T>) {
         super.unsubscribe(observer);
-        if (!this._observers.size && this._unsubscribe)
-            this._unsubscribe();
+        if (!this._observers.size)
+            this.unsubscribeFromSources();
+    }
+
+    unsubscribeFromSources() {
+        if (this._unsubscribeFromSources)
+            this._unsubscribeFromSources();
     }
 }
 
 export class ScopedObservable<T extends object, Scope extends Partial<T>> extends ObservableOperation<T> {
     constructor(source: Observable<T>, scope: Scope) {
         super(
-            `${source.displayName}.scoped({ ${Object.entries(scope).map(([k, v]) => `${k}: ${v}`).join(', ')} })`,
+            () => `${source.displayName}.scoped({ ${Object.entries(scope).map(([k, v]) => `${k}: ${v}`).join(', ')} })`,
             [source],
             observer => source.subscribe(value =>
                 Object.entries(scope)
                     .every(([k, v]) => value[k as keyof T] === v)
                 && observer.next(value),
-                this.displayName));
+                () => this.displayName));
     }
 }
 

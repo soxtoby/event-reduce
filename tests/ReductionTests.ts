@@ -14,7 +14,7 @@ describe("reduce", function () {
         it("starts with initial value", () => sut.value.should.equal(1));
 
         when("subscribed to an observable", () => {
-            let subject = new Subject<string>('test');
+            let subject = new Subject<string>(() => 'test');
             let reducer = sinon.stub();
             sut.on(subject, reducer);
 
@@ -39,7 +39,7 @@ describe("reduce", function () {
 
         when("a reducer accesses a reduced value", () => {
             let other = reduce(0);
-            let subject = new Subject<number>('test');
+            let subject = new Subject<number>(() => 'test');
             sut.on(subject, () => other.value);
 
             when("other value based on same event", () => {
@@ -59,7 +59,7 @@ describe("reduce", function () {
         let sut = reduce(1, events);
 
         when("subscribing to an observable", () => {
-            let subject = new Subject<string>('test');
+            let subject = new Subject<string>(() => 'test');
             let getEvent = sinon.spy(() => subject);
             let reducer = sinon.stub();
             sut.on(getEvent, reducer);

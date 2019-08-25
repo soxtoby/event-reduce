@@ -45,9 +45,7 @@ describe("mutable", () => {
 
         then("reduced value returns override", () => sut.value.should.equal(2));
 
-        then("computed value is still computed", () => {
-            sut.valuePlusOne.should.equal(3)
-        });
+        then("computed value is still computed", () => sut.valuePlusOne.should.equal(3));
     });
 
     when("computed property overridden", () => {

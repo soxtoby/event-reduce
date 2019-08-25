@@ -1,34 +1,27 @@
-import { derive } from "./derivation";
+import { getDerivedProperty, getReducedProperty } from "./decorators";
 import { event } from "./events";
-import { ObservableValue } from "./observableValue";
 
 export function mutable<T>(model: T): Mutable<T> {
     if (model && typeof model == 'object' && !Array.isArray(model)) {
-        let overrides = new ObservableBox<Record<string, unknown>>('(overrides)', {});
         for (let [key, base] of allProperties(model)) {
-            let propertyValue = derive(
-                () => key in overrides.value ? overrides.value[key]
-                    : base.get ? base.get.call(model)
-                        : base.value, key);
+            let observableValue = getDerivedProperty(model, key) || getReducedProperty(model, key)!;
 
-            Object.defineProperty(model, key, {
-                get() { return propertyValue.value; },
-                set(value) { overrides.value = { ...overrides.value, [key]: value }; },
-                enumerable: base.enumerable,
-                configurable: true
-            });
+            if (observableValue) {
+                Object.defineProperty(model, key, {
+                    get() { return observableValue.value; },
+                    set(value) {
+                        observableValue.unsubscribeFromSources();
+                        observableValue.setValue(value);
+                    },
+                    enumerable: base.enumerable,
+                    configurable: true
+                });
+            }
         }
 
         Object.defineProperty(model, 'readonly', { get: () => model, configurable: true });
     }
     return model as Mutable<T>;
-}
-
-class ObservableBox<T> extends ObservableValue<T> {
-    set value(val: T) {
-        this._value = val;
-        this.notifyObservers(val);
-    }
 }
 
 function allProperties(obj: unknown) {
@@ -54,7 +47,7 @@ export function eventProxy<TEvent extends (...args: any[]) => void>(createEvent:
 export function eventProxy<TEvent extends (...args: any[]) => void, T = any>(createEvent: () => TEvent): T & { [P in keyof T]: TEvent };
 export function eventProxy(createEvent: () => any = event) {
     let event = createEvent();
-    return new Proxy({}, {
+    return new Proxy(event, {
         get(target: any, key: PropertyKey) {
             if (typeof key == 'string')
                 return target[key] || (target[key] = eventProxy(createEvent));

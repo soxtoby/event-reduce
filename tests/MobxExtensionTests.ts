@@ -94,17 +94,10 @@ describe("events decorator", function () {
     @events
     class TestEvents {
         promiseEvent = asyncEvent<string>();
-        observableEvent = event<Observable<string>>();
     }
-    let listener = sinon.stub();
     let sut = new TestEvents();
 
     it("keeps class name", () => TestEvents.name.should.equal('TestEvents'));
-
-    test("property is a mobx action", () => {
-        sut.promiseEvent(SynchronousPromise.unresolved());
-        listener.should.have.been.calledWith(sinon.match({ type: 'action', name: 'promiseEvent' }));
-    });
 
     test("extended promises keep extra properties", () => {
         let promise = SynchronousPromise.unresolved<string>();
@@ -114,24 +107,6 @@ describe("events decorator", function () {
 
         sut.promiseEvent(promise);
 
-        onstarted.should.have.been.calledWith(sinon.match({ foo: 'bar', then: sinon.match.func }));
-    });
-
-    test("promise resolved as action", () => {
-        let onfulfilled = sinon.stub();
-        sut.promiseEvent.resolved.subscribe(onfulfilled);
-        sut.promiseEvent(SynchronousPromise.resolve('foo'));
-
-        onfulfilled.should.have.been.calledWith('foo');
-        listener.should.have.been.calledWith(sinon.match({ type: 'action', name: 'promiseEvent.resolved' }));
-    });
-
-    test("promise rejected as action", () => {
-        let onrejected = sinon.stub();
-        sut.promiseEvent.rejected.subscribe(onrejected);
-        sut.promiseEvent(SynchronousPromise.reject<string>('foo'));
-
-        onrejected.should.have.been.calledWith('foo');
-        listener.should.have.been.calledWith(sinon.match({ type: 'action', name: 'promiseEvent.rejected' }));
+        onstarted.should.have.been.calledWith(sinon.match({ promise: { foo: 'bar', then: sinon.match.func } }));
     });
 });

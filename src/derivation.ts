@@ -2,7 +2,7 @@ import { ObservableValue, collectAccessedValues } from "./observableValue";
 import { Observable, Unsubscribe } from "./observable";
 
 export function derive<T>(getDerivedValue: () => T, name?: string) {
-    return new Derivation(name || '(anonymous derivation)', getDerivedValue);
+    return new Derivation(() => name || '(anonymous derivation)', getDerivedValue);
 }
 
 export class Derivation<T> extends ObservableValue<T> {
@@ -10,10 +10,10 @@ export class Derivation<T> extends ObservableValue<T> {
     private _sources = new Map<Observable<any>, Unsubscribe>();
 
     constructor(
-        public displayName: string,
+        getDisplayName: () => string,
         private _deriveValue: () => T
     ) {
-        super(displayName, undefined!);
+        super(getDisplayName, undefined!);
     }
 
     get sources() { return Array.from(this._sources.keys()); }
@@ -28,22 +28,21 @@ export class Derivation<T> extends ObservableValue<T> {
         let value!: T;
 
         collectAccessedValues(() => value = this._deriveValue())
-            .forEach(o => this._sources.set(o, o.subscribe(() => this.invalidate(), this.displayName)));
+            .forEach(o => this._sources.set(o, o.subscribe(() => this.invalidate(), () => this.displayName)));
 
         this._requiresUpdate = false;
-        this._value = value;
-        this.notifyObservers(value);
+        this.setValue(value);
     }
 
     private invalidate() {
-        this.unsubscribe();
+        this.unsubscribeFromSources();
         this._requiresUpdate = true;
 
         if (this._observers.size)
             this.update();
     }
 
-    unsubscribe() {
+    unsubscribeFromSources() {
         this._sources.forEach(unsub => unsub());
         this._sources.clear();
     }

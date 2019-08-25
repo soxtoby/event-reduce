@@ -19,7 +19,7 @@ class Watcher {
     run() {
         this.unsubscribe();
         collectAccessedValues(this._action)
-            .forEach(o => this._sources.set(o, o.subscribe(() => this.run(), this.displayName)));
+            .forEach(o => this._sources.set(o, o.subscribe(() => this.run(), () => this.displayName)));
     }
 
     unsubscribe() {

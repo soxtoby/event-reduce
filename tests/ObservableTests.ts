@@ -9,10 +9,13 @@ describe("ObservableOperation", function () {
         let subscribe = sinon.spy(() => unsubscribe);
         let observer = sinon.spy();
 
-        let sut = new ObservableOperation('test', [], subscribe);
+        let sut = new ObservableOperation(() => 'test', [], subscribe);
         let result = sut.subscribe(observer);
 
-        then("subscribe function called with observer", () => subscribe.should.have.been.calledWith(sinon.match.func));
+        then("subscribe function called with observer", () => subscribe.should.have.been.calledWith(sinon.match({
+            getDisplayName: sinon.match.func,
+            next: sinon.match.func
+        })));
 
         when("unsubscribed", () => {
             result();
@@ -34,7 +37,7 @@ describe("ObservableOperation", function () {
     });
 
     function observableOf<T>(...args: T[]) {
-        return new ObservableOperation<T>('source', [], observer => {
+        return new ObservableOperation<T>(() => 'source', [], observer => {
             args.forEach(a => observer.next(a));
             return () => { }
         });
