@@ -5,10 +5,10 @@ import { Subject } from '../src/subject';
 import './setup';
 import { collectAccessedValues } from '../src/observableValue';
 
-describe("reduce", function () {
+describe(reduce.name, function () {
     when("unbound", () => {
         let subscriber = sinon.stub();
-        let sut = reduce(1);
+        let sut = reduce(1, 'sut');
         sut.subscribe(subscriber);
 
         it("starts with initial value", () => sut.value.should.equal(1));
@@ -51,6 +51,14 @@ describe("reduce", function () {
             when("other value not based on same event", () => {
                 it("doesn't throw", () => subject.next(0));
             });
+        });
+
+        when("subscribing to an observable based on itself", () => {
+            let observable = sut.filter(n => n > 3);
+            observable.displayName = 'dependant observable';
+            let action = () => sut.on(observable, (_, n) => n);
+
+            it("throws", () => action.should.throw("Cannot subscribe to 'dependant observable', as it depends on this reduction, 'sut'."));
         });
     });
 

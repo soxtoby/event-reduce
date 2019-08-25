@@ -3,20 +3,22 @@ import { Subject } from "./subject";
 import { ObservableValue, collectAccessedValues, lastAccessed } from "./observableValue";
 import { Observable, Unsubscribe, allSources } from "./observable";
 
-export function reduce<TValue>(initial: TValue): Reduction<TValue>;
-export function reduce<TValue, TEvents>(initial: TValue, events: TEvents): BoundReduction<TValue, TEvents>;
-export function reduce<TValue, TEvents>(initial: TValue, events?: TEvents): Reduction<TValue> {
-    return events ? new BoundReduction(initial, events) : new Reduction(initial);
+export function reduce<TValue>(initial: TValue, displayName?: string): Reduction<TValue>;
+export function reduce<TValue, TEvents>(initial: TValue, events: TEvents, displayName?: string): BoundReduction<TValue, TEvents>;
+export function reduce<TValue, TEvents>(initial: TValue, events?: TEvents | string, displayName: string = '(anonymous reduction)'): Reduction<TValue> {
+    return events && typeof events != 'string' ? new BoundReduction(() => displayName, initial, events)
+        : typeof events == 'string' ? new Reduction(() => events, initial)
+            : new Reduction(() => displayName, initial);
 }
 
 type Reducer<TValue, TEvent> = (previous: TValue, eventValue: TEvent) => TValue;
 
-export class Reduction<T> extends ObservableValue<T> {
+class Reduction<T> extends ObservableValue<T> {
     private _sources = new Map<Observable<any>, Unsubscribe>();
     private _restore = new Subject<State<T>>(() => `${this.displayName}.restored`);
 
-    constructor(initial: T) {
-        super(() => '(anonymous reduction)', initial);
+    constructor(getDisplayName: () => string, initial: T) {
+        super(getDisplayName, initial);
 
         this.onRestore((current, state) => {
             if (current && typeof current == 'object') {
@@ -34,6 +36,9 @@ export class Reduction<T> extends ObservableValue<T> {
     }
 
     on<TEvent>(observable: Observable<TEvent>, reduce: Reducer<T, TEvent>) {
+        if (allSources(observable.sources).has(this))
+            throw new Error(`Cannot subscribe to '${observable.displayName}', as it depends on this reduction, '${this.displayName}'.`);
+
         let unsubscribeExisting = this._sources.get(observable);
         if (unsubscribeExisting)
             unsubscribeExisting();
@@ -77,7 +82,11 @@ function firstIntersection<T>(a: Set<T>, b: Set<T>) {
 }
 
 export class BoundReduction<TValue, TEvents> extends Reduction<TValue> {
-    constructor(public initial: TValue, private _events: TEvents = {} as TEvents) { super(initial); }
+    constructor(
+        getDisplayName: () => string,
+        initial: TValue,
+        private _events: TEvents = {} as TEvents
+    ) { super(getDisplayName, initial); }
 
     on<TEvent>(observable: ((events: TEvents) => Observable<TEvent>) | Observable<TEvent>, reduce: Reducer<TValue, TEvent>): this {
         return super.on(typeof observable == 'function' ? observable(this._events) : observable, reduce);

@@ -14,6 +14,7 @@ export class Derivation<T> extends ObservableValue<T> {
         private _deriveValue: () => T
     ) {
         super(getDisplayName, undefined!);
+        this.update();
     }
 
     get sources() { return Array.from(this._sources.keys()); }

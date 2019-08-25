@@ -1,13 +1,13 @@
 import { Observable } from "./observable";
 import { Subject } from "./subject";
 
-const valueAccessed = new Subject<ObservableValue<any>>(() => "(accessed observable values)");
+let valueAccessed = new Subject<ObservableValue<any>>(() => "(accessed observable values)");
 
-export let lastAccessed = {} as { observableValue: ObservableValue<any> | undefined };
+export const lastAccessed = {} as { observableValue: ObservableValue<any> | undefined };
 
 valueAccessed.subscribe(accessedValue => lastAccessed.observableValue = accessedValue, () => '(last accessed)');
 
-export abstract class ObservableValue<T> extends Observable<T> {
+export class ObservableValue<T> extends Observable<T> {
     constructor(
         getDisplayName: () => string,
         protected _value: T

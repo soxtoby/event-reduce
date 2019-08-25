@@ -1,14 +1,12 @@
 import { SynchronousPromise } from "synchronous-promise";
 import { describe, it, test, then, when } from "wattle";
-import { events, reduced, extend, derived } from "../src/decorators";
-import { watch } from "../src/watching";
-import { Observable } from "../src/observable";
+import { derived, events, extend, reduced } from "../src/decorators";
+import { asyncEvent, event } from "../src/events";
 import { reduce } from "../src/reduction";
-import { event, asyncEvent } from "./../src/events";
 import './setup';
 import sinon = require("sinon");
 
-describe("reduced decorator", function () {
+describe("model decorators", function () {
     let increment = event();
     let decrement = event();
     class TestModel {
@@ -39,21 +37,14 @@ describe("reduced decorator", function () {
     }
     let model = new TestModel();
 
-    let result = [] as number[];
-    watch(() => result.push(model.property));
-
     test("property has initial value", () => model.property.should.equal(1));
 
     test("extended property has same initial value", () => model.extendedProperty.should.equal(1));
-
-    test("mobx observable provides value", () => result.should.have.members([1]));
 
     when("reduction updated", () => {
         increment();
 
         then("property value updated", () => model.property.should.equal(2));
-
-        then("mobx observable updated", () => result.should.have.members([1, 2]));
 
         then("dependent property value updated", () => model.dependentProperty.should.equal(2));
 

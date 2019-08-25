@@ -3,8 +3,8 @@ import { describe, it, when } from 'wattle';
 import { Subject } from '../src/subject';
 import './setup';
 
-describe("Subject", function () {
-    let sut = new Subject<number>('test');
+describe(Subject.name, function () {
+    let sut = new Subject<number>(() => 'test');
 
     when("subscribed to", () => {
         let observer1 = sinon.spy();
