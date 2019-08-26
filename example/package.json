@@ -1,0 +1,20 @@
+{
+    "name": "event-reduce-example",
+    "version": "1.0.0",
+    "license": "MIT",
+    "private": true,
+    "author": "Simon Oxtoby",
+    "homepage": "https://github.com/soxtoby/event-reduce",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/soxtoby/event-reduce.git"
+    },
+    "dependencies": {
+        "event-reduce": "*",
+        "react": "~16"
+    },
+    "devDependencies": {
+        "@types/react": "~16",
+        "typescript": "~3"
+    }
+}

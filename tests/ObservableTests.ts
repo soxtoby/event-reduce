@@ -1,6 +1,6 @@
+import { Observable, ObservableOperation } from 'event-reduce/lib/observable';
 import * as sinon from 'sinon';
 import { describe, test, then, when } from 'wattle';
-import { Observable, ObservableOperation } from '../src/observable';
 import './setup';
 
 describe("ObservableOperation", function () {

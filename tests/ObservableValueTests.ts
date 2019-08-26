@@ -1,6 +1,6 @@
+import { collectAccessedValues, lastAccessed, ObservableValue } from 'event-reduce/lib/observableValue';
 import * as sinon from 'sinon';
 import { describe, it, then, when } from 'wattle';
-import { collectAccessedValues, lastAccessed, ObservableValue } from '../src/observableValue';
 import './setup';
 
 describe(ObservableValue.name, function () {

@@ -1,8 +1,6 @@
+import { asyncEvent, derived, event, events, extend, reduce, reduced } from "event-reduce";
 import { SynchronousPromise } from "synchronous-promise";
 import { describe, it, test, then, when } from "wattle";
-import { derived, events, extend, reduced } from "../src/decorators";
-import { asyncEvent, event } from "../src/events";
-import { reduce } from "../src/reduction";
 import './setup';
 import sinon = require("sinon");
 

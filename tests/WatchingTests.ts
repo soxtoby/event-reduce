@@ -1,6 +1,6 @@
+import { watch } from "event-reduce";
+import { ObservableValue } from "event-reduce/lib/observableValue";
 import { describe, it, when } from "wattle";
-import { ObservableValue } from "../src/observableValue";
-import { watch } from "../src/watching";
 import './setup';
 import sinon = require("sinon");
 

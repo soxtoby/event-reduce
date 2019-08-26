@@ -1,16 +1,9 @@
 {
-  "compilerOptions": {
-    "target": "es6",
-    "module": "commonjs",
-    "lib": ["es2017", "dom"],
-    "declaration": true,
-    "outDir": "./lib",
-    "strict": true,
-    "inlineSourceMap": true,
-    "inlineSources": true,
-    "experimentalDecorators": true
-  },
-  "include": [
-    "src"
-  ]
+    "extends": "./tsconfig.base.json",
+    "files": [],
+    "references": [
+        {
+            "path": "packages/event-reduce"
+        }
+    ]
 }

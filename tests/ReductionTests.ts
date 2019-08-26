@@ -1,9 +1,9 @@
+import { reduce } from 'event-reduce';
+import { collectAccessedValues } from 'event-reduce/lib/observableValue';
+import { Subject } from 'event-reduce/lib/subject';
 import * as sinon from 'sinon';
 import { describe, it, test, then, when } from 'wattle';
-import { reduce } from '../src/reduction';
-import { Subject } from '../src/subject';
 import './setup';
-import { collectAccessedValues } from '../src/observableValue';
 
 describe(reduce.name, function () {
     when("unbound", () => {

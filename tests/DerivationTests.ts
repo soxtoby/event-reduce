@@ -1,6 +1,6 @@
+import { derive } from "event-reduce";
+import { lastAccessed, ObservableValue } from "event-reduce/lib/observableValue";
 import { describe, it, then, when } from "wattle";
-import { derive } from "../src/derivation";
-import { lastAccessed, ObservableValue } from "../src/observableValue";
 import './setup';
 import sinon = require("sinon");
 

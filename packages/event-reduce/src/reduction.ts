@@ -13,7 +13,7 @@ export function reduce<TValue, TEvents>(initial: TValue, events?: TEvents | stri
 
 type Reducer<TValue, TEvent> = (previous: TValue, eventValue: TEvent) => TValue;
 
-class Reduction<T> extends ObservableValue<T> {
+export class Reduction<T> extends ObservableValue<T> {
     private _sources = new Map<Observable<any>, Unsubscribe>();
     private _restore = new Subject<State<T>>(() => `${this.displayName}.restored`);
 
@@ -81,7 +81,7 @@ function firstIntersection<T>(a: Set<T>, b: Set<T>) {
             return item;
 }
 
-export class BoundReduction<TValue, TEvents> extends Reduction<TValue> {
+class BoundReduction<TValue, TEvents> extends Reduction<TValue> {
     constructor(
         getDisplayName: () => string,
         initial: TValue,

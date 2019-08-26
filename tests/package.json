@@ -1,0 +1,26 @@
+{
+  "name": "event-reduce-tests",
+  "version": "1.0.0",
+  "license": "MIT",
+  "private": true,
+  "author": "Simon Oxtoby",
+  "homepage": "https://github.com/soxtoby/event-reduce",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/soxtoby/event-reduce.git"
+  },
+  "dependencies": {
+    "event-reduce": "*"
+  },
+  "devDependencies": {
+    "@types/react": "~16",
+    "@types/sinon-chai": "~2",
+    "chai": "~4",
+    "react": "~16",
+    "sinon": "~4",
+    "sinon-chai": "~3",
+    "synchronous-promise": "~2",
+    "typescript": "~3",
+    "wattle": "~0"
+  }
+}

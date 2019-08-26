@@ -1,6 +1,6 @@
+import { derived, event, events, reduce, reduced } from 'event-reduce';
 import { observer } from 'mobx-react';
 import * as React from 'React';
-import { derived, event, events, reduce, reduced } from '..';
 
 @events
 class RootEvents {

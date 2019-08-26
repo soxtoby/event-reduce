@@ -1,8 +1,7 @@
 import { describe, it } from "wattle";
-import { getState, setState, State, state } from "../src/experimental/state";
-import { reduce } from "../src/reduction";
 import './setup';
-import { reduced, derived } from "../src/decorators";
+import { reduced, reduce, derived } from "event-reduce";
+import { state, getState, setState, State } from "event-reduce/lib/experimental/state";
 
 describe("state", function () {
     class TestModel {

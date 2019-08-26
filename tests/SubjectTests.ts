@@ -1,6 +1,6 @@
+import { Subject } from 'event-reduce/lib/subject';
 import * as sinon from 'sinon';
 import { describe, it, when } from 'wattle';
-import { Subject } from '../src/subject';
 import './setup';
 
 describe(Subject.name, function () {
