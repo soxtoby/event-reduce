@@ -1,5 +1,6 @@
-export { event, asyncEvent, IEventBase, makeEvent } from "./events";
-export { derived, events, reduced, extend } from "./decorators";
+export { derived, events, extend, reduced } from "./decorators";
 export { derive } from "./derivation";
-export { reduce } from "./reduction";
+export { asyncEvent, event, IEventBase, makeEvent } from "./events";
+export { IObservableValue } from "./observableValue";
+export { IBoundReduction, IReduction, reduce } from "./reduction";
 export { watch } from "./watching";

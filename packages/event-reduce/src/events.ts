@@ -1,13 +1,45 @@
-import { Subject, ISubject } from "./subject";
-import { Observable, ScopedObservable } from "./observable";
+import { IObservable, ScopedObservable } from "./observable";
+import { ISubject, Subject } from "./subject";
 import { ObjectOmit } from "./types";
 
-export function event<T = void>(name = '(anonymous event)') {
+export interface IEvent<T> extends Omit<ISubject<T>, 'scope'> {
+    (eventValue: T): void;
+    scope<TObject extends object, Scope extends Partial<TObject>>(this: ISubject<TObject>, scope: Scope): IScopedEvent<TObject, Scope>;
+}
+
+export interface IScopedEvent<T extends object, Scope extends object> extends Omit<ISubject<T>, 'scope'> {
+    (eventValue: ObjectOmit<T, Scope>): void;
+    scope<TObject extends object, Scope extends Partial<TObject>>(this: ISubject<TObject>, scope: Scope): IScopedEvent<TObject, Scope>;
+}
+
+export interface IAsyncEvent<Result, Context> {
+    (promise: PromiseLike<Result>, context: Context): void;
+    readonly started: IObservable<AsyncItem<Result, Context>>;
+    readonly resolved: IObservable<AsyncResult<Result, Context>>;
+    readonly rejected: IObservable<AsyncError<Context>>;
+}
+
+export interface AsyncItem<Result, Context> {
+    promise: PromiseLike<Result>;
+    context: Context;
+}
+
+export interface AsyncResult<Result, Context> {
+    result: Result;
+    context: Context;
+}
+
+export interface AsyncError<Context> {
+    error: any;
+    context: Context;
+}
+
+export function event<T = void>(name = '(anonymous event)'): IEvent<T> {
     let subject = new EventSubject<T>(() => name);
     return makeEvent(subject.next.bind(subject), subject);
 }
 
-export function asyncEvent<Result = void, Context = void>(name = '(anonymous async event)') {
+export function asyncEvent<Result = void, Context = void>(name = '(anonymous async event)'): IAsyncEvent<Result, Context> {
     let asyncEvent = new AsyncEvent<Result, Context>(name);
     return makeEvent(asyncEvent.next.bind(asyncEvent), asyncEvent);
 }
@@ -51,24 +83,9 @@ class AsyncEvent<Result = void, Context = void> implements IEventBase {
         this._started.next({ promise, context });
     }
 
-    get started() { return this._started as Observable<AsyncItem<Result, Context>>; }
-    get resolved() { return this._resolved as Observable<AsyncResult<Result, Context>>; }
-    get rejected() { return this._rejected as Observable<AsyncError<Context>>; }
-}
-
-interface AsyncItem<Result, Context> {
-    promise: PromiseLike<Result>;
-    context: Context;
-}
-
-interface AsyncResult<Result, Context> {
-    result: Result;
-    context: Context;
-}
-
-interface AsyncError<Context> {
-    error: any;
-    context: Context;
+    get started() { return this._started as IObservable<AsyncItem<Result, Context>>; }
+    get resolved() { return this._resolved as IObservable<AsyncResult<Result, Context>>; }
+    get rejected() { return this._rejected as IObservable<AsyncError<Context>>; }
 }
 
 export function makeEvent<Fn extends (...args: any[]) => void, Event extends IEventBase>(eventFn: Fn, prototype: Event) {

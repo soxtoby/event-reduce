@@ -1,6 +1,6 @@
-import { Observable } from "./observable";
+import { IObservable, Observable } from "./observable";
 
-export interface ISubject<TIn, TOut = TIn> extends Observable<TOut> {
+export interface ISubject<TIn, TOut = TIn> extends IObservable<TOut> {
     next(value: TIn): void;
 }
 

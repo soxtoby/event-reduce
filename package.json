@@ -18,7 +18,8 @@
     "scripts": {
         "prepare": "tsc -b",
         "watch": "tsc -b -w",
-        "test": "wattle ./tests/**"
+        "test": "wattle ./tests/**",
+        "example": "cd example && parcel index.html --open"
     },
     "devDependencies": {
         "typescript": "~3",

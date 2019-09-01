@@ -1,7 +1,13 @@
 {
-    "extends": "../tsconfig.base.json",
     "compilerOptions": {
-        "jsx": "react",
-        "baseUrl": "."
+      "target": "es5",
+      "module": "commonjs",
+      "lib": ["es2017", "dom"],
+      "jsx": "react",
+      "baseUrl": ".",
+      "strict": true,
+      "inlineSourceMap": true,
+      "inlineSources": true,
+      "experimentalDecorators": true
     }
-}
+  }

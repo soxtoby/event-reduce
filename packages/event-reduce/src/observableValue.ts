@@ -1,4 +1,4 @@
-import { Observable } from "./observable";
+import { IObservable, Observable } from "./observable";
 import { Subject } from "./subject";
 
 let valueAccessed = new Subject<ObservableValue<any>>(() => "(accessed observable values)");
@@ -6,6 +6,10 @@ let valueAccessed = new Subject<ObservableValue<any>>(() => "(accessed observabl
 export const lastAccessed = {} as { observableValue: ObservableValue<any> | undefined };
 
 valueAccessed.subscribe(accessedValue => lastAccessed.observableValue = accessedValue, () => '(last accessed)');
+
+export interface IObservableValue<T> extends IObservable<T> {
+    readonly value: T;
+}
 
 export class ObservableValue<T> extends Observable<T> {
     constructor(
@@ -27,7 +31,7 @@ export class ObservableValue<T> extends Observable<T> {
 }
 
 export function collectAccessedValues(action: () => void) {
-    let observables = new Set<Observable<any>>();
+    let observables = new Set<ObservableValue<any>>();
     let unsubscribe = valueAccessed.subscribe(o => observables.add(o), () => '(accessed value collection)');
 
     action();

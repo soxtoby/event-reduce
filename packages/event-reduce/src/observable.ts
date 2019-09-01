@@ -1,6 +1,17 @@
 export type Observe<T> = (value: T) => void;
 export type Unsubscribe = () => void;
 
+export interface IObservable<T> {
+    subscribe(observe: Observe<T>, getObserverName?: () => string): Unsubscribe;
+    unsubscribeFromSources(): void;
+    filter(condition: (value: T) => boolean): IObservable<T>;
+    scope<TObject extends object, Scope extends Partial<TObject>>(this: IObservable<TObject>, scope: Scope): IObservable<TObject>;
+    map<U>(select: (value: T) => U): IObservable<U>;
+
+    readonly displayName: string;
+    readonly sources: readonly IObservable<any>[];
+}
+
 export interface IObserver<T> {
     getDisplayName(): string;
     next: Observe<T>;
@@ -14,7 +25,7 @@ export abstract class Observable<T> {
     get displayName() { return this._getDisplayName(); }
     set displayName(name: string) { this._getDisplayName = () => name; }
 
-    get sources() { return [] as readonly Observable<any>[]; }
+    get sources() { return [] as readonly IObservable<any>[]; }
 
     subscribe(observe: Observe<T>, getObserverName = () => '(anonymous observer)'): Unsubscribe {
         let observer = { getDisplayName: getObserverName, next: observe };
@@ -32,17 +43,17 @@ export abstract class Observable<T> {
 
     unsubscribeFromSources() { }
 
-    filter(condition: (value: T) => boolean) {
+    filter(condition: (value: T) => boolean): IObservable<T> {
         let filterName = () => `${this.displayName}.filter(${nameOf(condition)})`;
         return new ObservableOperation<T>(filterName, [this],
             observer => this.subscribe(value => condition(value) && observer.next(value), filterName));
     }
 
-    scope<TObject extends object, Scope extends Partial<TObject>>(this: Observable<TObject>, scope: Scope) {
+    scope<TObject extends object, Scope extends Partial<TObject>>(this: IObservable<TObject>, scope: Scope): IObservable<TObject> {
         return new ScopedObservable<TObject, Scope>(this, scope);
     }
 
-    map<U>(select: (value: T) => U) {
+    map<U>(select: (value: T) => U): IObservable<U> {
         let mapName = () => `${this.displayName}.map(${nameOf(select)})`;
         return new ObservableOperation<U>(mapName, [this],
             observer => this.subscribe(value => observer.next(select(value)), mapName));
@@ -58,7 +69,7 @@ export class ObservableOperation<T> extends Observable<T> {
 
     constructor(
         getDisplayName: () => string,
-        private _sources: readonly Observable<any>[],
+        private _sources: readonly IObservable<any>[],
         private readonly _subscribeToSources: (observer: IObserver<T>) => Unsubscribe
     ) {
         super(getDisplayName);
@@ -86,7 +97,7 @@ export class ObservableOperation<T> extends Observable<T> {
 }
 
 export class ScopedObservable<T extends object, Scope extends Partial<T>> extends ObservableOperation<T> {
-    constructor(source: Observable<T>, scope: Scope) {
+    constructor(source: IObservable<T>, scope: Scope) {
         super(
             () => `${source.displayName}.scoped({ ${Object.entries(scope).map(([k, v]) => `${k}: ${v}`).join(', ')} })`,
             [source],
@@ -98,12 +109,12 @@ export class ScopedObservable<T extends object, Scope extends Partial<T>> extend
     }
 }
 
-export function allSources(sources: Iterable<Observable<any>>) {
-    let allSources = new Set<Observable<any>>();
+export function allSources(sources: Iterable<IObservable<any>>) {
+    let allSources = new Set<IObservable<any>>();
     addSourcesRecursive(sources);
     return allSources;
 
-    function addSourcesRecursive(sources: Iterable<Observable<any>>) {
+    function addSourcesRecursive(sources: Iterable<IObservable<any>>) {
         for (let s of sources) {
             allSources.add(s);
             addSourcesRecursive(s.sources);
