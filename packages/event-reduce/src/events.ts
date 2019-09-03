@@ -1,3 +1,4 @@
+import { log } from "./logging";
 import { IObservable, ScopedObservable } from "./observable";
 import { ISubject, Subject } from "./subject";
 import { ObjectOmit } from "./types";
@@ -36,18 +37,23 @@ export interface AsyncError<Context> {
 
 export function event<T = void>(name = '(anonymous event)'): IEvent<T> {
     let subject = new EventSubject<T>(() => name);
-    return makeEvent(subject.next.bind(subject), subject);
+    return makeEvent(subject);
 }
 
 export function asyncEvent<Result = void, Context = void>(name = '(anonymous async event)'): IAsyncEvent<Result, Context> {
     let asyncEvent = new AsyncEvent<Result, Context>(name);
-    return makeEvent(asyncEvent.next.bind(asyncEvent), asyncEvent);
+    return makeEvent(asyncEvent);
 }
 
 class EventSubject<T> extends Subject<T> implements IEventBase {
+    next(value: T) {
+        log('⚡ (event)', this.displayName, [value || ''], undefined,
+            () => super.next(value));
+    }
+
     scope<TObject extends object, Scope extends Partial<TObject>>(this: ISubject<TObject>, scope: Scope) {
         let scopedEvent = new ScopedEventSubject<TObject, Scope>(this, scope);
-        return makeEvent(scopedEvent.next.bind(scopedEvent), scopedEvent);
+        return makeEvent(scopedEvent);
     }
 }
 
@@ -60,12 +66,13 @@ class ScopedEventSubject<T extends object, Scope extends Partial<T>> extends Sco
     }
 
     next(partial: ObjectOmit<T, Scope>) {
-        this._source.next({ ...partial, ...this._scope } as any as T);
+        log('{⚡} (scoped event)', this.displayName, [partial], { Scope: this._scope },
+            () => this._source.next({ ...partial, ...this._scope } as any as T));
     }
 
     scope<TObject extends object, SubScope extends Partial<TObject>>(this: ISubject<TObject>, scope: SubScope) {
         let scopedEvent = new ScopedEventSubject<TObject, SubScope>(this, scope);
-        return makeEvent(scopedEvent.next.bind(scopedEvent), scopedEvent);
+        return makeEvent(scopedEvent);
     }
 }
 
@@ -78,9 +85,13 @@ class AsyncEvent<Result = void, Context = void> implements IEventBase {
 
     next(promise: PromiseLike<Result>, context: Context) {
         promise.then(
-            result => this._resolved.next({ result, context }),
-            error => this._rejected.next({ error, context }));
-        this._started.next({ promise, context });
+            result => log('⚡✔ (async result)', this.displayName + '.resolved', [context || ''], { Promise: promise },
+                () => this._resolved.next({ result, context })),
+            error => log('⚡❌ (async error)', this.displayName + '.rejected', [context || ''], { Promise: promise },
+                () => this._rejected.next({ error, context })));
+
+        log('⚡⌚ (async event)', this.displayName + '.started', [context || ''], { Promise: promise },
+            () => this._started.next({ promise, context }));
     }
 
     get started() { return this._started as IObservable<AsyncItem<Result, Context>>; }
@@ -88,7 +99,7 @@ class AsyncEvent<Result = void, Context = void> implements IEventBase {
     get rejected() { return this._rejected as IObservable<AsyncError<Context>>; }
 }
 
-export function makeEvent<Fn extends (...args: any[]) => void, Event extends IEventBase>(eventFn: Fn, prototype: Event) {
+export function makeEvent<Fn extends (...args: any[]) => void, Event extends IEventBase>(prototype: Event) {
     Object.setPrototypeOf(fireEvent, prototype);
     fireEvent.apply = Function.prototype.apply;
     return fireEvent as Fn & Event;
@@ -99,7 +110,7 @@ export function makeEvent<Fn extends (...args: any[]) => void, Event extends IEv
                 throw new Error("Fired an event in response to another event.");
 
             insideEvent = true;
-            eventFn(...args);
+            prototype.next.apply(fireEvent, args);
         } finally {
             insideEvent = false;
         }
@@ -110,4 +121,5 @@ let insideEvent = false;
 
 export interface IEventBase {
     displayName: string;
+    next(...args: any[]): void;
 }

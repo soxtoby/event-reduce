@@ -1,7 +1,8 @@
 import { setState, State, StateObject } from "./experimental/state";
+import { log } from "./logging";
+import { allSources, IObservable, Unsubscribe } from "./observable";
+import { collectAccessedValues, lastAccessed, ObservableValue } from "./observableValue";
 import { Subject } from "./subject";
-import { ObservableValue, collectAccessedValues, lastAccessed } from "./observableValue";
-import { Observable, Unsubscribe, allSources, IObservable } from "./observable";
 
 export function reduce<TValue>(initial: TValue, displayName?: string): IReduction<TValue>;
 export function reduce<TValue, TEvents>(initial: TValue, events: TEvents, displayName?: string): IBoundReduction<TValue, TEvents>;
@@ -65,7 +66,8 @@ export class Reduction<T> extends ObservableValue<T> {
             if (commonSource)
                 throw new Error("Accessed a reduced value derived from the same event being fired.")
 
-            this.setValue(value);
+            log('🧪 (reduction)', this.displayName, [], { Previous: this._value, Current: value },
+                () => this.setValue(value));
         }, () => this.displayName));
 
         return this;

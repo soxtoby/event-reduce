@@ -1,5 +1,6 @@
-import { ObservableValue, collectAccessedValues } from "./observableValue";
+import { log } from "./logging";
 import { Observable, Unsubscribe } from "./observable";
+import { collectAccessedValues, ObservableValue } from "./observableValue";
 
 export function derive<T>(getDerivedValue: () => T, name?: string) {
     return new Derivation(() => name || '(anonymous derivation)', getDerivedValue);
@@ -32,7 +33,9 @@ export class Derivation<T> extends ObservableValue<T> {
             .forEach(o => this._sources.set(o, o.subscribe(() => this.invalidate(), () => this.displayName)));
 
         this._requiresUpdate = false;
-        this.setValue(value);
+
+        log('🔗 (derivation)', this.displayName, [], { Previous: this._value, Current: value },
+            () => this.setValue(value));
     }
 
     private invalidate() {

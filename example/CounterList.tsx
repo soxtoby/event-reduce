@@ -29,7 +29,7 @@ export class CounterListModel {
 }
 
 export function CounterList({ model }: { model: CounterListModel; }) {
-    return <Derived>{() =>
+    return <Derived name="CounterList">{() =>
         <>
             <div>
                 <button onClick={() => model.events.counterAdded()}>Add Counter</button>

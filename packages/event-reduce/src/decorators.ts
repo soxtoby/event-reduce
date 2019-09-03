@@ -1,7 +1,7 @@
-import { lastAccessed } from "./observableValue";
-import { Reduction, reduce } from "./reduction";
-import { derive, Derivation } from "./derivation";
+import { Derivation, derive } from "./derivation";
 import { IEventBase } from "./events";
+import { lastAccessed } from "./observableValue";
+import { reduce, Reduction } from "./reduction";
 
 export let reduced: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
     return {
@@ -84,5 +84,6 @@ export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
 }
 
 function isObservableEvent(e: any): e is IEventBase {
-    return typeof e === 'function' && !!Object.getOwnPropertyDescriptor(e, 'displayName');
+    return typeof e === 'function'
+        && e.displayName;
 }

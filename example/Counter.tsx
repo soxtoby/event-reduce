@@ -37,7 +37,7 @@ export class CounterModel {
 export function Counter({ model }: { model: CounterModel }) {
     let events = model.events;
 
-    return <Derived>{() =>
+    return <Derived name={`Counter ${model.id}`}>{() =>
         <div style={{ display: 'inline-block', border: '1px solid silver', margin: 8, padding: 8 }}>
             <table>
                 <tbody>
@@ -52,13 +52,13 @@ export function Counter({ model }: { model: CounterModel }) {
                 </tbody>
             </table>
             <div>
-                <button onClick={events.decremented}>-</button>
-                <button onClick={events.reset}>0</button>
-                <button onClick={events.incremented}>+</button>
+                <button onClick={() => events.decremented({})}>-</button>
+                <button onClick={() => events.reset({})}>0</button>
+                <button onClick={() => events.incremented({})}>+</button>
             </div>
             <div>
                 <button onClick={() => events.valueFetched(Promise.resolve(100))}>Fetch</button>
-                <button onClick={events.removed}>Remove</button>
+                <button onClick={() => events.removed({})}>Remove</button>
             </div>
         </div>
     }</Derived>;
