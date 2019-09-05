@@ -16,6 +16,7 @@
     "lib"
   ],
   "devDependencies": {
+    "@types/node": "*",
     "typescript": "~3"
   }
 }
