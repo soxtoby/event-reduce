@@ -1,8 +1,15 @@
+import { sendEvent } from "./devtools";
+
 let loggingEnabled = false;
 let loggingDepth = 0;
 
 export function enableLogging(enable = true) {
     loggingEnabled = enable;
+}
+
+export function logEvent(type: string, displayName: string, arg: any, info: object | undefined, runEvent: () => void) {
+    log(type, displayName, [arg || ''], info, runEvent);
+    sendEvent(displayName, arg);
 }
 
 export function log(type: string, displayName: string, args: any[], info?: object, work?: () => void) {

@@ -1,4 +1,4 @@
-import { log } from "./logging";
+import { log, logEvent } from "./logging";
 import { IObservable, ScopedObservable } from "./observable";
 import { ISubject, Subject } from "./subject";
 import { ObjectOmit } from "./types";
@@ -47,7 +47,7 @@ export function asyncEvent<Result = void, Context = void>(name = '(anonymous asy
 
 class EventSubject<T> extends Subject<T> implements IEventBase {
     next(value: T) {
-        log('⚡ (event)', this.displayName, [value || ''], undefined,
+        logEvent('⚡ (event)', this.displayName, value, undefined,
             () => super.next(value));
     }
 
@@ -66,6 +66,7 @@ class ScopedEventSubject<T extends object, Scope extends Partial<T>> extends Sco
     }
 
     next(partial: ObjectOmit<T, Scope>) {
+        // Using plain log so only the unscoped event is logged as an event
         log('{⚡} (scoped event)', this.displayName, [partial], { Scope: this._scope },
             () => this._source.next({ ...partial, ...this._scope } as any as T));
     }
@@ -85,12 +86,12 @@ class AsyncEvent<Result = void, Context = void> implements IEventBase {
 
     next(promise: PromiseLike<Result>, context: Context) {
         promise.then(
-            result => log('⚡✔ (async result)', this.displayName + '.resolved', [context || ''], { Promise: promise },
+            result => logEvent('⚡✔ (async result)', this.displayName + '.resolved', context, { Promise: promise },
                 () => this._resolved.next({ result, context })),
-            error => log('⚡❌ (async error)', this.displayName + '.rejected', [context || ''], { Promise: promise },
+            error => logEvent('⚡❌ (async error)', this.displayName + '.rejected', context, { Promise: promise },
                 () => this._rejected.next({ error, context })));
 
-        log('⚡⌚ (async event)', this.displayName + '.started', [context || ''], { Promise: promise },
+        logEvent('⚡⌚ (async event)', this.displayName + '.started', context, { Promise: promise },
             () => this._started.next({ promise, context }));
     }
 
