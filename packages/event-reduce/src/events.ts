@@ -46,8 +46,10 @@ export function asyncEvent<Result = void, Context = void>(name = '(anonymous asy
 }
 
 class EventSubject<T> extends Subject<T> implements IEventBase {
+    container?: any;
+
     next(value: T) {
-        logEvent('⚡ (event)', this.displayName, value, undefined,
+        logEvent('⚡ (event)', this.displayName, value, () => ({ Container: this.container }),
             () => super.next(value));
     }
 
@@ -58,6 +60,8 @@ class EventSubject<T> extends Subject<T> implements IEventBase {
 }
 
 class ScopedEventSubject<T extends object, Scope extends Partial<T>> extends ScopedObservable<T, Scope> implements IEventBase {
+    container?: any;
+
     constructor(
         private _source: ISubject<T>,
         private _scope: Scope
@@ -67,7 +71,7 @@ class ScopedEventSubject<T extends object, Scope extends Partial<T>> extends Sco
 
     next(partial: ObjectOmit<T, Scope>) {
         // Using plain log so only the unscoped event is logged as an event
-        log('{⚡} (scoped event)', this.displayName, [partial], { Scope: this._scope },
+        log('{⚡} (scoped event)', this.displayName, [partial], () => ({ Scope: this._scope, Container: this.container }),
             () => this._source.next({ ...partial, ...this._scope } as any as T));
     }
 
@@ -81,17 +85,18 @@ class AsyncEvent<Result = void, Context = void> implements IEventBase {
     private _started = new Subject<AsyncItem<Result, Context>>(() => `${this.displayName}.started`);
     private _resolved = new Subject<AsyncResult<Result, Context>>(() => `${this.displayName}.resolved`);
     private _rejected = new Subject<AsyncError<Context>>(() => `${this.displayName}.rejected`);
+    container?: any;
 
     constructor(public displayName: string) { }
 
     next(promise: PromiseLike<Result>, context: Context) {
         promise.then(
-            result => logEvent('⚡✔ (async result)', this.displayName + '.resolved', context, { Promise: promise },
+            result => logEvent('⚡✔ (async result)', this.displayName + '.resolved', context, () => ({ Promise: promise, Container: this.container }),
                 () => this._resolved.next({ result, context })),
-            error => logEvent('⚡❌ (async error)', this.displayName + '.rejected', context, { Promise: promise },
+            error => logEvent('⚡❌ (async error)', this.displayName + '.rejected', context, () => ({ Promise: promise, Container: this.container }),
                 () => this._rejected.next({ error, context })));
 
-        logEvent('⚡⌚ (async event)', this.displayName + '.started', context, { Promise: promise },
+        logEvent('⚡⌚ (async event)', this.displayName + '.started', context, () => ({ Promise: promise, Container: this.container }),
             () => this._started.next({ promise, context }));
     }
 
@@ -122,5 +127,6 @@ let insideEvent = false;
 
 export interface IEventBase {
     displayName: string;
+    container?: any;
     next(...args: any[]): void;
 }

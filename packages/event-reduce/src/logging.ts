@@ -1,4 +1,5 @@
 import { sendEvent } from "./devtools";
+import { IObservable } from "./observable";
 
 let loggingEnabled = false;
 let loggingDepth = 0;
@@ -7,16 +8,12 @@ export function enableLogging(enable = true) {
     loggingEnabled = enable;
 }
 
-export function logEvent(type: string, displayName: string, arg: any, info: object | undefined, runEvent: () => void) {
-    log(type, displayName, [arg || ''], info, runEvent);
+export function logEvent(type: string, displayName: string, arg: any, getInfo: (() => object) | undefined, runEvent: () => void) {
+    log(type, displayName, [arg || ''], getInfo, runEvent);
     sendEvent(displayName, arg);
 }
 
-export function log(type: string, displayName: string, args: any[], info?: object, work?: () => void) {
-    logInner([`${displayName} %c${type}`, 'color: grey; font-weight: normal;', ...args], info, work);
-}
-
-function logInner(message: [string, ...any[]], info?: object, work?: () => void) {
+export function log(type: string, displayName: string, args: any[], getInfo?: () => object, work?: () => void) {
     if (!loggingEnabled)
         return void (work && work());
 
@@ -35,7 +32,10 @@ function logInner(message: [string, ...any[]], info?: object, work?: () => void)
     }
 
     function logMessage(group: boolean) {
-        let infoKeys = Object.keys(info || {});
+        let message = [`${displayName} %c${type}`, 'color: grey; font-weight: normal;', ...args];
+
+        let info = getInfo && getInfo() || {};
+        let infoKeys = Object.keys(info);
         if (infoKeys || group) {
             if (loggingDepth)
                 console.group(...message);
@@ -51,4 +51,12 @@ function logInner(message: [string, ...any[]], info?: object, work?: () => void)
             console.log(...message);
         }
     }
+}
+
+export interface ISourceInfo {
+    sources: ISourceInfo[];
+}
+
+export function sourceTree(sources: readonly IObservable<any>[]): ISourceInfo[] {
+    return sources.map(s => ({ name: s.displayName, sources: sourceTree(s.sources), get observable() { return s; } }));
 }

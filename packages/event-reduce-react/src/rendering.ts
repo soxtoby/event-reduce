@@ -19,7 +19,7 @@ export function useDerivedRender(render: () => ReactElement | null, name = 'Deri
 
     let renderWatcher = useOnce(() =>
         watch((renderCount) =>
-            log('⚛ (render)', name, [], { 'Render count': renderCount },
+            log('⚛ (render)', name, [], () => ({ 'Render count': renderCount }),
                 () => rendered.current = render()),
             renderCount,
             name));

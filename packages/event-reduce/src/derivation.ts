@@ -1,4 +1,4 @@
-import { log } from "./logging";
+import { log, sourceTree } from "./logging";
 import { Observable, Unsubscribe } from "./observable";
 import { collectAccessedValues, ObservableValue } from "./observableValue";
 
@@ -9,6 +9,7 @@ export function derive<T>(getDerivedValue: () => T, name?: string) {
 export class Derivation<T> extends ObservableValue<T> {
     private _requiresUpdate = true;
     private _sources = new Map<Observable<any>, Unsubscribe>();
+    container?: any;
 
     constructor(
         getDisplayName: () => string,
@@ -34,8 +35,12 @@ export class Derivation<T> extends ObservableValue<T> {
 
         this._requiresUpdate = false;
 
-        log('🔗 (derivation)', this.displayName, [], { Previous: this._value, Current: value },
-            () => this.setValue(value));
+        log('🔗 (derivation)', this.displayName, [], () => ({
+            Previous: this._value,
+            Current: value,
+            Container: this.container,
+            Sources: sourceTree(this.sources)
+        }), () => this.setValue(value));
     }
 
     private invalidate() {

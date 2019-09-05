@@ -11,6 +11,7 @@ export let reduced: PropertyDecorator = (target: Object, key: string | symbol): 
                 throw new Error("@reduced property must be set to the value of a reduction");
 
             reduction.displayName = String(key);
+            reduction.container = this;
 
             if (typeof key == 'string')
                 setReducedProperty(this, key, reduction);
@@ -36,16 +37,20 @@ export let derived: PropertyDecorator = (target: Object, key: string | symbol): 
     let property = Object.getOwnPropertyDescriptor(target, key);
 
     return {
-        get() { return getOrSetDerivedProperty(this, key, () => derive(property!.get!.bind(this), String(key))).value; },
+        get() { return getOrSetDerivedProperty(this, key as string, () => derive(property!.get!.bind(this), String(key))).value; },
         configurable: true
     };
 }
 
 let derivedProperties = Symbol('DerivedProperties');
 
-function getOrSetDerivedProperty(target: any, key: string | symbol, createComputedValue: () => Derivation<any>): Derivation<any> {
-    let properties = target[derivedProperties] || (target[derivedProperties] = {}) as { [key: string]: Derivation<any> };
-    return properties[key] || (properties[key] = createComputedValue());
+function getOrSetDerivedProperty(target: any, key: string, createDerivation: () => Derivation<any>): Derivation<any> {
+    let properties = (target[derivedProperties] || (target[derivedProperties] = {})) as Record<string, Derivation<any>>;
+    if (!properties[key]) {
+        properties[key] = createDerivation();
+        properties[key].container = target;
+    }
+    return properties[key];
 }
 
 export function getDerivedProperty(target: any, key: string | symbol): Derivation<any> | undefined {
@@ -75,8 +80,10 @@ export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
                 super(...args);
                 Object.keys(this).forEach(key => {
                     let prop = this[key];
-                    if (isObservableEvent(prop))
+                    if (isObservableEvent(prop)) {
                         prop.displayName = key;
+                        prop.container = this;
+                    }
                 });
             }
         }

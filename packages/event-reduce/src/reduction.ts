@@ -1,5 +1,5 @@
 import { setState, State, StateObject } from "./experimental/state";
-import { log } from "./logging";
+import { log, sourceTree } from "./logging";
 import { allSources, IObservable, Unsubscribe } from "./observable";
 import { collectAccessedValues, lastAccessed, ObservableValue } from "./observableValue";
 import { Subject } from "./subject";
@@ -29,6 +29,7 @@ export interface IBoundReduction<T, TEvents> extends IReduction<T> {
 export class Reduction<T> extends ObservableValue<T> {
     private _sources = new Map<IObservable<any>, Unsubscribe>();
     private _restore = new Subject<State<T>>(() => `${this.displayName}.restored`);
+    container?: any;
 
     constructor(getDisplayName: () => string, initial: T) {
         super(getDisplayName, initial);
@@ -66,8 +67,12 @@ export class Reduction<T> extends ObservableValue<T> {
             if (commonSource)
                 throw new Error("Accessed a reduced value derived from the same event being fired.")
 
-            log('🧪 (reduction)', this.displayName, [], { Previous: this._value, Current: value },
-                () => this.setValue(value));
+            log('🧪 (reduction)', this.displayName, [], () => ({
+                Previous: this._value,
+                Current: value,
+                Container: this.container,
+                Sources: sourceTree(this.sources)
+            }), () => this.setValue(value));
         }, () => this.displayName));
 
         return this;

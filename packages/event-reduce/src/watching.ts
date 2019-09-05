@@ -1,4 +1,4 @@
-import { log } from "./logging";
+import { log, sourceTree } from "./logging";
 import { IObservable, Observable, Unsubscribe } from "./observable";
 import { collectAccessedValues } from "./observableValue";
 
@@ -32,7 +32,7 @@ class Watcher<T> extends Observable<void> {
 
     private onDependenciesChanged() {
         if (this._observers.size)
-            log('👀 (watcher)', this.displayName, [], undefined, () => this.notifyObservers());
+            log('👀 (watcher)', this.displayName, [], () => ({ Sources: sourceTree(this.sources) }), () => this.notifyObservers());
     }
 
     unsubscribeFromSources() {
