@@ -3,7 +3,6 @@ import { collectAccessedValues } from 'event-reduce/lib/observableValue';
 import { Subject } from 'event-reduce/lib/subject';
 import * as sinon from 'sinon';
 import { describe, it, test, then, when } from 'wattle';
-import './setup';
 
 describe(reduce.name, function () {
     when("unbound", () => {
@@ -55,10 +54,9 @@ describe(reduce.name, function () {
 
         when("subscribing to an observable based on itself", () => {
             let observable = sut.filter(n => n > 3);
-            observable.displayName = 'dependant observable';
             let action = () => sut.on(observable, (_, n) => n);
 
-            it("throws", () => action.should.throw("Cannot subscribe to 'dependant observable', as it depends on this reduction, 'sut'."));
+            it("throws", () => action.should.throw("Cannot subscribe to 'sut.filter(n => n > 3)', as it depends on this reduction, 'sut'."));
         });
     });
 

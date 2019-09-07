@@ -1,7 +1,6 @@
 import { collectAccessedValues, lastAccessed, ObservableValue } from 'event-reduce/lib/observableValue';
 import * as sinon from 'sinon';
 import { describe, it, then, when } from 'wattle';
-import './setup';
 
 describe(ObservableValue.name, function () {
     let sut = new ObservableValue(() => 'sut', 'initial');

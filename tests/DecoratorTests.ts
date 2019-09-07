@@ -1,8 +1,5 @@
 import { asyncEvent, derived, event, events, extend, reduce, reduced } from "event-reduce";
-import { SynchronousPromise } from "synchronous-promise";
 import { describe, it, test, then, when } from "wattle";
-import './setup';
-import sinon = require("sinon");
 
 describe("model decorators", function () {
     let increment = event();
@@ -88,14 +85,7 @@ describe("events decorator", function () {
 
     it("keeps class name", () => TestEvents.name.should.equal('TestEvents'));
 
-    test("extended promises keep extra properties", () => {
-        let promise = SynchronousPromise.unresolved<string>();
-        (promise as any).foo = 'bar';
-        let onstarted = sinon.stub();
-        sut.promiseEvent.started.subscribe(onstarted);
+    it("sets event name", () => (sut.promiseEvent as any).displayName.should.equal('promiseEvent'));
 
-        sut.promiseEvent(promise);
-
-        onstarted.should.have.been.calledWith(sinon.match({ promise: { foo: 'bar', then: sinon.match.func } }));
-    });
+    it("sets event container", () => (sut.promiseEvent as any).container.should.equal(sut));
 });

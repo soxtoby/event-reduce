@@ -1,4 +1,4 @@
-import { getState, setState } from "./experimental/state";
+import { getState, setState } from "./state";
 
 let modelDevTools = new Map<object, any>();
 

@@ -1,7 +1,7 @@
-import { setState, State, StateObject } from "./experimental/state";
 import { log, sourceTree } from "./logging";
 import { allSources, IObservable, Unsubscribe } from "./observable";
-import { collectAccessedValues, lastAccessed, ObservableValue } from "./observableValue";
+import { collectAccessedValues, IObservableValue, lastAccessed, ObservableValue } from "./observableValue";
+import { setState, State, StateObject } from "./state";
 import { Subject } from "./subject";
 
 export function reduce<TValue>(initial: TValue, displayName?: string): IReduction<TValue>;
@@ -14,12 +14,10 @@ export function reduce<TValue, TEvents>(initial: TValue, events?: TEvents | stri
 
 type Reducer<TValue, TEvent> = (previous: TValue, eventValue: TEvent) => TValue;
 
-export interface IReduction<T> {
-    readonly value: T;
+export interface IReduction<T> extends IObservableValue<T> {
     on<TEvent>(observable: IObservable<TEvent>, reduce: Reducer<T, TEvent>): this;
     onValueChanged<TValue>(observableVaue: TValue, reduce: Reducer<T, TValue>): this;
     onRestore(reduce: Reducer<T, State<T>>): this;
-    unsubscribeFromSources(): void;
 }
 
 export interface IBoundReduction<T, TEvents> extends IReduction<T> {

@@ -1,14 +1,15 @@
 import { derive } from "event-reduce";
 import { lastAccessed, ObservableValue } from "event-reduce/lib/observableValue";
 import { describe, it, then, when } from "wattle";
-import './setup';
-import sinon = require("sinon");
+import * as sinon from "sinon";
 
 describe(derive.name, () => {
     let sourceA = new ObservableValue(() => 'a', 'a');
     let sourceB = new ObservableValue(() => 'b', 'b');
     let calculation = sinon.spy(() => sourceA.value + sourceB.value);
     let sut = derive(calculation, 'sut');
+
+    it("has provided name", () => sut.displayName.should.equal('sut'));
 
     when("value accessed", () => {
         let result = sut.value;

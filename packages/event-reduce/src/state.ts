@@ -1,5 +1,5 @@
-import { getReducedProperties } from "../decorators";
-import { StringKey } from "../types";
+import { getReducedProperties } from "./decorators";
+import { StringKey } from "./types";
 
 export type State<T> =
     T extends Function ? never

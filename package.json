@@ -18,10 +18,11 @@
     "scripts": {
         "prepare": "tsc -b",
         "watch": "tsc -b -w",
-        "test": "wattle ./tests/**",
+        "test": "wattle",
         "example": "cd example && parcel index.html --open"
     },
     "devDependencies": {
+        "ts-node": "*",
         "typescript": "~3",
         "wattle": "~0"
     }

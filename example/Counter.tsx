@@ -1,7 +1,7 @@
-import { CounterListEvents } from "CounterList";
 import { asyncEvent, derived, events, reduce, reduced } from "event-reduce";
-import { Derived } from "event-reduce-react";
+import { Derived, useDerivedRender } from "event-reduce-react";
 import * as React from "react";
+import { CounterListEvents } from "./CounterList";
 
 @events
 export class CounterEvents {
@@ -37,17 +37,17 @@ export class CounterModel {
 export function Counter({ model }: { model: CounterModel }) {
     let events = model.events;
 
-    return <Derived name={`Counter ${model.id}`}>{() =>
-        <div style={{ display: 'inline-block', border: '1px solid silver', margin: 8, padding: 8 }}>
+    return useDerivedRender(`Counter ${model.id}`, () =>
+        <div data-testid="counter" style={{ display: 'inline-block', border: '1px solid silver', margin: 8, padding: 8 }}>
             <table>
                 <tbody>
                     <tr>
                         <td>Count</td>
-                        <td><b>{model.count}</b></td>
+                        <td data-testid="count"><b>{model.count}</b></td>
                     </tr>
                     <tr>
                         <td>Count x2</td>
-                        <td><b>{model.countTimesTwo}</b></td>
+                        <td data-testid="countTimesTwo"><b>{model.countTimesTwo}</b></td>
                     </tr>
                 </tbody>
             </table>
@@ -57,9 +57,13 @@ export function Counter({ model }: { model: CounterModel }) {
                 <button onClick={() => events.incremented({})}>+</button>
             </div>
             <div>
-                <button onClick={() => events.valueFetched(Promise.resolve(100))}>Fetch</button>
+                <button onClick={() => onFetch()}>Fetch</button>
                 <button onClick={() => events.removed({})}>Remove</button>
             </div>
         </div>
-    }</Derived>;
+    );
+
+    function onFetch() {
+        events.valueFetched(Promise.resolve(100));
+    }
 }

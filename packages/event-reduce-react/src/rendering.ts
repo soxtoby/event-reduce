@@ -4,15 +4,16 @@ import { ReactElement, useEffect, useRef, useState, FunctionComponent } from "re
 import { useOnce } from "./utils";
 
 export function Derived(props: { name?: string; children: () => ReactElement | null; }) {
-    return useDerivedRender(props.children, props.name);
+    return useDerivedRender(props.name || 'Derived', props.children);
 }
 
-export function deriveRender<P>(component: FunctionComponent<P>) {
-    let displayName = component.displayName || component.name || 'Derived';
-    return Object.assign((props: P) => useDerivedRender(() => component(props), displayName), { displayName });
-}
+export function useDerivedRender(render: () => ReactElement | null): ReactElement | null;
+export function useDerivedRender(name: string, render: () => ReactElement | null): ReactElement | null;
+export function useDerivedRender(renderOrName: string | (() => ReactElement | null), maybeRender?: () => ReactElement | null): ReactElement | null {
+    let [name, render] = typeof renderOrName == 'string'
+        ? [renderOrName, maybeRender!]
+        : ['Derived', renderOrName];
 
-export function useDerivedRender(render: () => ReactElement | null, name = 'Derived') {
     let [renderCount, setRenderCount] = useState(1);
 
     let rendered = useRef<ReactElement | null | undefined>(undefined);

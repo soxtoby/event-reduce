@@ -2,7 +2,6 @@ import { asyncEvent, event } from 'event-reduce';
 import * as sinon from 'sinon';
 import { SynchronousPromise } from 'synchronous-promise';
 import { describe, it, test, then, when } from 'wattle';
-import './setup';
 
 describe(event.name, function () {
     type TestType = { foo: string, bar: number };

@@ -1,7 +1,6 @@
 import { Subject } from 'event-reduce/lib/subject';
 import * as sinon from 'sinon';
 import { describe, it, when } from 'wattle';
-import './setup';
 
 describe(Subject.name, function () {
     let sut = new Subject<number>(() => 'test');

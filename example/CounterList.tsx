@@ -1,5 +1,5 @@
 import { event, events, reduce, reduced } from "event-reduce";
-import { Derived } from "event-reduce-react";
+import { Derived, useDerivedRender } from "event-reduce-react";
 import * as React from "react";
 import { Counter, CounterEvents, CounterModel } from "./Counter";
 
@@ -29,12 +29,12 @@ export class CounterListModel {
 }
 
 export function CounterList({ model }: { model: CounterListModel; }) {
-    return <Derived name="CounterList">{() =>
+    return useDerivedRender('CounterList', () =>
         <>
             <div>
                 <button onClick={() => model.events.counterAdded()}>Add Counter</button>
             </div>
             {model.counters.map(c => <Counter key={c.id} model={c} />)}
         </>
-    }</Derived>;
+    );
 }

@@ -1,7 +1,6 @@
-import { Observable, ObservableOperation } from 'event-reduce/lib/observable';
+import { Observable, ObservableOperation, IObservable } from 'event-reduce/lib/observable';
 import * as sinon from 'sinon';
 import { describe, test, then, when } from 'wattle';
-import './setup';
 
 describe("ObservableOperation", function () {
     when("subscribing", () => {
@@ -43,7 +42,7 @@ describe("ObservableOperation", function () {
         });
     }
 
-    function values<T>(observable: Observable<T>) {
+    function values<T>(observable: IObservable<T>) {
         let values = [] as T[];
         observable.subscribe(value => values.push(value));
         return values;
