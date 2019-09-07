@@ -79,9 +79,8 @@ describe(useDerived.name, function () {
 
 describe(useReduced.name, function () {
     let added = event<number>();
-    let createReduction = spy(() => reduce(1)
-        .on(added, (current, added) => current + added)) as () => IReduction<number>;
-    let sut = renderHook(() => useReduced(createReduction));
+    let sut = renderHook(() => useReduced(1)
+        .on(added, (current, added) => current + added));
 
     let initialResult = sut.result.current;
 
@@ -97,8 +96,6 @@ describe(useReduced.name, function () {
         sut.rerender();
 
         it("returns the same reduction instance", () => sut.result.current.should.equal(initialResult));
-
-        it("doesn't create another reduction", () => createReduction.should.have.been.calledOnce);
     });
 
     when("disposed", () => {

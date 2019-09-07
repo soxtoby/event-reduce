@@ -4,7 +4,7 @@ let modelDevTools = new Map<object, any>();
 
 export function enableDevTools(model: object, name?: string) {
     if (process.env.NODE_ENV === 'development') {
-        if ((window as any).__REDUX_DEVTOOLS_EXTENSION__) {
+        if (!modelDevTools.has(model) && (window as any).__REDUX_DEVTOOLS_EXTENSION__) {
             let dev = (window as any).__REDUX_DEVTOOLS_EXTENSION__.connect({ name });
             modelDevTools.set(model, dev);
             dev.init(getState(model));

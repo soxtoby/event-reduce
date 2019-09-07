@@ -21,6 +21,7 @@ export class CounterListModel {
     counters = reduce([] as CounterModel[], this.events)
         .on(e => e.counterAdded, (cs) => cs.concat(this.createCounter({ id: uid++ })))
         .on(e => e.counterRemoved, (cs, { id }) => cs.filter(c => c.id != id))
+        .onRestore((_, counterStates) => counterStates.map(c => this.createCounter(c)))
         .value;
 
     private createCounter(initial: { id: number, count?: number }) {
