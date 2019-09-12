@@ -1,5 +1,5 @@
 import { log, sourceTree } from "./logging";
-import { Observable, Unsubscribe } from "./observable";
+import { IObservable, Unsubscribe } from "./observable";
 import { collectAccessedValues, ObservableValue } from "./observableValue";
 
 export function derive<T>(getDerivedValue: () => T, name?: string) {
@@ -8,7 +8,7 @@ export function derive<T>(getDerivedValue: () => T, name?: string) {
 
 export class Derivation<T> extends ObservableValue<T> {
     private _requiresUpdate = true;
-    private _sources = new Map<Observable<any>, Unsubscribe>();
+    private _sources = new Map<IObservable<any>, Unsubscribe>();
     container?: any;
 
     constructor(

@@ -8,7 +8,7 @@ export interface IObservable<T> {
     scope<TObject extends object, Scope extends Partial<TObject>>(this: IObservable<TObject>, scope: Scope): IObservable<TObject>;
     map<U>(select: (value: T) => U): IObservable<U>;
 
-    readonly displayName: string;
+    displayName: string;
     readonly sources: readonly IObservable<any>[];
 }
 
