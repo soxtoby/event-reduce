@@ -1,5 +1,6 @@
 import { getObservableProperty } from "./decorators";
 import { event } from "./events";
+import { ObservableValue } from "./observableValue";
 
 export function mutable<T>(model: T): Mutable<T> {
     if (model && typeof model == 'object' && !Array.isArray(model)) {
@@ -33,6 +34,35 @@ function allProperties(obj: unknown) {
         obj = Object.getPrototypeOf(obj);
     }
     return props;
+}
+
+export function modelProxy<T>(initialState: T): Mutable<T>;
+export function modelProxy<T = any>(): Mutable<T>;
+export function modelProxy(initialState: any = {}) {
+    let model = {} as any;
+
+    let proxy = new Proxy(model, {
+        get(target: any, key: PropertyKey) {
+            if (key == 'readonly')
+                return proxy;
+
+            return modelProxy(getOrAddObservableValue(target, key).value);
+        },
+
+        set(target: any, key: PropertyKey, value: any) {
+            if (key == 'readonly')
+                return false;
+
+            getOrAddObservableValue(target, key).setValue(value);
+            return true;
+        }
+    }) as any;
+
+    return proxy;
+
+    function getOrAddObservableValue(target: any, key: string | number | symbol): ObservableValue<any> {
+        return target[key] || (target[key] = new ObservableValue(() => String(key), initialState[key]));
+    }
 }
 
 export type Mutable<T> = {
