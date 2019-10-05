@@ -1,5 +1,6 @@
-import { getReducedProperties } from "./decorators";
 import { StringKey } from "./types";
+import { getObservableProperties } from "./decorators";
+import { Reduction } from "./reduction";
 
 export type State<T> =
     T extends Function ? never
@@ -36,13 +37,13 @@ export function getState<T>(model: T): State<T> {
 }
 
 export function setState<T>(model: T, state: StateObject<T>) {
-    let reducedProps = getReducedProperties(model) || {};
+    let observableProps = getReducedProperties(model);
     let stateProps = getStateProperties(model)
         .filter(key => key in state);
 
     stateProps.forEach(key => {
-        if (key in reducedProps)
-            reducedProps[key].restore(state[key]);
+        if (key in observableProps)
+            observableProps[key].restore(state[key]);
         else if (model[key] && typeof model[key] == 'object')
             setState(model[key], state[key] as StateObject<T[StringKey<T>]>);
         else
@@ -53,7 +54,17 @@ export function setState<T>(model: T, state: StateObject<T>) {
 }
 
 function getStateProperties<T>(model: T) {
-    let reducedProps = getReducedProperties(model);
+    let observableProps = getReducedProperties(model);
     let explicitProps = (model as any)[statePropsKey] || [] as string[];
-    return Object.keys(reducedProps || model).concat(explicitProps) as StringKey<T>[];
+    return Object.keys(observableProps || model).concat(explicitProps) as StringKey<T>[];
+}
+
+function getReducedProperties<T>(model: T) {
+    let reducedProps = {} as Record<string, Reduction<any>>;
+    let observableProps = getObservableProperties(model) || {};
+    for (let key in observableProps) {
+        if (observableProps[key] instanceof Reduction)
+            reducedProps[key] = observableProps[key] as Reduction<any>;
+    }
+    return reducedProps;
 }

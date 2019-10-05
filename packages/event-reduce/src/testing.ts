@@ -1,10 +1,10 @@
-import { getDerivedProperty, getReducedProperty } from "./decorators";
+import { getObservableProperty } from "./decorators";
 import { event } from "./events";
 
 export function mutable<T>(model: T): Mutable<T> {
     if (model && typeof model == 'object' && !Array.isArray(model)) {
         for (let [key, base] of allProperties(model)) {
-            let observableValue = getDerivedProperty(model, key) || getReducedProperty(model, key)!;
+            let observableValue = getObservableProperty(model, key)!;
 
             if (observableValue) {
                 Object.defineProperty(model, key, {

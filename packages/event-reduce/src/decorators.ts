@@ -1,24 +1,39 @@
 import { Derivation, derive } from "./derivation";
 import { IEventBase } from "./events";
-import { lastAccessed } from "./observableValue";
+import { lastAccessed, ObservableValue } from "./observableValue";
 import { reduce, Reduction } from "./reduction";
 
 export let reduced: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
+    return observableValueProperty(key, Reduction, true, "@reduced property must be set to the value of a reduction");
+}
+
+export let derived: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
+    let property = Object.getOwnPropertyDescriptor(target, key);
+
+    return property!.get ? {
+        get() { return getOrSetObservableProperty(this, key as string, () => derive(property!.get!.bind(this), String(key))).value; },
+        configurable: true
+    } : observableValueProperty(key, Derivation, false, "@derived property must have a getter or be set to the value of a derivation");
+}
+
+function observableValueProperty<Type extends ObservableValue<any>>(
+    key: string | symbol,
+    type: new (...args: any) => Type,
+    enumerable: boolean,
+    typeError: string
+): PropertyDescriptor {
     return {
         set(this: any, value: any) {
-            let reduction = lastAccessed.observableValue!;
-            if (!reduction || !(reduction instanceof Reduction) || value !== reduction.value)
-                throw new Error("@reduced property must be set to the value of a reduction");
-
-            reduction.displayName = String(key);
-            reduction.container = this;
-
+            let observableValue = lastAccessed.observableValue!;
+            if (!observableValue || !(observableValue instanceof type) || value !== observableValue.value)
+                throw new Error(typeError);
+            observableValue.displayName = String(key);
+            observableValue.container = this;
             if (typeof key == 'string')
-                setReducedProperty(this, key, reduction);
-
+                getOrSetObservableProperty(this, key, () => observableValue);
             Object.defineProperty(this, key, {
-                get: () => reduction.value,
-                enumerable: true,
+                get: () => observableValue.value,
+                enumerable,
                 configurable: true
             });
         }
@@ -33,43 +48,30 @@ export function extend<T>(reducedValue: T) {
     throw new Error("Couldn't detect reduced value. Make sure you pass in the value of a reduction directly.");
 }
 
-export let derived: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
-    let property = Object.getOwnPropertyDescriptor(target, key);
 
-    return {
-        get() { return getOrSetDerivedProperty(this, key as string, () => derive(property!.get!.bind(this), String(key))).value; },
-        configurable: true
-    };
-}
 
-let derivedProperties = Symbol('DerivedProperties');
 
-function getOrSetDerivedProperty(target: any, key: string, createDerivation: () => Derivation<any>): Derivation<any> {
-    let properties = (target[derivedProperties] || (target[derivedProperties] = {})) as Record<string, Derivation<any>>;
+let observableProperties = Symbol('ObservableProperties');
+
+function getOrSetObservableProperty(target: any, key: string, createObservableValue: () => ObservableValue<any>) {
+    let properties = getOrAddObservableProperties(target);
     if (!properties[key]) {
-        properties[key] = createDerivation();
-        properties[key].container = target;
+        properties[key] = createObservableValue();
+        properties[key]!.container = target;
     }
-    return properties[key];
+    return properties[key]!;
 }
 
-export function getDerivedProperty(target: any, key: string | symbol): Derivation<any> | undefined {
-    let properties = target[derivedProperties] || (target[derivedProperties] = {}) as { [key: string]: Derivation<any> };
-    return properties[key];
+export function getObservableProperty(target: any, key: string) {
+    return (getObservableProperties(target) || {})[key];
 }
 
-let reducedProperties = Symbol('ReducedProperties');
-
-export function getReducedProperty(target: any, key: string): Reduction<any> | undefined {
-    return (getReducedProperties(target) || {})[key];
+function getOrAddObservableProperties(target: any) {
+    return getObservableProperties(target) || (target[observableProperties] = {});
 }
 
-export function getReducedProperties(target: any) {
-    return target[reducedProperties] as { [key: string]: Reduction<any> };
-}
-
-function setReducedProperty(target: any, key: string, reduction: Reduction<any>) {
-    (target[reducedProperties] || (target[reducedProperties] = {}))[key] = reduction;
+export function getObservableProperties(target: any) {
+    return target[observableProperties] as Record<string, ObservableValue<any> | undefined> | undefined;
 }
 
 export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
