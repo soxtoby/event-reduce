@@ -19,6 +19,8 @@ export class ObservableValue<T> extends Observable<T> {
         super(getDisplayName);
     }
 
+    container?: any;
+
     get value() {
         valueAccessed.next(this);
         return this._value;

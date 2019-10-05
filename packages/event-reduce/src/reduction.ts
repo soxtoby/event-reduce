@@ -27,7 +27,6 @@ export interface IBoundReduction<T, TEvents> extends IReduction<T> {
 export class Reduction<T> extends ObservableValue<T> {
     private _sources = new Map<IObservable<any>, Unsubscribe>();
     private _restore = new Subject<State<T>>(() => `${this.displayName}.restored`);
-    container?: any;
 
     constructor(getDisplayName: () => string, initial: T) {
         super(getDisplayName, initial);

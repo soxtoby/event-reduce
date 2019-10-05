@@ -9,7 +9,6 @@ export function derive<T>(getDerivedValue: () => T, name?: string) {
 export class Derivation<T> extends ObservableValue<T> {
     private _requiresUpdate = true;
     private _sources = new Map<IObservable<any>, Unsubscribe>();
-    container?: any;
 
     constructor(
         getDisplayName: () => string,
