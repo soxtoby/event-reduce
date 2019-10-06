@@ -1,26 +1,28 @@
 import { log, logEvent } from "./logging";
-import { IObservable, ScopedObservable } from "./observable";
+import { IObservable, ObservableOperation } from "./observable";
 import { ISubject, Subject } from "./subject";
 import { ObjectOmit } from "./types";
+import { matchesScope } from "./scoping";
 
-export interface IEvent<T> extends Omit<ISubject<T>, 'scope'> {
-    (eventValue: T): void;
-    scope<TObject extends object, Scope extends Partial<TObject>>(this: ISubject<TObject>, scope: Scope): IScopedEvent<TObject, Scope>;
+export interface IEvent<TIn = void, TOut = TIn> extends IObservable<TOut> {
+    (eventValue: TIn): void;
+    displayName: string;
+    scope<ObjectT extends object, Scope extends Partial<ObjectT>>(this: IEvent<ObjectT>, scope: Scope): IEvent<ObjectOmit<ObjectT, Scope>, TOut>;
 }
 
-export interface IScopedEvent<T extends object, Scope extends object> extends Omit<ISubject<T>, 'scope'> {
-    (eventValue: ObjectOmit<T, Scope>): void;
-    scope<TObject extends object, Scope extends Partial<TObject>>(this: ISubject<TObject>, scope: Scope): IScopedEvent<TObject, Scope>;
-}
-
-export interface IAsyncEvent<Result, Context> {
-    (promise: PromiseLike<Result>, context: Context): void;
-    readonly started: IObservable<AsyncItem<Result, Context>>;
+export interface IAsyncEventObservables<Result = void, Context = void> {
+    readonly started: IObservable<AsyncStart<Result, Context>>;
     readonly resolved: IObservable<AsyncResult<Result, Context>>;
     readonly rejected: IObservable<AsyncError<Context>>;
 }
 
-export interface AsyncItem<Result, Context> {
+export interface IAsyncEvent<Result = void, ContextIn = void, ContextOut = ContextIn> extends IAsyncEventObservables<Result, ContextOut> {
+    (promise: PromiseLike<Result>, context: ContextIn): void;
+    displayName: string;
+    scope<ObjectContext extends object, Scope extends Partial<ObjectContext>>(this: IAsyncEvent<Result, ObjectContext>, scope: Scope): IAsyncEvent<Result, ObjectOmit<ObjectContext, Scope>, ObjectContext>;
+}
+
+export interface AsyncStart<Result, Context> {
     promise: PromiseLike<Result>;
     context: Context;
 }
@@ -36,91 +38,81 @@ export interface AsyncError<Context> {
 }
 
 export function event<T = void>(name = '(anonymous event)'): IEvent<T> {
-    let subject = new EventSubject<T>(() => name);
-    return makeEvent(subject);
+    return makeEvent(function next(value: T) {
+        fireEvent('⚡ (event)', this.displayName, value, () => ({ Container: this.container }),
+            () => this.next(value));
+    }, new Subject<T>(() => name));
+}
+
+function makeEvent<Args extends any[], Proto extends object, TIn = void, TOut = TIn>(next: (this: Proto & IEventBase, ...args: Args) => void, proto: Proto): IEvent<TIn, TOut> {
+    return makeEventFunction(next, Object.create(proto, Object.getOwnPropertyDescriptors({
+        scope<TObject extends Scope, Scope extends object>(this: ISubject<TObject>, scope: Scope) {
+            let source = this;
+            return makeEvent(function next(partial: ObjectOmit<TObject, Scope>) {
+                // Using plain log so only the unscoped event is logged as an event
+                log('{⚡} (scoped event)', this.displayName, [partial], () => ({ Scope: scope, Container: this.container }),
+                    () => source.next({ ...partial, ...scope } as any as TObject));
+
+            }, new ObservableOperation<TObject>(
+                () => `${this.displayName}.scoped({ ${Object.entries(scope).map(([k, v]) => `${k}: ${v}`).join(', ')} })`,
+                [source],
+                observer => source.subscribe(value => matchesScope(scope)(value) && observer.next(value), observer.getDisplayName)));
+        }
+    })));
 }
 
 export function asyncEvent<Result = void, Context = void>(name = '(anonymous async event)'): IAsyncEvent<Result, Context> {
-    let asyncEvent = new AsyncEvent<Result, Context>(name);
-    return makeEvent(asyncEvent);
-}
-
-class EventSubject<T> extends Subject<T> implements IEventBase {
-    container?: any;
-
-    next(value: T) {
-        logEvent('⚡ (event)', this.displayName, value, () => ({ Container: this.container }),
-            () => super.next(value));
-    }
-
-    scope<TObject extends object, Scope extends Partial<TObject>>(this: ISubject<TObject>, scope: Scope) {
-        let scopedEvent = new ScopedEventSubject<TObject, Scope>(this, scope);
-        return makeEvent(scopedEvent);
-    }
-}
-
-class ScopedEventSubject<T extends object, Scope extends Partial<T>> extends ScopedObservable<T, Scope> implements IEventBase {
-    container?: any;
-
-    constructor(
-        private _source: ISubject<T>,
-        private _scope: Scope
-    ) {
-        super(_source, _scope);
-    }
-
-    next(partial: ObjectOmit<T, Scope>) {
-        // Using plain log so only the unscoped event is logged as an event
-        log('{⚡} (scoped event)', this.displayName, [partial], () => ({ Scope: this._scope, Container: this.container }),
-            () => this._source.next({ ...partial, ...this._scope } as any as T));
-    }
-
-    scope<TObject extends object, SubScope extends Partial<TObject>>(this: ISubject<TObject>, scope: SubScope) {
-        let scopedEvent = new ScopedEventSubject<TObject, SubScope>(this, scope);
-        return makeEvent(scopedEvent);
-    }
-}
-
-class AsyncEvent<Result = void, Context = void> implements IEventBase {
-    private _started = new Subject<AsyncItem<Result, Context>>(() => `${this.displayName}.started`);
-    private _resolved = new Subject<AsyncResult<Result, Context>>(() => `${this.displayName}.resolved`);
-    private _rejected = new Subject<AsyncError<Context>>(() => `${this.displayName}.rejected`);
-    container?: any;
-
-    constructor(public displayName: string) { }
-
-    next(promise: PromiseLike<Result>, context: Context) {
+    return makeAsyncEvent(function next(promise: PromiseLike<Result>, context: Context) {
         promise.then(
-            result => logEvent('⚡✔ (async result)', this.displayName + '.resolved', context, () => ({ Promise: promise, Container: this.container }),
-                () => this._resolved.next({ result, context })),
-            error => logEvent('⚡❌ (async error)', this.displayName + '.rejected', context, () => ({ Promise: promise, Container: this.container }),
-                () => this._rejected.next({ error, context })));
+            result => fireEvent('⚡✔ (async result)', this.displayName + '.resolved', context, () => ({ Promise: promise, Container: this.container }),
+                () => this.resolved.next({ result, context })),
+            error => fireEvent('⚡❌ (async error)', this.displayName + '.rejected', context, () => ({ Promise: promise, Container: this.container }),
+                () => this.rejected.next({ error, context })));
 
-        logEvent('⚡⌚ (async event)', this.displayName + '.started', context, () => ({ Promise: promise, Container: this.container }),
-            () => this._started.next({ promise, context }));
-    }
-
-    get started() { return this._started as IObservable<AsyncItem<Result, Context>>; }
-    get resolved() { return this._resolved as IObservable<AsyncResult<Result, Context>>; }
-    get rejected() { return this._rejected as IObservable<AsyncError<Context>>; }
+        fireEvent('⚡⌚ (async event)', this.displayName + '.started', context, () => ({ Promise: promise, Container: this.container }),
+            () => this.started.next({ promise, context }));
+    }, {
+        started: new Subject<AsyncStart<Result, Context>>(function (this: IAsyncEvent<Result, Context>) { return `${this.displayName}.started` }),
+        resolved: new Subject<AsyncResult<Result, Context>>(function (this: IAsyncEvent<Result, Context>) { return `${this.displayName}.resolved` }),
+        rejected: new Subject<AsyncError<Context>>(function (this: IAsyncEvent<Result, Context>) { return `${this.displayName}.rejected` }),
+    });
 }
 
-export function makeEvent<Fn extends (...args: any[]) => void, Event extends IEventBase>(prototype: Event) {
-    Object.setPrototypeOf(fireEvent, prototype);
-    fireEvent.apply = Function.prototype.apply;
-    return fireEvent as Fn & Event;
+function makeAsyncEvent<Args extends any[], Proto extends IAsyncEventObservables<Result, ContextOut>, Result, ContextIn, ContextOut = ContextIn>(next: (this: Proto & IEventBase, ...args: Args) => void, proto: Proto) {
+    return makeEventFunction(next, Object.create(proto, Object.getOwnPropertyDescriptors({
+        scope<ObjectContext extends Scope, Scope extends object>(this: IAsyncEvent<Result, ObjectContext>, scope: Scope) {
+            let source = this;
+            return makeAsyncEvent(function next(promise: PromiseLike<Result>, partialContext: ObjectOmit<ObjectContext, Scope>) {
+                // Using plain log so only the unscoped event is logged as an event
+                log('{⚡⌚} (scoped async event)', this.displayName, [partialContext], () => ({ Scope: scope, Container: this.container }),
+                    () => source(promise, { ...scope, ...partialContext } as any as ObjectContext));
+            }, {
+                started: source.started.filter(s => matchesScope(scope)(s.context)),
+                resolved: source.resolved.filter(r => matchesScope(scope)(r.context)),
+                rejected: source.rejected.filter(r => matchesScope(scope)(r.context))
+            })
+        }
+    })))
+}
 
-    function fireEvent(...args: any[]) {
+export function makeEventFunction<Fn extends (...args: any) => void, Proto extends IEventBase>(next: Fn, prototype: Proto) {
+    Object.setPrototypeOf(next, prototype);
+    next.apply = Function.prototype.apply;
+    return next as Fn & Proto;
+}
+
+export function fireEvent(type: string, displayName: string, arg: any, getInfo: (() => object) | undefined, runEvent: () => void) {
+    logEvent(type, displayName, arg, getInfo, () => {
         try {
             if (insideEvent)
                 throw new Error("Fired an event in response to another event.");
 
             insideEvent = true;
-            prototype.next.apply(fireEvent, args);
+            runEvent();
         } finally {
             insideEvent = false;
         }
-    }
+    });
 }
 
 let insideEvent = false;
@@ -128,5 +120,4 @@ let insideEvent = false;
 export interface IEventBase {
     displayName: string;
     container?: any;
-    next(...args: any[]): void;
 }

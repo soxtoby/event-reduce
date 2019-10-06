@@ -5,7 +5,6 @@ export interface IObservable<T> {
     subscribe(observe: Observe<T>, getObserverName?: () => string): Unsubscribe;
     unsubscribeFromSources(): void;
     filter(condition: (value: T) => boolean): IObservable<T>;
-    scope<TObject extends object, Scope extends Partial<TObject>>(this: IObservable<TObject>, scope: Scope): IObservable<TObject>;
     map<U>(select: (value: T) => U): IObservable<U>;
 
     displayName: string;
@@ -17,7 +16,7 @@ export interface IObserver<T> {
     next: Observe<T>;
 }
 
-export abstract class Observable<T> {
+export class Observable<T> {
     protected _observers = new Set<IObserver<T>>();
 
     constructor(private _getDisplayName: () => string) { }
@@ -47,10 +46,6 @@ export abstract class Observable<T> {
         let filterName = () => `${this.displayName}.filter(${nameOf(condition)})`;
         return new ObservableOperation<T>(filterName, [this],
             observer => this.subscribe(value => condition(value) && observer.next(value), filterName));
-    }
-
-    scope<TObject extends object, Scope extends Partial<TObject>>(this: IObservable<TObject>, scope: Scope): IObservable<TObject> {
-        return new ScopedObservable<TObject, Scope>(this, scope);
     }
 
     map<U>(select: (value: T) => U): IObservable<U> {
@@ -93,19 +88,6 @@ export class ObservableOperation<T> extends Observable<T> {
     unsubscribeFromSources() {
         if (this._unsubscribeFromSources)
             this._unsubscribeFromSources();
-    }
-}
-
-export class ScopedObservable<T extends object, Scope extends Partial<T>> extends ObservableOperation<T> {
-    constructor(source: IObservable<T>, scope: Scope) {
-        super(
-            () => `${source.displayName}.scoped({ ${Object.entries(scope).map(([k, v]) => `${k}: ${v}`).join(', ')} })`,
-            [source],
-            observer => source.subscribe(value =>
-                Object.entries(scope)
-                    .every(([k, v]) => value[k as keyof T] === v)
-                && observer.next(value),
-                () => this.displayName));
     }
 }
 
