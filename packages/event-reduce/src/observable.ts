@@ -1,10 +1,12 @@
+import { nameOf, filteredName } from "./utils";
+
 export type Observe<T> = (value: T) => void;
 export type Unsubscribe = () => void;
 
 export interface IObservable<T> {
     subscribe(observe: Observe<T>, getObserverName?: () => string): Unsubscribe;
     unsubscribeFromSources(): void;
-    filter(condition: (value: T) => boolean): IObservable<T>;
+    filter(condition: (value: T) => boolean, getDisplayName?: () => string): IObservable<T>;
     map<U>(select: (value: T) => U): IObservable<U>;
 
     displayName: string;
@@ -42,10 +44,9 @@ export class Observable<T> {
 
     unsubscribeFromSources() { }
 
-    filter(condition: (value: T) => boolean): IObservable<T> {
-        let filterName = () => `${this.displayName}.filter(${nameOf(condition)})`;
-        return new ObservableOperation<T>(filterName, [this],
-            observer => this.subscribe(value => condition(value) && observer.next(value), filterName));
+    filter(condition: (value: T) => boolean, getDisplayName: () => string = () => filteredName(this.displayName, condition)): IObservable<T> {
+        return new ObservableOperation<T>(getDisplayName, [this],
+            observer => this.subscribe(value => condition(value) && observer.next(value), getDisplayName));
     }
 
     map<U>(select: (value: T) => U): IObservable<U> {
@@ -53,10 +54,6 @@ export class Observable<T> {
         return new ObservableOperation<U>(mapName, [this],
             observer => this.subscribe(value => observer.next(select(value)), mapName));
     }
-}
-
-function nameOf(fn: any) {
-    return fn.name || fn.displayName || String(fn);
 }
 
 export class ObservableOperation<T> extends Observable<T> {
