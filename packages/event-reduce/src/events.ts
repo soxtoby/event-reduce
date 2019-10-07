@@ -1,13 +1,18 @@
 import { log, logEvent } from "./logging";
 import { IObservable, ObservableOperation } from "./observable";
 import { matchesScope } from "./scoping";
-import { Subject } from "./subject";
+import { ISubject, Subject } from "./subject";
 import { ObjectOmit } from "./types";
-import { extend, filteredName, named, scopedName } from "./utils";
+import { filteredName, Named, scopedName } from "./utils";
 
 export interface IEventBase {
     displayName: string;
     container?: any;
+}
+
+/** Event implementation */
+export interface IEventClass extends IEventBase {
+    next(...args: any): void;
 }
 
 export interface IEvent<TIn = void, TOut = TIn> extends IObservable<TOut>, IEventBase {
@@ -45,99 +50,119 @@ export interface AsyncError<Context> {
     context: Context;
 }
 
-/** Creates an event that takes individual values as inputs */
 export function event<T = void>(name = '(anonymous event)'): IEvent<T> {
-    return makeEvent(function next(value: T) {
-        fireEvent('⚡ (event)', this.displayName, value, () => ({ Container: this.container }),
-            () => this.next(value));
-    }, new Subject<T>(() => name));
+    return makeEventFunction(new EventSubject<T>(() => name));
 }
 
-function makeEvent<TIn, TOut, Proto extends IObservable<TOut>>(next: (this: Proto & IEventBase, value: TIn) => void, proto: Proto) {
-    return makeEventFunction(next, extend(proto, {
-        scope<ObjectIn extends Scope, ObjectOut extends Scope, Scope extends object>(this: IEvent<ObjectIn, ObjectOut>, scope: Scope) {
-            let source = this;
-            return makeEvent(
-                function next(partial: ObjectOmit<ObjectIn, Scope>) {
-                    // Using plain log so only the unscoped event is logged as an event
-                    log('{⚡} (scoped event)', this.displayName, [partial], () => ({ Scope: scope, Container: this.container }),
-                        () => source({ ...partial, ...scope } as any as ObjectIn));
+class EventBase<TOut> extends ObservableOperation<TOut> {
+    container?: any;
 
-                },
-                new ObservableOperation<ObjectOut>(
-                    () => scopedName(this.displayName, scope),
-                    [source],
-                    observer => source.subscribe(value => matchesScope(scope, value) && observer.next(value), observer.getDisplayName)));
-        }
-    }));
+    scope<ObjectIn extends Scope, ObjectOut extends Scope, Scope extends object>(this: IEvent<ObjectIn, ObjectOut>, scope: Scope) {
+        return makeEventFunction(new ScopedEventSubject<ObjectIn, ObjectOut, Scope>(this, scope));
+    }
+}
+
+class EventSubject<T> extends EventBase<T> {
+    private _subject: ISubject<T>;
+
+    constructor(getDisplayName: () => string) {
+        let subject = new Subject<T>(() => this.displayName);
+        super(getDisplayName, [subject], observer => subject.subscribe(observer.next, observer.getDisplayName));
+        this._subject = subject;
+    }
+
+    next(value: T) {
+        fireEvent('⚡ (event)', this.displayName, value, () => ({ Container: this.container }),
+            () => this._subject.next(value));
+    }
+}
+
+class ScopedEventSubject<ObjectIn extends Scope, ObjectOut extends Scope, Scope extends object> extends EventBase<ObjectOut> {
+    constructor(private _source: IEvent<ObjectIn, ObjectOut>, private _scope: Scope) {
+        super(() => scopedName(_source.displayName, _scope), [_source],
+            observer => _source.subscribe(value => matchesScope(_scope, value) && observer.next(value), observer.getDisplayName));
+    }
+
+    next(partial: ObjectOmit<ObjectIn, Scope>) {
+        // Using plain log so only the unscoped event is logged as an event
+        log('{⚡} (scoped event)', this.displayName, [partial], () => ({ Scope: this._scope, Container: this.container }),
+            () => this._source({ ...partial, ...this._scope } as any as ObjectIn));
+
+    }
 }
 
 /** Creates an event that takes promises as inputs, along with an optional context value */
 export function asyncEvent<Result = void, Context = void>(name = '(anonymous async event)'): IAsyncEvent<Result, Context> {
-    let event: IAsyncEvent<Result, Context> = makeAsyncEvent(() => name,
-        function next(promise: PromiseLike<Result>, context: Context) {
-            promise.then(
-                result => fireEvent('⚡✔ (async result)', this.displayName + '.resolved', context, () => ({ Promise: promise, Container: this.container }),
-                    () => this.resolved.next({ result, context })),
-                error => fireEvent('⚡❌ (async error)', this.displayName + '.rejected', context, () => ({ Promise: promise, Container: this.container }),
-                    () => this.rejected.next({ error, context })));
-
-            fireEvent('⚡⌚ (async event)', this.displayName + '.started', context, () => ({ Promise: promise, Container: this.container }),
-                () => this.started.next({ promise, context }));
-        },
-        {
-            started: new Subject<AsyncStart<Result, Context>>(() => `${event.displayName}.started`),
-            resolved: new Subject<AsyncResult<Result, Context>>(() => `${event.displayName}.resolved`),
-            rejected: new Subject<AsyncError<Context>>(() => `${event.displayName}.rejected`)
-        });
-    return event;
+    return makeEventFunction(new AsyncEvent<Result, Context>(() => name));
 }
 
-function makeAsyncEvent<Result, ContextIn, ContextOut, Observables extends IAsyncEventObservables<Result, ContextOut>>(
-    getDisplayName: () => string,
-    next: (this: Observables & IEventBase, promise: PromiseLike<Result>, context: ContextIn) => void,
-    observables: Observables
-) {
-    return makeEventFunction(next, extend(filterableAsyncObservable<Result, ContextOut>(getDisplayName)(observables),
-        {
-            scope<ObjectContext extends Scope, Scope extends object>(this: IAsyncEvent<Result, ObjectContext>, scope: Scope) {
-                let source = this;
-                let event: IAsyncEvent<Result, ObjectOmit<ObjectContext, Scope>, ObjectContext> =
-                    makeAsyncEvent(() => scopedName(this.displayName, scope),
-                        function next(promise: PromiseLike<Result>, partialContext: ObjectOmit<ObjectContext, Scope>) {
-                            // Using plain log so only the unscoped event is logged as an event
-                            log('{⚡⌚} (scoped async event)', this.displayName, [partialContext], () => ({ Scope: scope, Container: this.container }),
-                                () => source(promise, { ...scope, ...partialContext } as any as ObjectContext));
-                        },
-                        {
-                            started: source.started.filter(s => matchesScope(scope, s.context), () => `${event.displayName}.started`),
-                            resolved: source.resolved.filter(r => matchesScope(scope, r.context), () => `${event.displayName}.resolved`),
-                            rejected: source.rejected.filter(e => matchesScope(scope, e.context), () => `${event.displayName}.rejected`)
-                        });
-                return event;
-            }
-        }))
+abstract class FilterableAsyncObservables<Result, Context> extends Named {
+    container?: any;
+
+    abstract readonly started: IObservable<AsyncStart<Result, Context>>;
+    abstract readonly resolved: IObservable<AsyncResult<Result, Context>>;
+    abstract readonly rejected: IObservable<AsyncError<Context>>;
+
+    filter(predicate: (context: Context) => boolean) {
+        return new FilteredAsyncObservables(this, predicate);
+    }
 }
 
-function filterableAsyncObservable<Result, Context>(getDisplayName: () => string) {
-    return <Observables extends IAsyncEventObservables<Result, Context>>(observables: Observables) =>
-        extend(named(observables, getDisplayName), {
-            filter(predicate: (context: Context) => boolean) {
-                let source = this;
-                return filterableAsyncObservable<Result, Context>(() => filteredName(source.displayName, predicate))({
-                    started: source.started.filter(s => predicate(s.context)),
-                    resolved: source.resolved.filter(r => predicate(r.context)),
-                    rejected: source.rejected.filter(r => predicate(r.context)),
-                });
-            }
-        });
+class FilteredAsyncObservables<Result, Context> extends FilterableAsyncObservables<Result, Context> {
+    constructor(private _source: IAsyncEventObservables<Result, Context> & { displayName: string }, private _predicate: (context: Context) => boolean) {
+        super(() => filteredName(_source.displayName, _predicate));
+    }
+
+    started = this._source.started.filter(s => this._predicate(s.context), () => `${this.displayName}.started`);
+    resolved = this._source.resolved.filter(r => this._predicate(r.context), () => `${this.displayName}.resolved`);
+    rejected = this._source.rejected.filter(r => this._predicate(r.context), () => `${this.displayName}.rejected`);
 }
 
-/** Combines an input function with a prototype to produce an event function */
-export function makeEventFunction<Fn extends (...args: any) => void, Proto extends IEventBase>(next: Fn, prototype: Proto) {
-    Object.setPrototypeOf(next, prototype);
-    next.apply = Function.prototype.apply;
-    return next as Fn & Proto;
+abstract class AsyncEventBase<Result, Context> extends FilterableAsyncObservables<Result, Context> {
+    scope<ObjectContextIn extends Scope, ObjectContextOut extends Scope, Scope extends object>(this: IAsyncEvent<Result, ObjectContextIn, ObjectContextOut>, scope: Scope) {
+        return makeEventFunction(new ScopedAsyncEvent<Result, ObjectContextIn, ObjectContextOut, Scope>(this, scope));
+    }
+}
+
+class AsyncEvent<Result, Context> extends AsyncEventBase<Result, Context> {
+    started = new Subject<AsyncStart<Result, Context>>(() => `${this.displayName}.started`);
+    resolved = new Subject<AsyncResult<Result, Context>>(() => `${this.displayName}.resolved`);
+    rejected = new Subject<AsyncError<Context>>(() => `${this.displayName}.rejected`);
+
+    next(promise: PromiseLike<Result>, context: Context) {
+        promise.then(
+            result => fireEvent('⚡✔ (async result)', this.displayName + '.resolved', context, () => ({ Promise: promise, Container: this.container }),
+                () => this.resolved.next({ result, context })),
+            error => fireEvent('⚡❌ (async error)', this.displayName + '.rejected', context, () => ({ Promise: promise, Container: this.container }),
+                () => this.rejected.next({ error, context })));
+
+        fireEvent('⚡⌚ (async event)', this.displayName + '.started', context, () => ({ Promise: promise, Container: this.container }),
+            () => this.started.next({ promise, context }));
+    }
+}
+
+class ScopedAsyncEvent<Result, ContextIn extends Scope, ContextOut extends Scope, Scope extends object> extends AsyncEventBase<Result, ContextOut> {
+    constructor(private _source: IAsyncEvent<Result, ContextIn, ContextOut>, private _scope: Scope) {
+        super(() => scopedName(_source.displayName, _scope));
+    }
+
+    started = this._source.started.filter(s => matchesScope(this._scope, s.context), () => `${this.displayName}.started`);
+    resolved = this._source.resolved.filter(r => matchesScope(this._scope, r.context), () => `${this.displayName}.resolved`);
+    rejected = this._source.rejected.filter(e => matchesScope(this._scope, e.context), () => `${this.displayName}.rejected`);
+
+    next(promise: PromiseLike<Result>, partialContext: ObjectOmit<ContextIn, Scope>) {
+        // Using plain log so only the unscoped event is logged as an event
+        log('{⚡⌚} (scoped async event)', this.displayName, [partialContext], () => ({ Scope: this._scope, Container: this.container }),
+            () => this._source(promise, { ...this._scope, ...partialContext } as any as ContextIn));
+    }
+}
+
+/** Converts an event class into a callable function */
+export function makeEventFunction<Event extends IEventClass>(event: Event) {
+    let fn = event.next.bind(event);
+    Object.setPrototypeOf(fn, event);
+    fn.apply = Function.prototype.apply;
+    return fn as Event & Event['next'];
 }
 
 /** Logs event and ensures no other events are run at the same time. */

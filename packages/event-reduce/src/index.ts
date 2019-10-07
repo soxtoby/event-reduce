@@ -1,6 +1,6 @@
 export { derived, events, extend, reduced } from "./decorators";
 export { derive } from "./derivation";
-export { asyncEvent, event, IEventBase, makeEvent } from "./events";
+export { asyncEvent, event, IEventBase, makeEventFunction } from "./events";
 export { enableLogging } from "./logging";
 export { allSources, IObservable, IObserver, Observable, Observe, Unsubscribe } from "./observable";
 export { IObservableValue } from "./observableValue";

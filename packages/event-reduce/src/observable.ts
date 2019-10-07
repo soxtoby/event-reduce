@@ -1,4 +1,4 @@
-import { nameOf, filteredName } from "./utils";
+import { nameOfFunction, filteredName, Named } from "./utils";
 
 export type Observe<T> = (value: T) => void;
 export type Unsubscribe = () => void;
@@ -18,13 +18,8 @@ export interface IObserver<T> {
     next: Observe<T>;
 }
 
-export class Observable<T> {
+export class Observable<T> extends Named {
     protected _observers = new Set<IObserver<T>>();
-
-    constructor(private _getDisplayName: () => string) { }
-
-    get displayName() { return this._getDisplayName(); }
-    set displayName(name: string) { this._getDisplayName = () => name; }
 
     get sources() { return [] as readonly IObservable<any>[]; }
 
@@ -50,7 +45,7 @@ export class Observable<T> {
     }
 
     map<U>(select: (value: T) => U): IObservable<U> {
-        let mapName = () => `${this.displayName}.map(${nameOf(select)})`;
+        let mapName = () => `${this.displayName}.map(${nameOfFunction(select)})`;
         return new ObservableOperation<U>(mapName, [this],
             observer => this.subscribe(value => observer.next(select(value)), mapName));
     }
