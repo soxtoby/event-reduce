@@ -1,9 +1,8 @@
 import { log, logEvent } from "./logging";
 import { IObservable, ObservableOperation } from "./observable";
-import { matchesScope } from "./scoping";
 import { ISubject, Subject } from "./subject";
 import { ObjectOmit } from "./types";
-import { filteredName, Named, scopedName } from "./utils";
+import { filteredName, matchesScope, NamedBase, scopedName } from "./utils";
 
 export interface IEventBase {
     displayName: string;
@@ -20,17 +19,17 @@ export interface IEvent<TIn = void, TOut = TIn> extends IObservable<TOut>, IEven
     scope<ObjectIn extends Scope, ObjectOut extends Scope, Scope extends object>(this: IEvent<ObjectIn, ObjectOut>, scope: Scope): IEvent<ObjectOmit<ObjectIn, Scope>, ObjectOut>;
 }
 
-export interface IAsyncEventObservables<Result = void, Context = void> {
+export interface IAsyncObservables<Result = void, Context = void> {
     readonly started: IObservable<AsyncStart<Result, Context>>;
     readonly resolved: IObservable<AsyncResult<Result, Context>>;
     readonly rejected: IObservable<AsyncError<Context>>;
 }
 
-export interface IFilterableAsyncEvent<Result = void, Context = void> extends IAsyncEventObservables<Result, Context>, IEventBase {
-    filter(predicate: (context: Context) => boolean): IFilterableAsyncEvent<Result, Context>;
+export interface IFilterableAsyncObservables<Result = void, Context = void> extends IAsyncObservables<Result, Context>, IEventBase {
+    filter(predicate: (context: Context) => boolean): IFilterableAsyncObservables<Result, Context>;
 }
 
-export interface IAsyncEvent<Result = void, ContextIn = void, ContextOut = ContextIn> extends IFilterableAsyncEvent<Result, ContextOut> {
+export interface IAsyncEvent<Result = void, ContextIn = void, ContextOut = ContextIn> extends IFilterableAsyncObservables<Result, ContextOut> {
     (promise: PromiseLike<Result>, context: ContextIn): void;
     scope<ObjectContext extends Scope, Scope extends object>(this: IAsyncEvent<Result, ObjectContext>, scope: Scope): IAsyncEvent<Result, ObjectOmit<ObjectContext, Scope>, ObjectContext>;
 }
@@ -96,26 +95,26 @@ export function asyncEvent<Result = void, Context = void>(name = '(anonymous asy
     return makeEventFunction(new AsyncEvent<Result, Context>(() => name));
 }
 
-abstract class FilterableAsyncObservables<Result, Context> extends Named {
+abstract class FilterableAsyncObservables<Result, Context> extends NamedBase {
     container?: any;
 
     abstract readonly started: IObservable<AsyncStart<Result, Context>>;
     abstract readonly resolved: IObservable<AsyncResult<Result, Context>>;
     abstract readonly rejected: IObservable<AsyncError<Context>>;
 
-    filter(predicate: (context: Context) => boolean) {
+    filter(predicate: (context: Context) => boolean): IFilterableAsyncObservables<Result, Context> {
         return new FilteredAsyncObservables(this, predicate);
     }
 }
 
 class FilteredAsyncObservables<Result, Context> extends FilterableAsyncObservables<Result, Context> {
-    constructor(private _source: IAsyncEventObservables<Result, Context> & { displayName: string }, private _predicate: (context: Context) => boolean) {
+    constructor(private _source: IFilterableAsyncObservables<Result, Context>, private _predicate: (context: Context) => boolean) {
         super(() => filteredName(_source.displayName, _predicate));
     }
 
-    started = this._source.started.filter(s => this._predicate(s.context), () => `${this.displayName}.started`);
-    resolved = this._source.resolved.filter(r => this._predicate(r.context), () => `${this.displayName}.resolved`);
-    rejected = this._source.rejected.filter(r => this._predicate(r.context), () => `${this.displayName}.rejected`);
+    readonly started = this._source.started.filter(s => this._predicate(s.context), () => `${this.displayName}.started`);
+    readonly resolved = this._source.resolved.filter(r => this._predicate(r.context), () => `${this.displayName}.resolved`);
+    readonly rejected = this._source.rejected.filter(r => this._predicate(r.context), () => `${this.displayName}.rejected`);
 }
 
 abstract class AsyncEventBase<Result, Context> extends FilterableAsyncObservables<Result, Context> {
@@ -125,9 +124,9 @@ abstract class AsyncEventBase<Result, Context> extends FilterableAsyncObservable
 }
 
 class AsyncEvent<Result, Context> extends AsyncEventBase<Result, Context> {
-    started = new Subject<AsyncStart<Result, Context>>(() => `${this.displayName}.started`);
-    resolved = new Subject<AsyncResult<Result, Context>>(() => `${this.displayName}.resolved`);
-    rejected = new Subject<AsyncError<Context>>(() => `${this.displayName}.rejected`);
+    readonly started = new Subject<AsyncStart<Result, Context>>(() => `${this.displayName}.started`);
+    readonly resolved = new Subject<AsyncResult<Result, Context>>(() => `${this.displayName}.resolved`);
+    readonly rejected = new Subject<AsyncError<Context>>(() => `${this.displayName}.rejected`);
 
     next(promise: PromiseLike<Result>, context: Context) {
         promise.then(
@@ -146,9 +145,9 @@ class ScopedAsyncEvent<Result, ContextIn extends Scope, ContextOut extends Scope
         super(() => scopedName(_source.displayName, _scope));
     }
 
-    started = this._source.started.filter(s => matchesScope(this._scope, s.context), () => `${this.displayName}.started`);
-    resolved = this._source.resolved.filter(r => matchesScope(this._scope, r.context), () => `${this.displayName}.resolved`);
-    rejected = this._source.rejected.filter(e => matchesScope(this._scope, e.context), () => `${this.displayName}.rejected`);
+    readonly started = this._source.started.filter(s => matchesScope(this._scope, s.context), () => `${this.displayName}.started`);
+    readonly resolved = this._source.resolved.filter(r => matchesScope(this._scope, r.context), () => `${this.displayName}.resolved`);
+    readonly rejected = this._source.rejected.filter(e => matchesScope(this._scope, e.context), () => `${this.displayName}.rejected`);
 
     next(promise: PromiseLike<Result>, partialContext: ObjectOmit<ContextIn, Scope>) {
         // Using plain log so only the unscoped event is logged as an event

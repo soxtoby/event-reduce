@@ -11,9 +11,18 @@ export function nameOfFunction(fn: Function) {
 }
 
 /** Utility base class for anything with a dynamic displayName */
-export class Named {
+export class NamedBase {
     constructor(private _getDisplayName: () => string) { }
 
     get displayName() { return this._getDisplayName(); }
     set displayName(name: string) { this._getDisplayName = () => name; }
+}
+
+export function matchesScope<Scope>(scope: Scope): <Value>(value: Value) => boolean;
+export function matchesScope<Scope, Value>(scope: Scope, value: Value): boolean;
+export function matchesScope<Scope, Value>(scope: Scope, value?: Value) {
+    return arguments.length == 2
+        ? matchesScope(scope)(value)
+        : <Value extends Scope>(value: Value) => Object.entries(scope)
+            .every(([k, v]) => value[k as keyof Scope] === v);
 }

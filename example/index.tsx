@@ -1,8 +1,7 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 import { CounterList, CounterListEvents, CounterListModel } from "./CounterList";
-import { enableLogging } from "event-reduce";
-import { enableDevTools } from "event-reduce/lib/devtools";
+import { enableLogging, enableDevTools } from "event-reduce";
 
 enableLogging();
 

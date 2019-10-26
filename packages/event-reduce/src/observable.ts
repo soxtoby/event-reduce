@@ -1,4 +1,4 @@
-import { nameOfFunction, filteredName, Named } from "./utils";
+import { nameOfFunction, filteredName, NamedBase } from "./utils";
 
 export type Observe<T> = (value: T) => void;
 export type Unsubscribe = () => void;
@@ -18,7 +18,7 @@ export interface IObserver<T> {
     next: Observe<T>;
 }
 
-export class Observable<T> extends Named {
+export class Observable<T> extends NamedBase {
     protected _observers = new Set<IObserver<T>>();
 
     get sources() { return [] as readonly IObservable<any>[]; }
