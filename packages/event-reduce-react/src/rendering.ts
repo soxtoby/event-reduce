@@ -1,41 +1,50 @@
-import { watch } from "event-reduce";
-import { log } from "event-reduce/lib/logging";
-import { ReactElement, useEffect, useRef, useState, FunctionComponent } from "react";
-import { useOnce } from "./utils";
+import { Unsubscribe, watch } from "event-reduce";
+import { log, sourceTree } from "event-reduce/lib/logging";
+import { collectAccessedValues } from "event-reduce/lib/observableValue";
+import { createElement, Fragment, FunctionComponent, memo, ReactElement, ReactNode, useRef, useState, useEffect } from "react";
+import { useDispose, useOnce } from "./utils";
 
-export function Derived(props: { name?: string; children: () => ReactElement | null; }) {
+export function Derived(props: { name?: string; children: () => ReactNode; }) {
     return useDerivedRender(props.name || 'Derived', props.children);
 }
 
-export function useDerivedRender(render: () => ReactElement | null): ReactElement | null;
-export function useDerivedRender(name: string, render: () => ReactElement | null): ReactElement | null;
-export function useDerivedRender(renderOrName: string | (() => ReactElement | null), maybeRender?: () => ReactElement | null): ReactElement | null {
+export function derivedComponent<Component extends FunctionComponent<any>>(component: Component) {
+    let componentName = component.displayName || component.name || 'Derived';
+    let derived = ((...args: Parameters<Component>) => useDerivedRender(componentName, () => component(...args as [any]))) as Component;
+    let memoed = memo<Component>(derived);
+    memoed.displayName = componentName;
+    return memoed;
+}
+
+export function useDerivedRender(render: () => ReactNode): ReactElement;
+export function useDerivedRender(name: string, render: () => ReactNode): ReactElement;
+export function useDerivedRender(renderOrName: string | (() => ReactNode), maybeRender?: () => ReactNode): ReactElement {
     let [name, render] = typeof renderOrName == 'string'
         ? [renderOrName, maybeRender!]
         : ['Derived', renderOrName];
 
-    let [renderCount, setRenderCount] = useState(1);
+    let [rerenderCount, setRerenderCount] = useState(1);
 
-    let rendered = useRef<ReactElement | null | undefined>(undefined);
+    let rendered: ReactNode;
 
-    let renderWatcher = useOnce(() =>
-        watch((renderCount) =>
-            log('⚛ (render)', name, [], () => ({ 'Render count': renderCount }),
-                () => rendered.current = render()),
-            renderCount,
-            name));
+    let watcher = watch(
+        () => {
+            let newSources = collectAccessedValues(() => rendered = render());
+            log('⚛ (render)', name, [], () => ({ 'Re-render count': rerenderCount, Sources: sourceTree(Array.from(newSources)) }));
+        },
+        name);
 
-    useEffect(() => {
-        let stopWatching = renderWatcher.subscribe(() => {
-            stopWatching();
-            rendered.current = undefined;
-            setRenderCount(c => c + 1);
-        });
-        return () => stopWatching();
+    let stopWatching = watcher.subscribe(() => {
+        if (rendered !== undefined) {
+            rendered = undefined;
+            setRerenderCount(c => c + 1);
+        }
     });
 
-    if (rendered.current == undefined)
-        renderWatcher.run(renderCount);
+    useEffect(() => () => {
+        stopWatching();
+        watcher.unsubscribeFromSources();
+    });
 
-    return rendered.current as ReactElement | null;
+    return createElement(Fragment, { children: rendered });
 }

@@ -2,31 +2,30 @@ import { log, sourceTree } from "./logging";
 import { IObservable, Observable, Unsubscribe } from "./observable";
 import { collectAccessedValues } from "./observableValue";
 
-export function watch<T = void>(action: (input: T) => void, initialInput: T, name = '(anonymous watcher)'): IWatcher<T> {
-    return new Watcher(() => name, action, initialInput);
+export function watch(action: () => void, name = '(anonymous watcher)'): IWatcher {
+    return new Watcher(() => name, action);
 }
 
-export interface IWatcher<T> extends IObservable<void> {
-    run(input: T): void;
+export interface IWatcher extends IObservable<void> {
+    run(): void;
 }
 
-class Watcher<T> extends Observable<void> {
+class Watcher extends Observable<void> {
     private _sources = new Map<Observable<any>, Unsubscribe>();
 
     constructor(
         public getDisplayName: () => string,
-        private _action: (input: T) => void,
-        initialInput: T
+        private _action: () => void
     ) {
         super(getDisplayName);
-        this.run(initialInput);
+        this.run();
     }
 
     get sources() { return Array.from(this._sources.keys()); }
 
-    run(input: T) {
+    run() {
         this.unsubscribeFromSources();
-        collectAccessedValues(() => this._action(input))
+        collectAccessedValues(() => this._action())
             .forEach(o => this._sources.set(o, o.subscribe(() => this.onDependenciesChanged(), () => this.displayName)));
     }
 

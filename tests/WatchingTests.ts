@@ -8,12 +8,12 @@ describe(watch.name, function () {
     let sourceB = new ObservableValue(() => 'b', 'b');
     let accessValues = () => sourceA.value;
     let action = spy(() => accessValues());
-    let result = watch(action, 'input' as string, 'sut');
+    let result = watch(action, 'sut');
 
     let observer = spy();
     result.subscribe(observer);
 
-    it("runs action straight away", () => action.should.have.been.calledOnce.and.calledWith('input'));
+    it("runs action straight away", () => action.should.have.been.calledOnce);
 
     when("source value changed", () => {
         sourceA.setValue('A');
@@ -24,14 +24,14 @@ describe(watch.name, function () {
     });
 
     when("run again", () => {
-        result.run('new input');
+        result.run();
 
-        it("runs action again with new input", () => action.should.have.been.calledTwice.and.calledWith('new input'));
+        it("runs action again", () => action.should.have.been.calledTwice);
     });
 
     when("action's sources change between runs", () => {
         accessValues = () => sourceB.value;
-        result.run('input2');
+        result.run();
 
         when("old source value changed", () => {
             sourceA.setValue('AA');
