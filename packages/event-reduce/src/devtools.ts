@@ -3,7 +3,7 @@ import { getState, setState } from "./state";
 let modelDevTools = new Map<object, any>();
 
 export function enableDevTools(model: object, name?: string) {
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV !== 'production') {
         if (!modelDevTools.has(model) && (window as any).__REDUX_DEVTOOLS_EXTENSION__) {
             let dev = (window as any).__REDUX_DEVTOOLS_EXTENSION__.connect({ name });
             modelDevTools.set(model, dev);
@@ -22,7 +22,7 @@ export function enableDevTools(model: object, name?: string) {
 }
 
 export function sendEvent(name: string, arg: any) {
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV !== 'production') {
         if (modelDevTools.size) {
             let event = typeof arg == 'object'
                 ? { ...arg }

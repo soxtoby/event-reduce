@@ -14,7 +14,7 @@ export function logEvent(type: string, displayName: string, arg: any, getInfo: (
 }
 
 export function log(type: string, displayName: string, args: any[], getInfo?: () => object, work?: () => void) {
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV !== 'production') {
         if (!loggingEnabled)
             return void (work && work());
 
@@ -62,7 +62,7 @@ export interface ISourceInfo {
 }
 
 export function sourceTree(sources: readonly IObservable<any>[]): ISourceInfo[] {
-    if (process.env.NODE_ENV === 'development')
+    if (process.env.NODE_ENV !== 'production')
         return sources.map(s => ({ name: s.displayName, sources: sourceTree(s.sources), get observable() { return s; } }));
     else
         return [];
