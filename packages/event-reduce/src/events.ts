@@ -158,10 +158,13 @@ class ScopedAsyncEvent<Result, ContextIn extends Scope, ContextOut extends Scope
 
 /** Converts an event class into a callable function */
 export function makeEventFunction<Event extends IEventClass>(event: Event) {
-    let fn = event.next.bind(event);
-    Object.setPrototypeOf(fn, event);
-    fn.apply = Function.prototype.apply;
-    return fn as Event & Event['next'];
+    Object.setPrototypeOf(eventFn, event);
+    eventFn.apply = Function.prototype.apply;
+    return eventFn as Event & Event['next'];
+
+    function eventFn(...args: any) {
+        event.next.apply(eventFn, args);
+    }
 }
 
 /** Logs event and ensures no other events are run at the same time. */
