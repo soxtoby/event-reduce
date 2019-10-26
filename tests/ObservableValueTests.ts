@@ -1,4 +1,4 @@
-import { collectAccessedValues, lastAccessed, ObservableValue } from 'event-reduce/lib/observableValue';
+import { collectAccessedValues, ObservableValue, consumeLastAccessed } from 'event-reduce/lib/observableValue';
 import * as sinon from 'sinon';
 import { describe, it, then, when } from 'wattle';
 
@@ -12,7 +12,7 @@ describe(ObservableValue.name, function () {
 
         it("returns provided value", () => result.should.equal('initial'));
 
-        it("is last accessed value", () => lastAccessed.observableValue!.should.equal(sut));
+        it("is last accessed value", () => consumeLastAccessed()!.should.equal(sut));
     });
 
     when("value changed", () => {

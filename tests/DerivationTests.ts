@@ -1,7 +1,7 @@
 import { derive } from "event-reduce";
-import { lastAccessed, ObservableValue } from "event-reduce/lib/observableValue";
-import { describe, it, then, when } from "wattle";
+import { consumeLastAccessed, ObservableValue } from "event-reduce/lib/observableValue";
 import * as sinon from "sinon";
+import { describe, it, then, when } from "wattle";
 
 describe(derive.name, () => {
     let sourceA = new ObservableValue(() => 'a', 'a');
@@ -16,7 +16,7 @@ describe(derive.name, () => {
 
         it("returns result of calculation", () => result.should.equal('ab'));
 
-        then("derivation is last accessed value", () => lastAccessed.observableValue!.should.equal(sut));
+        then("derivation is last accessed value", () => consumeLastAccessed()!.should.equal(sut));
 
         when("accessed again", () => {
             let result2 = sut.value;
@@ -48,18 +48,18 @@ describe(derive.name, () => {
                 it("re-computes only once", () => calculation.should.have.been.calledTwice);
             });
         });
-    });
 
-    when("subscribed to", () => {
-        let observe = sinon.stub();
-        sut.subscribe(observe);
+        when("subscribed to", () => {
+            let observe = sinon.stub();
+            sut.subscribe(observe);
 
-        it("doesn't notify immediately", () => observe.should.not.have.been.called);
+            it("doesn't notify immediately", () => observe.should.not.have.been.called);
 
-        when("a source value changed", () => {
-            sourceA.setValue('A');
+            when("a source value changed", () => {
+                sourceA.setValue('A');
 
-            it("notifies observer of new value", () => observe.should.have.been.calledWith('Ab'));
+                it("notifies observer of new value", () => observe.should.have.been.calledWith('Ab'));
+            });
         });
     });
 });

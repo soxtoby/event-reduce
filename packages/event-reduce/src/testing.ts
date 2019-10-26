@@ -5,12 +5,13 @@ import { ObservableValue } from "./observableValue";
 export function mutable<T>(model: T): Mutable<T> {
     if (model && typeof model == 'object' && !Array.isArray(model)) {
         for (let [key, base] of allProperties(model)) {
-            let observableValue = getObservableProperty(model, key)!;
+            let getObservableValue = getObservableProperty(Object.getPrototypeOf(model), key)!;
 
-            if (observableValue) {
+            if (getObservableValue) {
                 Object.defineProperty(model, key, {
-                    get() { return observableValue.value; },
+                    get() { return getObservableValue(model).value; },
                     set(value) {
+                        let observableValue = getObservableValue(model);
                         observableValue.unsubscribeFromSources();
                         observableValue.setValue(value);
                     },
@@ -39,26 +40,30 @@ function allProperties(obj: unknown) {
 export function modelProxy<T>(initialState: T): Mutable<T>;
 export function modelProxy<T = any>(): Mutable<T>;
 export function modelProxy(initialState: any = {}) {
-    let model = {} as any;
+    if (initialState && typeof initialState == 'object' && !Array.isArray(initialState)) {
+        let model = {} as any;
 
-    let proxy = new Proxy(model, {
-        get(target: any, key: PropertyKey) {
-            if (key == 'readonly')
-                return proxy;
+        let proxy = new Proxy(model, {
+            get(target: any, key: PropertyKey) {
+                if (key == 'readonly')
+                    return proxy;
 
-            return modelProxy(getOrAddObservableValue(target, key).value);
-        },
+                return getOrAddObservableValue(target, key).value;
+            },
 
-        set(target: any, key: PropertyKey, value: any) {
-            if (key == 'readonly')
-                return false;
+            set(target: any, key: PropertyKey, value: any) {
+                if (key == 'readonly')
+                    return false;
 
-            getOrAddObservableValue(target, key).setValue(value);
-            return true;
-        }
-    }) as any;
+                getOrAddObservableValue(target, key).setValue(value);
+                return true;
+            }
+        }) as any;
 
-    return proxy;
+        return proxy;
+    } else {
+        return initialState;
+    }
 
     function getOrAddObservableValue(target: any, key: string | number | symbol): ObservableValue<any> {
         return target[key] || (target[key] = new ObservableValue(() => String(key), initialState[key]));

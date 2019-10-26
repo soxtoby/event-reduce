@@ -1,36 +1,50 @@
 import { Derivation, derive } from "./derivation";
 import { IEventBase } from "./events";
-import { lastAccessed, ObservableValue } from "./observableValue";
+import { consumeLastAccessed, ObservableValue, withInnerTrackingScope } from "./observableValue";
 import { reduce, Reduction } from "./reduction";
 
 export let reduced: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
-    return observableValueProperty(key, Reduction, true, "@reduced property must be set to the value of a reduction");
+    return observableValueProperty(target, key, Reduction, true, `@reduced property '${String(key)}' must be set to the value of a reduction`);
 }
 
 export let derived: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
-    let property = Object.getOwnPropertyDescriptor(target, key);
+    let property = Object.getOwnPropertyDescriptor(target, key)!;
 
-    return property!.get ? {
-        get() { return getOrSetObservableProperty(this, key as string, () => derive(property!.get!.bind(this), String(key))).value; },
-        configurable: true
-    } : observableValueProperty(key, Derivation, false, "@derived property must have a getter or be set to the value of a derivation");
+    if (property && property.get) {
+        let getObservableValue = (instance: any) => getOrSetObservableValue(instance, key, () => derive(property.get!.bind(instance), String(key)));
+        setObservableProperty(target, key, getObservableValue);
+        return {
+            get() { return getObservableValue(this).value; },
+            configurable: true
+        }
+    }
+
+    return observableValueProperty(target, key, Derivation, false, `@derived property ${String(key)} must have a getter or be set to the value of a derivation`);
 }
 
 function observableValueProperty<Type extends ObservableValue<any>>(
+    prototype: any,
     key: string | symbol,
     type: new (...args: any) => Type,
     enumerable: boolean,
     typeError: string
 ): PropertyDescriptor {
+
+    setObservableProperty(prototype, key, instance => {
+        let value = getOrAddObservableValues(instance)[key as string];
+        if (!value)
+            throw new Error(typeError);
+        return value;
+    });
+
     return {
         set(this: any, value: any) {
-            let observableValue = lastAccessed.observableValue!;
-            if (!observableValue || !(observableValue instanceof type) || value !== observableValue.value)
+            let observableValue = consumeLastAccessed()!;
+            if (!observableValue || !(observableValue instanceof type) || value !== withInnerTrackingScope(() => observableValue.value))
                 throw new Error(typeError);
             observableValue.displayName = String(key);
             observableValue.container = this;
-            if (typeof key == 'string')
-                getOrSetObservableProperty(this, key, () => observableValue);
+            getOrAddObservableValues(this)[key as string] = observableValue;
             Object.defineProperty(this, key, {
                 get: () => observableValue.value,
                 enumerable,
@@ -41,37 +55,42 @@ function observableValueProperty<Type extends ObservableValue<any>>(
 }
 
 export function extend<T>(reducedValue: T) {
-    let source = lastAccessed.observableValue as Reduction<T>;
-    if (source && source instanceof Reduction && source.value == reducedValue)
+    let source = consumeLastAccessed() as Reduction<T>;
+    if (source && source instanceof Reduction && withInnerTrackingScope(() => source.value) == reducedValue)
         return reduce(reducedValue)
-            .onValueChanged(reducedValue, (_, val) => val);
+            .onValueChanged(source.value, (_, val) => val);
     throw new Error("Couldn't detect reduced value. Make sure you pass in the value of a reduction directly.");
 }
 
-
-
-
 let observableProperties = Symbol('ObservableProperties');
+let observableValues = Symbol('ObservableValues');
 
-function getOrSetObservableProperty(target: any, key: string, createObservableValue: () => ObservableValue<any>) {
-    let properties = getOrAddObservableProperties(target);
-    if (!properties[key]) {
-        properties[key] = createObservableValue();
-        properties[key]!.container = target;
-    }
-    return properties[key]!;
+function setObservableProperty(prototype: any, key: string | symbol, getObservableValue: (instance: any) => ObservableValue<any>) {
+    return getOrAddObservableProperties(prototype)[key as string] = getObservableValue;
 }
 
-export function getObservableProperty(target: any, key: string) {
-    return (getObservableProperties(target) || {})[key];
+function getOrSetObservableValue(instance: any, key: string | symbol, createObservableValue: (instance: any) => ObservableValue<any>) {
+    return getOrAdd(getOrAddObservableValues(instance), key, () => Object.assign(createObservableValue(instance), { container: instance }));
 }
 
-function getOrAddObservableProperties(target: any) {
-    return getObservableProperties(target) || (target[observableProperties] = {});
+function getOrAddObservableValues(instance: any) {
+    return getOrAdd(instance, observableValues, () => ({} as Record<string, ObservableValue<any>>));
 }
 
-export function getObservableProperties(target: any) {
-    return target[observableProperties] as Record<string, ObservableValue<any> | undefined> | undefined;
+export function getObservableProperty(prototype: any, key: string) {
+    return (getObservableProperties(prototype) || {})[key];
+}
+
+function getOrAddObservableProperties(prototype: any) {
+    return getOrAdd(prototype, observableProperties, () => ({} as Record<string | symbol, (instance: any) => ObservableValue<any>>));
+}
+
+export function getObservableProperties(prototype: any) {
+    return prototype[observableProperties] as Record<string, (instance: any) => ObservableValue<any>> | undefined;
+}
+
+function getOrAdd<T>(target: any, key: string | symbol, create: () => T): T {
+    return target[key] || (target[key] = create());
 }
 
 export let events = <T extends { new(...args: any[]): any }>(target: T): T => {

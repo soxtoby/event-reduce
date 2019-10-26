@@ -1,4 +1,4 @@
-import { asyncEvent, derived, event, events, extend, reduce, reduced } from "event-reduce";
+import { asyncEvent, derived, event, events, extend, reduce, reduced, derive } from "event-reduce";
 import { describe, it, test, then, when } from "wattle";
 
 describe("model decorators", function () {
@@ -25,6 +25,9 @@ describe("model decorators", function () {
             return this.property * 2;
         }
 
+        @derived
+        derivedField = derive(() => this.property * 2).value;
+
         @reduced
         basedOnDerivedProperty = reduce(0)
             .onValueChanged(this.derivedProperty, (_, d) => d)
@@ -47,6 +50,8 @@ describe("model decorators", function () {
 
         then("derived property value updated", () => model.derivedProperty.should.equal(4));
 
+        then("derived field value updated", () => model.derivedField.should.equal(4));
+
         then("property based on derived value updated", () => model.basedOnDerivedProperty.should.equal(4));
     });
 
@@ -58,19 +63,18 @@ describe("model decorators", function () {
         then("extended property value updated", () => model.extendedProperty.should.equal(0));
     });
 
-    when("reducer creates a new model", () => {
-        let createChild = event()
+    when("reducer creates a new model that observes the same event that created it", () => {
         class Parent {
             @reduced
             child = reduce(null as TestModel | null)
-                .on(createChild, () => new TestModel())
+                .on(increment, () => new TestModel())
                 .value;
         }
 
         let parentModel = new Parent();
 
         it("doesn't throw", () => {
-            createChild();
+            increment();
             parentModel.child!.should.be.an.instanceof(TestModel);
         })
     });

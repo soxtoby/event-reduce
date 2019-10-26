@@ -1,6 +1,6 @@
 import { log, sourceTree } from "./logging";
 import { IObservable, Unsubscribe } from "./observable";
-import { collectAccessedValues, ObservableValue } from "./observableValue";
+import { collectAccessedValues, ObservableValue, withInnerTrackingScope } from "./observableValue";
 
 export function derive<T>(getDerivedValue: () => T, name?: string) {
     return new Derivation(() => name || '(anonymous derivation)', getDerivedValue);
@@ -15,14 +15,13 @@ export class Derivation<T> extends ObservableValue<T> {
         private _deriveValue: () => T
     ) {
         super(getDisplayName, undefined!);
-        this.update();
     }
 
     get sources() { return Array.from(this._sources.keys()); }
 
     get value() {
         if (this._requiresUpdate)
-            this.update();
+            withInnerTrackingScope(() => this.update());
         return super.value;
     }
 

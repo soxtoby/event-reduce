@@ -1,6 +1,6 @@
 import { log, sourceTree } from "./logging";
 import { allSources, IObservable, Unsubscribe } from "./observable";
-import { collectAccessedValues, IObservableValue, lastAccessed, ObservableValue } from "./observableValue";
+import { collectAccessedValues, IObservableValue, consumeLastAccessed, ObservableValue, withInnerTrackingScope } from "./observableValue";
 import { setState, State, StateObject } from "./state";
 import { Subject } from "./subject";
 
@@ -76,8 +76,9 @@ export class Reduction<T> extends ObservableValue<T> {
     }
 
     onValueChanged<TValue>(observableValue: TValue, reduce: Reducer<T, TValue>) {
-        if (lastAccessed.observableValue && lastAccessed.observableValue.value == observableValue)
-            return this.on(lastAccessed.observableValue, reduce);
+        let lastAccessed = consumeLastAccessed();
+        if (lastAccessed && withInnerTrackingScope(() => lastAccessed!.value) == observableValue)
+            return this.on(lastAccessed, reduce);
         throw new Error("Couldn't detect observable value. Make sure you pass in an observable value directly.");
     }
 

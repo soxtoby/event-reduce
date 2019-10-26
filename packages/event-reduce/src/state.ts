@@ -61,10 +61,11 @@ function getStateProperties<T>(model: T) {
 
 function getReducedProperties<T>(model: T) {
     let reducedProps = {} as Record<string, Reduction<any>>;
-    let observableProps = getObservableProperties(model) || {};
+    let observableProps = getObservableProperties(Object.getPrototypeOf(model)) || {};
     for (let key in observableProps) {
-        if (observableProps[key] instanceof Reduction)
-            reducedProps[key] = observableProps[key] as Reduction<any>;
+        let observableValue = observableProps[key](model);
+        if (observableValue instanceof Reduction)
+            reducedProps[key] = observableValue;
     }
     return reducedProps;
 }
