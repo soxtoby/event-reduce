@@ -31,14 +31,17 @@ export class Derivation<T> extends ObservableValue<T> {
         collectAccessedValues(() => value = this._deriveValue())
             .forEach(o => this._sources.set(o, o.subscribe(() => this.invalidate(), () => this.displayName)));
 
-        this._requiresUpdate = false;
-
         log('🔗 (derivation)', this.displayName, [], () => ({
             Previous: this._value,
             Current: value,
             Container: this.container,
             Sources: sourceTree(this.sources)
         }), () => this.setValue(value));
+    }
+
+    setValue(value: T) {
+        this._requiresUpdate = false;
+        super.setValue(value);
     }
 
     private invalidate() {
