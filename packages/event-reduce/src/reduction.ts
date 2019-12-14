@@ -1,5 +1,5 @@
 import { log, sourceTree } from "./logging";
-import { allSources, IObservable, Unsubscribe } from "./observable";
+import { allSources, IObservable, Unsubscribe, pathToSource, isObservable } from "./observable";
 import { collectAccessedValues, IObservableValue, consumeLastAccessed, ObservableValue, withInnerTrackingScope } from "./observableValue";
 import { setState, State, StateObject } from "./state";
 import { Subject } from "./subject";
@@ -62,7 +62,7 @@ export class Reduction<T> extends ObservableValue<T> {
             let triggeringSources = allSources([observable]);
             let commonSource = firstIntersection(accessedSources, triggeringSources);
             if (commonSource)
-                throw new Error("Accessed a reduced value derived from the same event being fired.")
+                throw new Error(commonSourceError(commonSource, observable, sources))
 
             log('🧪 (reduction)', this.displayName, [], () => ({
                 Previous: this._value,
@@ -92,6 +92,12 @@ export class Reduction<T> extends ObservableValue<T> {
     }
 }
 
+function commonSourceError(commonSource: IObservable<any>, triggeringObservable: IObservable<any>, accessedObservables: Iterable<IObservable<any>>): string | undefined {
+    return `Accessed a reduced value derived from the same event being fired.
+Fired:    ${pathToSource([triggeringObservable], commonSource)!.map(o => o.displayName).join(' -> ')}
+Accessed: ${pathToSource(accessedObservables, commonSource)!.map(o => o.displayName).join(' -> ')}`;
+}
+
 function firstIntersection<T>(a: Set<T>, b: Set<T>) {
     for (let item of a)
         if (b.has(item))
@@ -106,6 +112,6 @@ class BoundReduction<TValue, TEvents> extends Reduction<TValue> {
     ) { super(getDisplayName, initial); }
 
     on<TEvent>(observable: ((events: TEvents) => IObservable<TEvent>) | IObservable<TEvent>, reduce: Reducer<TValue, TEvent>): this {
-        return super.on(typeof observable == 'function' ? observable(this._events) : observable, reduce);
+        return super.on(isObservable(observable) ? observable : observable(this._events), reduce);
     }
 }

@@ -95,3 +95,17 @@ export function allSources(sources: Iterable<IObservable<any>>) {
         }
     }
 }
+
+export function pathToSource(leaves: Iterable<IObservable<any>>, root: IObservable<any>): IObservable<any>[] | undefined {
+    for (let l of leaves) {
+        if (l == root)
+            return [l];
+        let path = pathToSource(l.sources, root);
+        if (path)
+            return path.concat([l]);
+    }
+}
+
+export function isObservable<T>(maybeObservable: any): maybeObservable is IObservable<T> {
+    return maybeObservable && typeof maybeObservable.subscribe == 'function';
+}
