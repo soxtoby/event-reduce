@@ -4,7 +4,7 @@ import { consumeLastAccessed, ObservableValue, withInnerTrackingScope } from "./
 import { reduce, Reduction } from "./reduction";
 
 export let reduced: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
-    return observableValueProperty(target, key, Reduction, true, `@reduced property '${String(key)}' must be set to the value of a reduction`);
+    return observableValueProperty(target, key, Reduction, true, `@reduced property '${String(key)}' can only be set to the value of a reduction`);
 }
 
 export let derived: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
@@ -37,21 +37,22 @@ function observableValueProperty<Type extends ObservableValue<any>>(
         return value;
     });
 
-    return {
-        set(this: any, value: any) {
-            let observableValue = consumeLastAccessed()!;
-            if (!observableValue || !(observableValue instanceof type) || value !== withInnerTrackingScope(() => observableValue.value))
-                throw new Error(typeError);
-            observableValue.displayName = String(key);
-            observableValue.container = this;
-            getOrAddObservableValues(this)[key as string] = observableValue;
-            Object.defineProperty(this, key, {
-                get: () => observableValue.value,
-                enumerable,
-                configurable: true
-            });
-        }
-    };
+    return { set };
+
+    function set(this: any, value: any) {
+        let observableValue = consumeLastAccessed()!;
+        if (!observableValue || !(observableValue instanceof type) || value !== withInnerTrackingScope(() => observableValue.value))
+            throw new Error(typeError);
+        observableValue.displayName = String(key);
+        observableValue.container = this;
+        getOrAddObservableValues(this)[key as string] = observableValue;
+        Object.defineProperty(this, key, {
+            get: () => observableValue.value,
+            set,
+            enumerable,
+            configurable: true
+        });
+    }
 }
 
 export function extend<T>(reducedValue: T) {

@@ -15,11 +15,6 @@ describe("model decorators", function () {
             .onValueChanged(this.property, (_, p) => p)
             .value;
 
-        @reduced
-        extendedProperty = extend(this.property)
-            .on(decrement, c => c - 1)
-            .value;
-
         @derived
         get derivedProperty() {
             return this.property * 2;
@@ -35,9 +30,16 @@ describe("model decorators", function () {
     }
     let model = new TestModel();
 
+    class ExtendedModel extends TestModel {
+        property: number = extend(this.property)
+            .on(decrement, c => c - 1)
+            .value;
+    }
+    let extendedModel = new ExtendedModel();
+
     test("property has initial value", () => model.property.should.equal(1));
 
-    test("extended property has same initial value", () => model.extendedProperty.should.equal(1));
+    test("extended property has same initial value", () => extendedModel.property.should.equal(1));
 
     when("reduction updated", () => {
         increment();
@@ -46,7 +48,7 @@ describe("model decorators", function () {
 
         then("dependent property value updated", () => model.dependentProperty.should.equal(2));
 
-        then("extended property value updated", () => model.extendedProperty.should.equal(2));
+        then("extended property value updated", () => extendedModel.property.should.equal(2));
 
         then("derived property value updated", () => model.derivedProperty.should.equal(4));
 
@@ -60,7 +62,7 @@ describe("model decorators", function () {
 
         then("property value unaffected", () => model.property.should.equal(1));
 
-        then("extended property value updated", () => model.extendedProperty.should.equal(0));
+        then("extended property value updated", () => extendedModel.property.should.equal(0));
     });
 
     when("reducer creates a new model that observes the same event that created it", () => {
