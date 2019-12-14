@@ -9,6 +9,8 @@
       "strict": true,
       "inlineSourceMap": true,
       "inlineSources": true,
-      "experimentalDecorators": true
+      "experimentalDecorators": true,
+      "noEmit": true,
+      "skipLibCheck": true
     }
   }
