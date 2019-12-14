@@ -39,34 +39,58 @@ function allProperties(obj: unknown) {
 
 export function modelProxy<T>(initialState: T): Mutable<T>;
 export function modelProxy<T = any>(): Mutable<T>;
-export function modelProxy(initialState: any = {}) {
-    if (initialState && typeof initialState == 'object' && !Array.isArray(initialState)) {
-        let model = {} as any;
+export function modelProxy(model: any = {}) {
+    if (!model || typeof model != 'object' || Array.isArray(model))
+        return model;
 
-        let proxy = new Proxy(model, {
-            get(target: any, key: PropertyKey) {
-                if (key == 'readonly')
-                    return proxy;
+    let observableValues = {} as Record<PropertyKey, ObservableValue<any>>;
 
-                return getOrAddObservableValue(target, key).value;
-            },
+    // Pre-populate observable values with plain value fields
+    Object.entries(Object.getOwnPropertyDescriptors(model))
+        .forEach(([key, prop]) => {
+            if ('value' in prop)
+                observableValues[key] = new ObservableValue(() => String(key), prop.value);
+        });
 
-            set(target: any, key: PropertyKey, value: any) {
-                if (key == 'readonly')
-                    return false;
+    let proxy = new Proxy(model, {
+        get(target: any, key: PropertyKey) {
+            if (key == 'readonly')
+                return proxy;
 
-                getOrAddObservableValue(target, key).setValue(value);
-                return true;
-            }
-        }) as any;
+            if (observableValues.hasOwnProperty(key))
+                return observableValues[key as string].value;
 
-        return proxy;
-    } else {
-        return initialState;
-    }
+            if (key in target)
+                return target[key];
 
-    function getOrAddObservableValue(target: any, key: string | number | symbol): ObservableValue<any> {
-        return target[key] || (target[key] = new ObservableValue(() => String(key), initialState[key]));
+            return getOrAddObservableValue(key).value;
+        },
+
+        set(target: any, key: PropertyKey, value: any) {
+            if (key == 'readonly')
+                return false;
+
+            getOrAddObservableValue(key).setValue(value);
+            return true;
+        },
+
+        enumerate(target: any) {
+            return this.ownKeys!(target);
+        },
+
+        ownKeys(target: any) {
+            return Array.from(new Set(Object.keys(target).concat(Object.keys(observableValues))));
+        },
+
+        has(target: any, key: PropertyKey) {
+            return key in target || key in observableValues;
+        },
+    }) as any;
+
+    return proxy;
+
+    function getOrAddObservableValue(key: PropertyKey): ObservableValue<any> {
+        return observableValues[key as string] || (observableValues[key as string] = new ObservableValue(() => String(key), model[key]));
     }
 }
 
