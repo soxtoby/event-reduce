@@ -1,5 +1,5 @@
 import { asyncEvent, derived, events, reduce, reduced } from "event-reduce";
-import { Derived, useDerivedRender } from "event-reduce-react";
+import { useReactive } from "event-reduce-react";
 import * as React from "react";
 import { CounterListEvents } from "./CounterList";
 
@@ -37,7 +37,7 @@ export class CounterModel {
 export function Counter({ model }: { model: CounterModel }) {
     let events = model.events;
 
-    return useDerivedRender(`Counter ${model.id}`, () =>
+    return useReactive(`Counter ${model.id}`, () =>
         <div data-testid="counter" style={{ display: 'inline-block', border: '1px solid silver', margin: 8, padding: 8 }}>
             <table>
                 <tbody>

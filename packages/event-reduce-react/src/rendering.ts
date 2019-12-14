@@ -1,42 +1,62 @@
-import { Unsubscribe, watch } from "event-reduce";
+import { watch } from "event-reduce";
 import { log, sourceTree } from "event-reduce/lib/logging";
-import { collectAccessedValues } from "event-reduce/lib/observableValue";
-import { createElement, Fragment, FunctionComponent, memo, ReactElement, ReactNode, useRef, useState, useEffect } from "react";
-import { useDispose, useOnce } from "./utils";
+import { collectAccessedValues, ObservableValue } from "event-reduce/lib/observableValue";
+import { createElement, forwardRef, ForwardRefExoticComponent, Fragment, memo, MemoExoticComponent, PropsWithoutRef, ReactElement, ReactNode, RefAttributes, RefForwardingComponent, useEffect, useState, PropsWithChildren, WeakValidationMap, ValidationMap, FunctionComponent } from "react";
 
-export function Derived(props: { name?: string; children: () => ReactNode; }) {
-    return useDerivedRender(props.name || 'Derived', props.children);
+interface ContextlessFunctionComponent<P = {}> {
+    (props: PropsWithChildren<P>): ReactElement | null;
+    propTypes?: WeakValidationMap<P>;
+    contextTypes?: ValidationMap<any>;
+    defaultProps?: Partial<P>;
+    displayName?: string;
 }
 
-export function derivedComponent<Component extends FunctionComponent<any>>(component: Component) {
-    let componentName = component.displayName || component.name || 'Derived';
-    let derived = ((...args: Parameters<Component>) => useDerivedRender(componentName, () => component(...args as [any]))) as Component;
-    let memoed = memo<Component>(derived);
-    memoed.displayName = componentName;
-    return memoed;
+export type ReactiveComponent<Component extends ContextlessFunctionComponent<any> | RefForwardingComponent<any, any>> =
+    Component extends ContextlessFunctionComponent<any>
+    ? MemoExoticComponent<Component>
+    : Component extends RefForwardingComponent<infer Ref, infer Props>
+    ? MemoExoticComponent<ForwardRefExoticComponent<PropsWithoutRef<Props> & RefAttributes<Ref>>>
+    : never;
+
+export function Reactive(props: { name?: string; children: () => ReactNode; }): ReactElement {
+    return useReactive(props.name || 'Derived', () => createElement(Fragment, { children: props.children() }));
 }
 
-export function useDerivedRender(render: () => ReactNode): ReactElement;
-export function useDerivedRender(name: string, render: () => ReactNode): ReactElement;
-export function useDerivedRender(renderOrName: string | (() => ReactNode), maybeRender?: () => ReactNode): ReactElement {
-    let [name, render] = typeof renderOrName == 'string'
-        ? [renderOrName, maybeRender!]
-        : ['Derived', renderOrName];
+export function reactive<Component extends (ContextlessFunctionComponent<any> | RefForwardingComponent<any, any>)>(component: Component): ReactiveComponent<Component> {
+    let componentName = component.displayName || component.name || 'ReactiveComponent';
+    let reactiveComponent = ((...args: Parameters<Component>) => useReactive(componentName, () => component(...args as [any, any]))) as ReactiveComponent<Component>;
+
+    if (component.length == 2)
+        reactiveComponent = forwardRef(component) as ReactiveComponent<Component>;
+    reactiveComponent = memo<Component>(reactiveComponent as FunctionComponent<any>) as ReactiveComponent<Component>;
+    reactiveComponent.displayName = componentName;
+    return reactiveComponent;
+}
+
+export function useReactive<T>(deriveValue: () => T): T;
+export function useReactive<T>(name: string, deriveValue: () => T): T;
+export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriveValue?: () => T): T {
+    let [name, deriveValue] = typeof nameOrDeriveValue == 'string'
+        ? [nameOrDeriveValue, maybeDeriveValue!]
+        : ['ReactiveValue', nameOrDeriveValue];
 
     let [rerenderCount, setRerenderCount] = useState(1);
 
-    let rendered: ReactNode;
+    let value: T | undefined;
 
     let watcher = watch(
         () => {
-            let newSources = collectAccessedValues(() => rendered = render());
-            log('⚛ (render)', name, [], () => ({ 'Re-render count': rerenderCount, Sources: sourceTree(Array.from(newSources)) }));
+            let newSources: Set<ObservableValue<any>>;
+            log('⚛ (render)', name, [], () => ({
+                'Re-render count': rerenderCount,
+                Sources: { get list() { return sourceTree(Array.from(newSources)); } }
+            }), () => newSources = collectAccessedValues(() => value = deriveValue()));
         },
         name);
 
     let stopWatching = watcher.subscribe(() => {
-        if (rendered !== undefined) {
-            rendered = undefined;
+        if (value !== undefined) {
+            value = undefined;
             setRerenderCount(c => c + 1);
         }
     });
@@ -46,5 +66,5 @@ export function useDerivedRender(renderOrName: string | (() => ReactNode), maybe
         watcher.unsubscribeFromSources();
     });
 
-    return createElement(Fragment, { children: rendered });
+    return value!;
 }
