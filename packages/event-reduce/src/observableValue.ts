@@ -27,8 +27,10 @@ export class ObservableValue<T> extends Observable<T> {
     }
 
     setValue(value: T) {
-        this._value = value;
-        this.notifyObservers(value);
+        if (value !== this._value) {
+            this._value = value;
+            this.notifyObservers(value);
+        }
     }
 }
 

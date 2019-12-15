@@ -22,6 +22,12 @@ describe(ObservableValue.name, function () {
 
         then("observers notified", () => observer.should.have.been.calledWith('different'));
     });
+
+    when("value set to same value", () => {
+        sut.setValue('initial');
+
+        then("observers not notified", () => observer.should.not.have.been.called);
+    });
 });
 
 describe(collectAccessedValues.name, function () {
