@@ -70,8 +70,8 @@ function setObservableProperty(prototype: any, key: string | symbol, getObservab
     return getOrAddObservableProperties(prototype)[key as string] = getObservableValue;
 }
 
-function getOrSetObservableValue(instance: any, key: string | symbol, createObservableValue: (instance: any) => ObservableValue<any>) {
-    return getOrAdd(getOrAddObservableValues(instance), key, () => Object.assign(createObservableValue(instance), { container: instance }));
+export function getOrSetObservableValue(instance: any, key: string | symbol, createObservableValue: () => ObservableValue<any>) {
+    return getOrAdd(getOrAddObservableValues(instance), key, () => Object.assign(createObservableValue(), { container: instance }));
 }
 
 function getOrAddObservableValues(instance: any) {
