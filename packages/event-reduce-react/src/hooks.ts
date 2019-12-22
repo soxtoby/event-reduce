@@ -43,7 +43,8 @@ export function useAsObservableValues<T extends object>(values: T, name?: string
 
         if (!Object.getOwnPropertyDescriptor(observableValues, key))
             Object.defineProperty(observableValues, key, {
-                get() { return observableValue.value; }
+                get() { return observableValue.value; },
+                enumerable: true
             });
     }
 
