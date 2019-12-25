@@ -1,4 +1,5 @@
 import { getState, setState } from "./state";
+import { isObject } from "./utils";
 
 let modelDevTools = new Map<object, any>();
 
@@ -24,7 +25,7 @@ export function enableDevTools(model: object, name?: string) {
 export function sendEvent(name: string, arg: any) {
     if (process.env.NODE_ENV !== 'production') {
         if (modelDevTools.size) {
-            let event = typeof arg == 'object'
+            let event = isObject(arg)
                 ? { ...arg }
                 : { value: arg };
             if ('type' in event)

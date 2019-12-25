@@ -1,9 +1,10 @@
 import { getObservableProperty } from "./decorators";
 import { event } from "./events";
 import { ObservableValue } from "./observableValue";
+import { isObject } from "./utils";
 
 export function mutable<T>(model: T): Mutable<T> {
-    if (model && typeof model == 'object' && !Array.isArray(model)) {
+    if (isObject(model) && !Array.isArray(model)) {
         for (let [key, base] of allProperties(model)) {
             let getObservableValue = getObservableProperty(Object.getPrototypeOf(model), key)!;
 
@@ -40,7 +41,7 @@ function allProperties(obj: unknown) {
 export function modelProxy<T>(initialState: T): Mutable<T>;
 export function modelProxy<T = any>(): Mutable<T>;
 export function modelProxy(model: any = {}) {
-    if (!model || typeof model != 'object' || Array.isArray(model))
+    if (!isObject(model) || Array.isArray(model))
         return model;
 
     let observableValues = {} as Record<PropertyKey, ObservableValue<any>>;

@@ -1,6 +1,7 @@
 import { StringKey } from "./types";
 import { getObservableProperties } from "./decorators";
 import { Reduction } from "./reduction";
+import { isObject } from "./utils";
 
 export type State<T> =
     T extends Function ? never
@@ -19,7 +20,7 @@ export function state(target: any, key: string) {
 }
 
 export function getState<T>(model: T): State<T> {
-    if (!model || typeof model != 'object')
+    if (!isObject(model))
         return model as State<T>;
 
     if (Array.isArray(model))
@@ -44,7 +45,7 @@ export function setState<T>(model: T, state: StateObject<T>) {
     stateProps.forEach(key => {
         if (key in observableProps)
             observableProps[key].restore(state[key]);
-        else if (model[key] && typeof model[key] == 'object')
+        else if (isObject(model[key]))
             setState(model[key], state[key] as StateObject<T[StringKey<T>]>);
         else
             model[key] = state[key] as T[StringKey<T>];

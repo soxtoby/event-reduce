@@ -3,6 +3,7 @@ import { allSources, IObservable, Unsubscribe, pathToSource, isObservable } from
 import { collectAccessedValues, IObservableValue, consumeLastAccessed, ObservableValue, withInnerTrackingScope } from "./observableValue";
 import { setState, State, StateObject } from "./state";
 import { Subject } from "./subject";
+import { isObject } from "./utils";
 
 export function reduce<TValue>(initial: TValue, displayName?: string): IReduction<TValue>;
 export function reduce<TValue, TEvents>(initial: TValue, events: TEvents, displayName?: string): IBoundReduction<TValue, TEvents>;
@@ -32,7 +33,7 @@ export class Reduction<T> extends ObservableValue<T> {
         super(getDisplayName, initial);
 
         this.onRestore((current, state) => {
-            if (current && typeof current == 'object') {
+            if (isObject(current)) {
                 setState(current, state as StateObject<T>);
                 return current;
             }

@@ -26,3 +26,7 @@ export function matchesScope<Scope, Value>(scope: Scope, value?: Value) {
         : <Value extends Scope>(value: Value) => Object.entries(scope)
             .every(([k, v]) => value[k as keyof Scope] === v);
 }
+
+export function isObject(value: any) {
+    return value && typeof value == 'object';
+}
