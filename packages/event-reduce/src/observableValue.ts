@@ -1,3 +1,4 @@
+import { ensureValueOwner, valueOwner, unsubscribeOldModelsFromSources } from "./cleanup";
 import { IObservable, Observable } from "./observable";
 import { Subject } from "./subject";
 
@@ -17,6 +18,7 @@ export class ObservableValue<T> extends Observable<T> {
         protected _value: T
     ) {
         super(getDisplayName);
+        ensureValueOwner(_value, this);
     }
 
     container?: any;
@@ -28,7 +30,10 @@ export class ObservableValue<T> extends Observable<T> {
 
     setValue(value: T) {
         if (value !== this._value) {
+            if (valueOwner(this._value) == this)
+                unsubscribeOldModelsFromSources(this._value, value);
             this._value = value;
+            ensureValueOwner(value, this);
             this.notifyObservers(value);
         }
     }

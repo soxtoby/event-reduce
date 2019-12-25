@@ -26,7 +26,7 @@ export function getState<T>(model: T): State<T> {
     if (Array.isArray(model))
         return model.map(getState) as State<T>;
 
-    let stateProps = getStateProperties(model);
+    let stateProps = getAllStatefulProperties(model);
 
     let state = {} as StateObject<T>;
     stateProps.forEach(key => {
@@ -39,7 +39,7 @@ export function getState<T>(model: T): State<T> {
 
 export function setState<T>(model: T, state: StateObject<T>) {
     let observableProps = getReducedProperties(model);
-    let stateProps = getStateProperties(model)
+    let stateProps = getAllStatefulProperties(model)
         .filter(key => key in state);
 
     stateProps.forEach(key => {
@@ -54,10 +54,14 @@ export function setState<T>(model: T, state: StateObject<T>) {
     return model;
 }
 
-function getStateProperties<T>(model: T) {
+function getAllStatefulProperties<T>(model: T) {
     let observableProps = getReducedProperties(model);
-    let explicitProps = (model as any)[statePropsKey] || [] as string[];
-    return Object.keys(observableProps || model).concat(explicitProps) as StringKey<T>[];
+    let explicitProps = getStateProperties(model);
+    return Object.keys(observableProps).concat(explicitProps || []) as StringKey<T>[];
+}
+
+export function getStateProperties<T>(model: T) {
+    return (model as any)[statePropsKey] as StringKey<T>[] | undefined;
 }
 
 function getReducedProperties<T>(model: T) {

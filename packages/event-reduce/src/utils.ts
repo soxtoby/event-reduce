@@ -27,6 +27,11 @@ export function matchesScope<Scope, Value>(scope: Scope, value?: Value) {
             .every(([k, v]) => value[k as keyof Scope] === v);
 }
 
+export function isPlainObject(value: any) {
+    return isObject(value)
+        && Object.getPrototypeOf(value) == Object.prototype;
+}
+
 export function isObject(value: any) {
     return value && typeof value == 'object';
 }

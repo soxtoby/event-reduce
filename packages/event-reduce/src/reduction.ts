@@ -1,6 +1,6 @@
 import { log, sourceTree } from "./logging";
-import { allSources, IObservable, Unsubscribe, pathToSource, isObservable } from "./observable";
-import { collectAccessedValues, IObservableValue, consumeLastAccessed, ObservableValue, withInnerTrackingScope } from "./observableValue";
+import { allSources, IObservable, isObservable, pathToSource, Unsubscribe } from "./observable";
+import { collectAccessedValues, consumeLastAccessed, IObservableValue, ObservableValue, withInnerTrackingScope } from "./observableValue";
 import { setState, State, StateObject } from "./state";
 import { Subject } from "./subject";
 import { isObject } from "./utils";
@@ -63,7 +63,7 @@ export class Reduction<T> extends ObservableValue<T> {
             let triggeringSources = allSources([observable]);
             let commonSource = firstIntersection(accessedSources, triggeringSources);
             if (commonSource)
-                throw new Error(commonSourceError(commonSource, observable, sources))
+                throw new Error(commonSourceError(commonSource, observable, sources));
 
             log('🧪 (reduction)', this.displayName, [], () => ({
                 Previous: this._value,

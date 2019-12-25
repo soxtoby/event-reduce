@@ -1,7 +1,7 @@
 import { asyncEvent, derive, event, IObservableValue, IReduction, reduce } from "event-reduce";
+import { ensureValueOwner } from "event-reduce/lib/cleanup";
 import { getOrSetObservableValue } from "event-reduce/lib/decorators";
 import { ObservableValue } from "event-reduce/lib/observableValue";
-import { useRef } from "react";
 import { useDispose, useOnce } from "./utils";
 
 export function useEvent<T>(name?: string) {
@@ -36,10 +36,13 @@ export function useAsObservableValues<T extends object>(values: T, name?: string
     let keys = Array.from(new Set(Object.keys(observableValues).concat(Object.keys(values))));
 
     for (let key of keys) {
-        let observableValue = getOrSetObservableValue(observableValues, key,
-            () => new ObservableValue<any>(() => nameBase + key, values[key as keyof T]));
+        let propValue = values[key as keyof T];
+        ensureValueOwner(propValue, undefined); // Prevent prop value from being owned by observable value below to avoid attempting cleanup
 
-        observableValue.setValue(values[key as keyof T]);
+        let observableValue = getOrSetObservableValue(observableValues, key,
+            () => new ObservableValue<any>(() => nameBase + key, propValue));
+
+        observableValue.setValue(propValue);
 
         if (!Object.getOwnPropertyDescriptor(observableValues, key))
             Object.defineProperty(observableValues, key, {

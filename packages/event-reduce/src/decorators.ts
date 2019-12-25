@@ -2,6 +2,7 @@ import { Derivation, derive } from "./derivation";
 import { IEventBase } from "./events";
 import { consumeLastAccessed, ObservableValue, withInnerTrackingScope } from "./observableValue";
 import { reduce, Reduction } from "./reduction";
+import { isObject } from "./utils";
 
 export let reduced: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
     return observableValueProperty(target, key, Reduction, true, `@reduced property '${String(key)}' can only be set to the value of a reduction`);
@@ -78,20 +79,29 @@ function getOrAddObservableValues(instance: any) {
     return getOrAdd(instance, observableValues, () => ({} as Record<string, ObservableValue<any>>));
 }
 
+export function getObservableValues(instance: any) {
+    return isObject(instance)
+        ? instance[observableValues] as Record<string, ObservableValue<any>> | undefined
+        : undefined;
+}
+
 export function getObservableProperty(prototype: any, key: string) {
     return (getObservableProperties(prototype) || {})[key];
 }
 
 function getOrAddObservableProperties(prototype: any) {
-    return getOrAdd(prototype, observableProperties, () => ({} as Record<string | symbol, (instance: any) => ObservableValue<any>>));
+    return getOrAdd<Record<string | symbol, (instance: any) => ObservableValue<any>>>(prototype, observableProperties,
+        base => base ? Object.create(base) : {});
 }
 
 export function getObservableProperties(prototype: any) {
     return prototype[observableProperties] as Record<string, (instance: any) => ObservableValue<any>> | undefined;
 }
 
-function getOrAdd<T>(target: any, key: string | symbol, create: () => T): T {
-    return target[key] || (target[key] = create());
+function getOrAdd<T>(target: any, key: string | symbol, create: (base: T | undefined) => T): T {
+    return target.hasOwnProperty(key)
+        ? target[key]
+        : (target[key] = create(target[key]));
 }
 
 export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
