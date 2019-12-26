@@ -1,4 +1,5 @@
-import { Observable, ObservableOperation, IObservable } from 'event-reduce/lib/observable';
+import { IObservable, merge, Subject } from 'event-reduce';
+import { ObservableOperation } from 'event-reduce/lib/observable';
 import * as sinon from 'sinon';
 import { describe, test, then, when } from 'wattle';
 
@@ -33,6 +34,20 @@ describe("ObservableOperation", function () {
         let source = observableOf(1, 2, 3);
         let result = source.map(v => v * 2);
         values(result).should.have.members([2, 4, 6]);
+    });
+
+    test("merge", () => {
+        let source1 = new Subject<number>(() => 'source 1');
+        let source2 = new Subject<number>(() => 'source 2');
+        let result = merge([source1, source2]);
+        let values = [] as number[];
+        result.subscribe(v => values.push(v));
+
+        source1.next(1);
+        source2.next(2);
+        source1.next(3);
+
+        values.should.have.members([1, 2, 3]);
     });
 
     function observableOf<T>(...args: T[]) {

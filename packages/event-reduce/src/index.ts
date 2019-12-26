@@ -3,7 +3,7 @@ export { derive } from "./derivation";
 export { enableDevTools } from "./devtools";
 export { AsyncError, asyncEvent, AsyncResult, AsyncStart, event, fireEvent, IAsyncEvent, IAsyncObservables, IEvent, IEventBase, IFilterableAsyncObservables, makeEventFunction } from "./events";
 export { enableLogging } from "./logging";
-export { allSources, IObservable, IObserver, Observable, Observe, Unsubscribe } from "./observable";
+export { allSources, IObservable, IObserver, merge, Observable, Observe, Unsubscribe } from "./observable";
 export { IObservableValue } from "./observableValue";
 export { IBoundReduction, IReduction, reduce } from "./reduction";
 export { getState, setState, State, state, StateArray, StateObject } from "./state";

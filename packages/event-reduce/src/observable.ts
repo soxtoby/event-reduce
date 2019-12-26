@@ -18,6 +18,15 @@ export interface IObserver<T> {
     next: Observe<T>;
 }
 
+export function merge<T>(observables: IObservable<T>[]): IObservable<T> {
+    let getDisplayName = () => `merged(${observables.map(o => o.displayName).join(', ')})`;
+    return new ObservableOperation<T>(getDisplayName, observables,
+        observer => {
+            let unsubscribes = observables.map(o => o.subscribe(value => observer.next(value), getDisplayName));
+            return () => unsubscribes.forEach(u => u());
+        });
+}
+
 export class Observable<T> extends NamedBase {
     protected _observers = new Set<IObserver<T>>();
 
