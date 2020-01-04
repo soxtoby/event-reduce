@@ -1,5 +1,5 @@
 import { event, events, reduce, reduced } from "event-reduce";
-import { useReactive } from "event-reduce-react";
+import { reactive } from "event-reduce-react";
 import * as React from "react";
 import { Counter, CounterEvents, CounterModel } from "./Counter";
 
@@ -29,13 +29,11 @@ export class CounterListModel {
     }
 }
 
-export function CounterList({ model }: { model: CounterListModel; }) {
-    return useReactive('CounterList', () =>
-        <>
-            <div>
-                <button onClick={() => model.events.counterAdded()}>Add Counter</button>
-            </div>
-            {model.counters.map(c => <Counter key={c.id} model={c} />)}
-        </>
-    );
-}
+export const CounterList = reactive(function CounterList({ model }: { model: CounterListModel; }) {
+    return <>
+        <div>
+            <button onClick={() => model.events.counterAdded()}>Add Counter</button>
+        </div>
+        {model.counters.map(c => <Counter key={c.id} model={c} />)}
+    </>
+});

@@ -97,25 +97,23 @@ React integration is provided by a separate package, so start by installing that
 ```
 yarn add event-reduce-react
 ```
-Hooks are provided for creating events, reductions, and derivations that persist between renders. Any access of the `value` property of a reduction or derivation should be wrapped in the `useDerivedRender` hook, so that the component will re-render when the model changes.
+Hooks are provided for creating events, reductions, and derivations that persist between renders. Components that use reduced or derived properties should be wrapped in the `reactive` HOC, so that the component will re-render when the model changes.
 ```tsx
-import { useEvent, useReduced, useDerivedRender } from "event-reduce-react";
+import { reactive, useEvent, useReduced } from "event-reduce-react";
 
-export function MyComponent() {
+export const MyComponent = reactive(function MyComponent() {
     let increment = useEvent<number>();
     let count = useReduced(0)
         .on(increment, c => c + 1);
 
-    return useDerivedRender(() =>
-        <div>
-            Count: {count.value}
-            <button onClick={() => increment()}>Increment</button>
-        </div>
-    );
-}
+    return <div>
+        Count: {count.value}
+        <button onClick={() => increment()}>Increment</button>
+    </div>
+});
 ```
 
-State can come from model objects instead of using hooks inside your components - just make sure to access observable properties inside `useDerivedRender`. The `example` application is implemented this way.
+State can come from model objects instead of using hooks inside your components. The `example` application is implemented this way.
 
 ## Can I persist the state of my models?
 Yes! If you've got the appropriate decorators on your model properties, they can easily be saved and restored later.
@@ -147,7 +145,7 @@ let state = getState(model); // { id: "mine", count: 0 }
 setState(model, state); // Restore the saved state to the model
 ```
 
-Often, reduced properties will contain more models. Their state will be saved and restored as part of the parent model's state. If you have reduced collection of models though, you'll need to create new models from the restored state using the `onRestore` function. See the `CounterListModel` class in [example/CounterList.tsx](https://github.com/soxtoby/event-reduce/blob/master/example/CounterList.tsx) for an example.
+Often, reduced properties will contain more models. Their state will be saved and restored as part of the parent model's state. If you have a reduced collection of models though, you'll need to create new models from the restored state using the `onRestore` function. See the `CounterListModel` class in [example/CounterList.tsx](https://github.com/soxtoby/event-reduce/blob/master/example/CounterList.tsx) for an example.
 
 
 ## How can I debug state changes?
@@ -160,7 +158,7 @@ enableLogging(true);
 Events and the reductions, derivations, and renders they trigger will be logged to the console, along with useful information such as the parameters passed in to the event, the previous and current values of reductions and derivations, and the sources of reductions, derivations, and renders.
 ![example console log](/assets/logging-screenshot.png)
 
-event-reduce also has support for time-travelling debugging with the [Redux DevTools](https://github.com/reduxjs/redux-devtools). Make sure you've set up your model for [saving and restoring state](#how-can-i-debug-state-changes), then simply register your top-level model to enable the integration.
+event-reduce also has support for time-travelling debugging with the [Redux DevTools](https://github.com/reduxjs/redux-devtools). Make sure you've set up your model for [saving and restoring state](#can-i-persist-the-state-of-my-models), then simply register your top-level model to enable the integration.
 ```ts
 import { enableDevTools } from "event-reduce";
 import { myModel } from "./my-model"
