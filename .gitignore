@@ -3,3 +3,4 @@ lib/
 tsconfig.tsbuildinfo
 dist/
 .cache/
+/packages/event-reduce/readme.md

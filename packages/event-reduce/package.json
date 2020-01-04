@@ -12,6 +12,9 @@
   "license": "MIT",
   "main": "lib/index",
   "types": "lib/index",
+  "scripts": {
+    "prepack": "cp ../../readme.md ."
+  },
   "files": [
     "lib"
   ],
