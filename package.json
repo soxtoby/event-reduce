@@ -1,40 +1,29 @@
 {
-  "name": "event-reduce",
-  "description": "State management based on reducing observable events into state",
-  "version": "0.2.8",
-  "author": "Simon Oxtoby",
-  "homepage": "https://github.com/soxtoby/event-reduce",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/soxtoby/event-reduce.git"
-  },
-  "license": "MIT",
-  "main": "lib/index",
-  "types": "lib/index",
-  "engines": {
-    "node": ">=6"
-  },
-  "scripts": {
-    "test": "wattle ./tests/**",
-    "prepare": "tsc"
-  },
-  "files": [
-    "lib"
-  ],
-  "peerDependencies": {
-    "mobx": ">=4.2.0"
-  },
-  "devDependencies": {
-    "@types/react": "~16",
-    "@types/sinon-chai": "~2",
-    "chai": "~4",
-    "mobx": ">=4.2.0",
-    "mobx-react": "~5",
-    "react": "~16",
-    "sinon": "~4",
-    "sinon-chai": "~3",
-    "synchronous-promise": "~2",
-    "typescript": "~3",
-    "wattle": "~0"
-  }
+    "name": "event-reduce-root",
+    "description": "State management based on reducing observable events into state",
+    "version": "1.0.0",
+    "license": "MIT",
+    "private": true,
+    "author": "Simon Oxtoby",
+    "homepage": "https://github.com/soxtoby/event-reduce",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/soxtoby/event-reduce.git"
+    },
+    "workspaces": [
+        "packages/*",
+        "tests",
+        "example"
+    ],
+    "scripts": {
+        "prepare": "tsc -b",
+        "watch": "tsc -b -w",
+        "test": "wattle",
+        "example": "cd example && parcel index.html --open"
+    },
+    "devDependencies": {
+        "ts-node": "*",
+        "typescript": "~3",
+        "wattle": "~0"
+    }
 }

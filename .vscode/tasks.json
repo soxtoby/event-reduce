@@ -18,8 +18,6 @@
                 "cwd": "${workspaceFolder}" // Change this if your tests aren't using the top-level node_modules
             },
             "args": [
-                // Use the same command line arguments as the normal wattle command
-                "./tests/*",
                 "--errors-only"
             ],
             "presentation": {

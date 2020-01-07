@@ -1,9 +1,9 @@
+import { asyncEvent, event } from 'event-reduce';
 import * as sinon from 'sinon';
+import { SynchronousPromise } from 'synchronous-promise';
 import { describe, it, test, then, when } from 'wattle';
-import { event } from './../src/events';
-import './setup';
 
-describe("event", function () {
+describe(event.name, function () {
     type TestType = { foo: string, bar: number };
     let sut = event<TestType>();
 
@@ -54,6 +54,41 @@ describe("event", function () {
                 rootSubscriber.should.have.been.calledWith(sinon.match({ foo: 'foo', bar: 2 }));
                 scopedSubscriber.should.have.been.calledWith(sinon.match({ foo: 'foo', bar: 2 }));
             });
+        });
+    });
+});
+
+describe(asyncEvent.name, function () {
+    type Result = { foo: string; };
+    type Context = { bar: string; };
+    let sut = asyncEvent<Result, Context>();
+
+    let started = sinon.stub();
+    let resolved = sinon.stub();
+    let rejected = sinon.stub();
+    sut.started.subscribe(started);
+    sut.resolved.subscribe(resolved);
+    sut.rejected.subscribe(rejected);
+
+    when("called", () => {
+        let promise = SynchronousPromise.unresolved<Result>();
+        let context = { bar: 'context' };
+        sut(promise, context);
+
+        then("started event fired", () => started.should.have.been.calledWith(sinon.match({ promise, context })));
+
+        when("promise resolved", () => {
+            let result = { foo: 'result' };
+            promise.resolve(result);
+
+            then("resolved event fired", () => resolved.should.have.been.calledWith(sinon.match({ result, context })));
+        });
+
+        when("promise rejected", () => {
+            let error = { message: 'error' };
+            promise.reject(error);
+
+            then("rejected event fired", () => rejected.should.have.been.calledWith(sinon.match({ error, context })));
         });
     });
 });

@@ -1,11 +1,7 @@
+import { derived, event, events, reduce, reduced } from "event-reduce";
+import { eventProxy, mutable, modelProxy } from "event-reduce/lib/testing";
 import { match, spy } from "sinon";
 import { describe, test, then, when } from "wattle";
-import { event } from "../src/events";
-import { derived, events, reduced } from "../src/mobx";
-import { reduce } from "../src/reduction";
-import { eventProxy, mutable } from "../src/testing";
-
-debugger;
 
 describe("mutable", () => {
     @events
@@ -47,9 +43,7 @@ describe("mutable", () => {
 
         then("reduced value returns override", () => sut.value.should.equal(2));
 
-        then("computed value is still computed", () => {
-            sut.valuePlusOne.should.equal(3)
-        });
+        then("computed value is still computed", () => sut.valuePlusOne.should.equal(3));
     });
 
     when("computed property overridden", () => {
@@ -57,6 +51,22 @@ describe("mutable", () => {
 
         then("computed value returns override", () => sut.valuePlusOne.should.equal(3));
     });
+});
+
+describe(modelProxy.name, function () {
+    let sut = modelProxy({
+        stringValue: 'foo',
+        objectValue: {
+            prop: 'bar'
+        }
+    });
+
+    test("can deeply compare proxy", () => sut.should.deep.equal({
+        stringValue: 'foo',
+        objectValue: {
+            prop: 'bar'
+        }
+    }));
 });
 
 describe("eventProxy", () => {

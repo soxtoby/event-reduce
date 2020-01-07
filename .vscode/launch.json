@@ -9,8 +9,8 @@
             "request": "launch",
             "name": "Run tests",
             "program": "${workspaceFolder}/node_modules/wattle/lib/cmd.js",
-            "args": [ "./tests/*" ], // Use the same command line arguments as the normal wattle command
-            "disableOptimisticBPs": true
+            "args": [ "${relativeFile}" ],
+            "autoAttachChildProcesses": true
         }
     ]
 }
