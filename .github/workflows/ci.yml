@@ -1,0 +1,17 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      uses: Borales/actions-yarn@v2.1.0
+    - name: Test
+      uses: Borales/actions-yarn@v2.1.0
+      with:
+        cmd: test --ci
