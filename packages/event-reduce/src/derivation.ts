@@ -1,5 +1,5 @@
 import { log, sourceTree } from "./logging";
-import { IObservable, Unsubscribe } from "./observable";
+import { IObservable, Unsubscribe, Observe } from "./observable";
 import { collectAccessedValues, ObservableValue, withInnerTrackingScope } from "./observableValue";
 
 export function derive<T>(getDerivedValue: () => T, name?: string) {
@@ -50,6 +50,13 @@ export class Derivation<T> extends ObservableValue<T> {
 
         if (this._observers.size)
             this.update();
+    }
+
+    subscribe(observe: Observe<T>, getObserverName?: () => string) {
+        if (this._requiresUpdate)
+            withInnerTrackingScope(() => this.update());
+
+        return super.subscribe(observe, getObserverName);
     }
 
     unsubscribeFromSources() {
