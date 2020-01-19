@@ -7,7 +7,7 @@ export interface IObservable<T> {
     subscribe(observe: Observe<T>, getObserverName?: () => string): Unsubscribe;
     unsubscribeFromSources(): void;
     filter(condition: (value: T) => boolean, getDisplayName?: () => string): IObservable<T>;
-    map<U>(select: (value: T) => U): IObservable<U>;
+    map<U>(select: (value: T) => U, getDisplayName?: () => string): IObservable<U>;
 
     displayName: string;
     readonly sources: readonly IObservable<any>[];
@@ -53,10 +53,9 @@ export class Observable<T> extends NamedBase {
             observer => this.subscribe(value => condition(value) && observer.next(value), getDisplayName));
     }
 
-    map<U>(select: (value: T) => U): IObservable<U> {
-        let mapName = () => `${this.displayName}.map(${nameOfFunction(select)})`;
-        return new ObservableOperation<U>(mapName, [this],
-            observer => this.subscribe(value => observer.next(select(value)), mapName));
+    map<U>(select: (value: T) => U, getDisplayName: () => string = () => `${this.displayName}.map(${nameOfFunction(select)})`): IObservable<U> {
+        return new ObservableOperation<U>(getDisplayName, [this],
+            observer => this.subscribe(value => observer.next(select(value)), getDisplayName));
     }
 }
 
