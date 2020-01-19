@@ -1,6 +1,7 @@
 import { watch } from "event-reduce";
 import { log, sourceTree } from "event-reduce/lib/logging";
 import { collectAccessedValues, ObservableValue } from "event-reduce/lib/observableValue";
+import { addReaction } from "event-reduce/lib/reactions";
 import { createElement, forwardRef, ForwardRefExoticComponent, Fragment, FunctionComponent, memo, MemoExoticComponent, PropsWithChildren, PropsWithoutRef, ReactElement, ReactNode, RefAttributes, RefForwardingComponent, useEffect, useState, ValidationMap, WeakValidationMap } from "react";
 import { useAsObservableValues } from "./hooks";
 
@@ -60,7 +61,7 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
     let stopWatching = watcher.subscribe(() => {
         if (value !== undefined) {
             value = undefined;
-            setRerenderCount(c => c + 1);
+            addReaction(() => setRerenderCount(c => c + 1));
         }
     });
 

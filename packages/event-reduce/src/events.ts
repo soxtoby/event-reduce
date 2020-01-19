@@ -3,6 +3,7 @@ import { IObservable, ObservableOperation } from "./observable";
 import { ISubject, Subject } from "./subject";
 import { ObjectOmit } from "./types";
 import { filteredName, matchesScope, NamedBase, scopedName } from "./utils";
+import { batchReactions } from "./reactions";
 
 export interface IEventBase {
     displayName: string;
@@ -175,7 +176,7 @@ export function fireEvent(type: string, displayName: string, arg: any, getInfo: 
                 throw new Error("Fired an event in response to another event.");
 
             insideEvent = true;
-            runEvent();
+            batchReactions(runEvent);
         } finally {
             insideEvent = false;
         }
