@@ -6206,9 +6206,9 @@ wait-for-expect@^3.0.0:
   integrity sha512-3Ha7lu+zshEG/CeHdcpmQsZnnZpPj/UsG3DuKO8FskjuDbkx3jE3845H+CuwZjA2YWYDfKMU2KhnCaXMLd3wVw==
 
 wattle@~0:
-  version "0.6.6"
-  resolved "https://registry.yarnpkg.com/wattle/-/wattle-0.6.6.tgz#e734578c34e424684ea65d272feb213513b5ad55"
-  integrity sha512-OAbSz5rgH7ZU97DcGs/4uHO8XmKsbXHGud+U3hF7U94TvjNl2IyVmJ5xscoe4yo1A1kENn+xOF1bC8KX7cGqig==
+  version "0.6.7"
+  resolved "https://registry.yarnpkg.com/wattle/-/wattle-0.6.7.tgz#6d2d2174971a1105fade7b7bb9f01c1df1302ba6"
+  integrity sha512-X7PGn4abJDJGlqJbUfzEZms38eT3XbnG5R0c8jRcX+OZfu2+/i94/lJ4ejYv4SHRcENmqb+yZCvCfvg8Eokevw==
   dependencies:
     chalk "^3.0.0"
     chokidar "^3.3.1"
