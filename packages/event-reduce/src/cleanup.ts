@@ -4,13 +4,15 @@ import { getStateProperties } from "./state";
 import { isObject, isPlainObject } from "./utils";
 
 export function unsubscribeOldModelsFromSources(oldModel: any, newModel: any) {
+    let modelOwner = valueOwner(oldModel);
+
     if (isModel(oldModel)) {
         if (oldModel != newModel)
             unsubscribeFromSources(oldModel);
     } else if (Array.isArray(oldModel)) {
         if (Array.isArray(newModel)) {
             for (let oldItem of oldModel) {
-                if (!newModel.includes(oldItem))
+                if (modelOwner && valueOwner(oldItem) == modelOwner && !newModel.includes(oldItem))
                     unsubscribeFromSources(oldItem);
             }
         } else {
@@ -20,7 +22,7 @@ export function unsubscribeOldModelsFromSources(oldModel: any, newModel: any) {
         if (isPlainObject(newModel)) {
             Object.entries(oldModel)
                 .forEach(([key, oldValue]) => {
-                    if (newModel[key] !== oldValue)
+                    if (modelOwner && valueOwner(oldModel[key]) == modelOwner && newModel[key] !== oldValue)
                         unsubscribeFromSources(oldValue);
                 });
         } else {

@@ -98,14 +98,30 @@ describe("subscription cleanup", function () {
         let model2 = new Model(2);
         let unsubscribe1 = spyOnUnsubscribe(model1, 'reducedProp');
         let unsubscribe2 = spyOnUnsubscribe(model2, 'reducedProp');
-        reduce([model1, model2])
-            .on(removeModel, ms => ms.slice(0, -1));
 
-        removeModel();
+        when("model is owned by reduction", () => {
+            reduce([model1, model2])
+                .on(removeModel, ms => ms.slice(0, -1));
 
-        it("unsubscribes removed model from events", () => unsubscribe2.should.have.been.called);
+            removeModel();
 
-        it("doesn't unsubscribe remaining model from events", () => unsubscribe1.should.not.have.been.called);
+            it("unsubscribes removed model from events", () => unsubscribe2.should.have.been.called);
+
+            it("doesn't unsubscribe remaining model from events", () => unsubscribe1.should.not.have.been.called);
+        });
+
+        when("model is owned by a different observable value", () => {
+            let model2Owner = new ObservableValue(() => 'model owner', model2);
+
+            reduce([model1, model2Owner.value])
+                .on(removeModel, ms => ms.slice(0, -1));
+
+            removeModel();
+
+            it("doesn't unsubscribe removed model from events", () => unsubscribe2.should.not.have.been.called);
+
+            it("doesn't unsubscribe remaining model from events", () => unsubscribe1.should.not.have.been.called);
+        });
     });
 
     when("reduction changes an array to a non-array", () => {
@@ -138,17 +154,36 @@ describe("subscription cleanup", function () {
         let model2 = new Model(2);
         let unsubscribe1 = spyOnUnsubscribe(model1, 'reducedProp');
         let unsubscribe2 = spyOnUnsubscribe(model2, 'reducedProp');
-        reduce({ model1, model2 } as Record<string, Model | undefined>)
-            .on(removeModel, ms => {
-                let { model2, ...remaining } = ms;
-                return remaining;
-            });
 
-        removeModel();
+        when("model is owned by reduction", () => {
+            reduce({ model1, model2 } as Record<string, Model | undefined>)
+                .on(removeModel, ms => {
+                    let { model2, ...remaining } = ms;
+                    return remaining;
+                });
 
-        it("unsubscribes removed model from events", () => unsubscribe2.should.have.been.called);
+            removeModel();
 
-        it("doesn't unsubscribe remaining model from events", () => unsubscribe1.should.not.have.been.called);
+            it("unsubscribes removed model from events", () => unsubscribe2.should.have.been.called);
+
+            it("doesn't unsubscribe remaining model from events", () => unsubscribe1.should.not.have.been.called);
+        });
+
+        when("model is owned by a different observable value", () => {
+            let model2Owner = new ObservableValue(() => 'model owner', model2);
+
+            reduce({ model1, model2: model2Owner.value } as Record<string, Model | undefined>)
+                .on(removeModel, ms => {
+                    let { model2, ...remaining } = ms;
+                    return remaining;
+                });
+
+            removeModel();
+
+            it("doesn't unsubscribe removed model from events", () => unsubscribe2.should.not.have.been.called);
+
+            it("doesn't unsubscribe remaining model from events", () => unsubscribe1.should.not.have.been.called);
+        });
     });
 
     when("reduction replaces a model on an object", () => {
