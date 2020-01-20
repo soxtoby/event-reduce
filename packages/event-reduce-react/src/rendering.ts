@@ -34,6 +34,7 @@ export function reactive<Component extends (ContextlessFunctionComponent<any> | 
     if (component.length == 2)
         reactiveComponent = forwardRef(reactiveComponent) as ReactiveComponent<Component>;
     reactiveComponent = memo<Component>(reactiveComponent as FunctionComponent<any>) as ReactiveComponent<Component>;
+    reactiveComponent.displayName = componentName;
     return reactiveComponent;
 }
 
