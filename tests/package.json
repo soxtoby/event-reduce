@@ -10,7 +10,8 @@
     "url": "https://github.com/soxtoby/event-reduce.git"
   },
   "dependencies": {
-    "event-reduce": "*"
+    "event-reduce": "*",
+    "event-reduce-react": "*"
   },
   "devDependencies": {
     "@testing-library/react": "*",

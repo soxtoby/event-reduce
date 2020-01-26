@@ -1,8 +1,8 @@
-import { watch } from "event-reduce";
+import { Unsubscribe, watch } from "event-reduce";
 import { log, sourceTree } from "event-reduce/lib/logging";
 import { collectAccessedValues, ObservableValue } from "event-reduce/lib/observableValue";
 import { addReaction } from "event-reduce/lib/reactions";
-import { createElement, forwardRef, ForwardRefExoticComponent, Fragment, FunctionComponent, memo, MemoExoticComponent, PropsWithChildren, PropsWithoutRef, ReactElement, ReactNode, RefAttributes, RefForwardingComponent, useEffect, useState, ValidationMap, WeakValidationMap } from "react";
+import { createElement, forwardRef, ForwardRefExoticComponent, Fragment, FunctionComponent, memo, MemoExoticComponent, PropsWithChildren, PropsWithoutRef, ReactElement, ReactNode, RefAttributes, RefForwardingComponent, useEffect, useRef, useState, ValidationMap, WeakValidationMap } from "react";
 import { useAsObservableValues } from "./hooks";
 
 interface ContextlessFunctionComponent<P = {}> {
@@ -25,12 +25,14 @@ export function Reactive(props: { name?: string; children: () => ReactNode; }): 
 export function reactive<Component extends (ContextlessFunctionComponent<any> | RefForwardingComponent<any, any>)>(component: Component): ReactiveComponent<Component> {
     let componentName = component.displayName || component.name || 'ReactiveComponent';
     let reactiveComponent = ((...args: Parameters<Component>) => { // Important to use rest operator here so react ignores function arity
-        let [props, ...otherArgs] = args;
-        let observableProps = useAsObservableValues(props, `${componentName}.props`);
-        return useReactive(componentName, () => component(observableProps, ...otherArgs as [any]));
+        return useReactive(componentName, () => {
+            let [props, ...otherArgs] = args;
+            let observableProps = useAsObservableValues(props, `${componentName}.props`);
+            return component(observableProps, ...otherArgs as [any])
+        });
     }) as ReactiveComponent<Component>;
     reactiveComponent.displayName = componentName;
-    
+
     if (component.length == 2)
         reactiveComponent = forwardRef(reactiveComponent) as ReactiveComponent<Component>;
     reactiveComponent = memo<Component>(reactiveComponent as FunctionComponent<any>) as ReactiveComponent<Component>;
@@ -47,7 +49,10 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
 
     let [rerenderCount, setRerenderCount] = useState(1);
 
-    let value: T | undefined;
+    let stopWatching = useRef((() => { }) as Unsubscribe);
+    stopWatching.current();
+
+    let value: T;
 
     let watcher = watch(
         () => {
@@ -59,17 +64,17 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
         },
         name);
 
-    let stopWatching = watcher.subscribe(() => {
-        if (value !== undefined) {
-            value = undefined;
-            addReaction(() => setRerenderCount(c => c + 1));
-        }
+    stopWatching.current = watcher.subscribe(() => {
+        unsubscribe();
+        addReaction(() => setRerenderCount(c => c + 1))
     });
 
-    useEffect(() => () => {
-        stopWatching();
-        watcher.unsubscribeFromSources();
-    });
+    useEffect(() => unsubscribe);
 
     return value!;
+
+    function unsubscribe() {
+        stopWatching.current();
+        watcher.unsubscribeFromSources();
+    }
 }
