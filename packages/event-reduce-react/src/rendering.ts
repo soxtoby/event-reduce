@@ -2,8 +2,9 @@ import { Unsubscribe, watch } from "event-reduce";
 import { log, sourceTree } from "event-reduce/lib/logging";
 import { collectAccessedValues, ObservableValue } from "event-reduce/lib/observableValue";
 import { addReaction } from "event-reduce/lib/reactions";
-import { createElement, forwardRef, ForwardRefExoticComponent, Fragment, FunctionComponent, memo, MemoExoticComponent, PropsWithChildren, PropsWithoutRef, ReactElement, ReactNode, RefAttributes, RefForwardingComponent, useEffect, useRef, useState, ValidationMap, WeakValidationMap } from "react";
+import { createElement, forwardRef, ForwardRefExoticComponent, Fragment, FunctionComponent, memo, MemoExoticComponent, PropsWithChildren, PropsWithoutRef, ReactElement, ReactNode, RefAttributes, RefForwardingComponent, useRef, useState, ValidationMap, WeakValidationMap } from "react";
 import { useAsObservableValues } from "./hooks";
+import { useDispose } from "./utils";
 
 interface ContextlessFunctionComponent<P = {}> {
     (props: PropsWithChildren<P>): ReactElement | null;
@@ -47,34 +48,35 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
         ? [nameOrDeriveValue, maybeDeriveValue!]
         : ['ReactiveValue', nameOrDeriveValue];
 
-    let [rerenderCount, setRerenderCount] = useState(1);
+    let [reactionCount, setRerenderCount] = useState(0);
 
-    let stopWatching = useRef((() => { }) as Unsubscribe);
-    stopWatching.current();
+    // Unsubscribe from previous render before rendering again
+    let unsubscribeFromLatestRender = useRef((() => { }) as Unsubscribe);
+    unsubscribeFromLatestRender.current();
+    unsubscribeFromLatestRender.current = unsubscribeFromThisRender;
+    useDispose(() => unsubscribeFromLatestRender.current());
 
-    let value: T;
+    let value!: T;
 
     let watcher = watch(
         () => {
             let newSources: Set<ObservableValue<any>>;
             log('⚛ (render)', name, [], () => ({
-                'Re-render count': rerenderCount,
+                'Reaction count': reactionCount,
                 Sources: { get list() { return sourceTree(Array.from(newSources)); } }
             }), () => newSources = collectAccessedValues(() => value = deriveValue()));
         },
         name);
 
-    stopWatching.current = watcher.subscribe(() => {
-        unsubscribe();
-        addReaction(() => setRerenderCount(c => c + 1))
+    let stopWatching = watcher.subscribe(() => {
+        unsubscribeFromThisRender(); // Avoid queueing up extra renders if more sources change
+        addReaction(() => setRerenderCount(c => c + 1));
     });
 
-    useEffect(() => unsubscribe);
+    return value;
 
-    return value!;
-
-    function unsubscribe() {
-        stopWatching.current();
+    function unsubscribeFromThisRender() {
+        stopWatching();
         watcher.unsubscribeFromSources();
     }
 }
