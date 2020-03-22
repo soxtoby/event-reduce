@@ -19,8 +19,16 @@ export function batchReactions(action: () => void) {
 }
 
 export function addReaction(reaction: () => void) {
-    if (reactionScope)
+    if (reactionScope) {
         reactionScope.push(reaction);
-    else
+        return () => {
+            let i = reactionScope?.indexOf(reaction)!;
+            if (i >= 0)
+                reactionScope?.splice(i, 1);
+        };
+    }
+    else {
         reaction();
+        return () => { };
+    }
 }

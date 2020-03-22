@@ -68,14 +68,16 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
         },
         name);
 
+    let cancelReaction: () => void;
     let stopWatching = watcher.subscribe(() => {
         unsubscribeFromThisRender(); // Avoid queueing up extra renders if more sources change
-        addReaction(() => setRerenderCount(c => c + 1));
+        cancelReaction = addReaction(() => setRerenderCount(c => c + 1));
     });
 
     return value;
 
     function unsubscribeFromThisRender() {
+        cancelReaction?.();
         stopWatching();
         watcher.unsubscribeFromSources();
     }
