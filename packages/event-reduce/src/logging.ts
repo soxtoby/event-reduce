@@ -37,7 +37,7 @@ export function log(type: string, displayName: string, args: any[], getInfo?: ()
 
             let info = getInfo && getInfo() || {};
             let infoKeys = Object.keys(info);
-            if (infoKeys || group) {
+            if (infoKeys.length || group) {
                 if (loggingDepth)
                     console.group(...message);
                 else
