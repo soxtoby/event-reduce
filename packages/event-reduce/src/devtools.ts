@@ -31,7 +31,7 @@ export function sendEvent(name: string, arg: any) {
             if ('type' in event)
                 event['.type'] = event.type;
             event.type = name;
-            modelDevTools.forEach((dev, model) => dev.send(event, getState(model)));
+            modelDevTools.forEach((dev, model) => dev.send(getState(event), getState(model)));
         }
     }
 }
