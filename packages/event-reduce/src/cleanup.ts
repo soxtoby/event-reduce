@@ -43,7 +43,7 @@ export function unsubscribeFromSources(model: any) {
                 if (valueOwner(value) == observableValue)
                     unsubscribeFromSources(value);
             });
-        (getStateProperties(model) || [])
+        getStateProperties(model)
             .forEach(stateProp => unsubscribeFromSources(model[stateProp]));
     } else if (Array.isArray(model)) {
         model.forEach(item => {

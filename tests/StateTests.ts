@@ -3,6 +3,8 @@ import { describe, it } from "wattle";
 
 describe("state", function () {
     class TestModel {
+        constructor(@state('constructorProperty') public constructorProperty: string) { }
+
         @reduced
         valueProperty = reduce(1).value;
 
@@ -34,7 +36,7 @@ describe("state", function () {
         value = reduce(this._initialValue).value;
     }
 
-    let model = new TestModel();
+    let model = new TestModel('ctor');
 
     describe(getState.name, () => {
         let result = getState(model);
@@ -46,7 +48,8 @@ describe("state", function () {
                 { value: 'one' },
                 { value: 'two' }
             ],
-            mergedModel: { value: 'merged' }
+            mergedModel: { value: 'merged' },
+            constructorProperty: 'ctor'
         })));
     });
 

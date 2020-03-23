@@ -33,7 +33,7 @@ export function matchesScope<Scope, Value>(scope: Scope, value?: Value) {
 export function isModel(model: any) {
     return isObject(model)
         && (!!getObservableProperties(Object.getPrototypeOf(model))
-            || !!getStateProperties(model));
+            || !!getStateProperties(model).length);
 }
 
 export function isPlainObject(value: any) {
@@ -43,4 +43,10 @@ export function isPlainObject(value: any) {
 
 export function isObject(value: any) {
     return value && typeof value == 'object';
+}
+
+export function getOrAdd<T>(target: any, key: string | symbol, create: (base: T | undefined) => T): T {
+    return target.hasOwnProperty(key)
+        ? target[key]
+        : (target[key] = create(target[key]));
 }

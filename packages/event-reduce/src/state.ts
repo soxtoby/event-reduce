@@ -1,7 +1,7 @@
 import { getObservableProperties } from "./decorators";
 import { Reduction } from "./reduction";
 import { StringKey } from "./types";
-import { isModel, isObject } from "./utils";
+import { getOrAdd, isModel, isObject, isPlainObject } from "./utils";
 
 export type State<T> =
     T extends Function ? never
@@ -14,9 +14,20 @@ export type StateObject<T> = { [P in keyof T]: State<T[P]> };
 
 const statePropsKey = Symbol('stateProps');
 
-export function state(target: any, key: string) {
-    let stateProps = (target[statePropsKey] || (target[statePropsKey] = [])) as string[];
-    stateProps.push(key);
+/** Mark a constructor parameter as a state property by specifying its name. */
+export function state(parameterName: string): ParameterDecorator;
+/** Mark a property as a state property. */
+export function state(target: any, key: string): void;
+export function state(paramNameOrTarget: any, key?: string) {
+    if (typeof paramNameOrTarget == 'string')
+        return (constructor: Function, key: any, index: number) => addStateProp(constructor.prototype, paramNameOrTarget);
+
+    addStateProp(paramNameOrTarget.constructor.prototype, key!);
+}
+
+function addStateProp(prototype: any, key: string) {
+    getOrAdd(prototype, statePropsKey, () => [] as string[])
+        .push(key);
 }
 
 export function getState<T>(model: T): State<T> {
@@ -59,11 +70,16 @@ function getAllStatefulProperties<T>(model: T) {
         return Object.keys(model) as StringKey<T>[];
     let observableProps = getReducedProperties(model);
     let explicitProps = getStateProperties(model);
-    return Object.keys(observableProps).concat(explicitProps || []) as StringKey<T>[];
+    return Object.keys(observableProps).concat(explicitProps) as StringKey<T>[];
 }
 
-export function getStateProperties<T>(model: T) {
-    return (model as any)[statePropsKey] as StringKey<T>[] | undefined;
+export function getStateProperties<T>(model: T): string[] {
+    if (isPlainObject(model))
+        return [];
+
+    let prototype = Object.getPrototypeOf(model);
+    return getStateProperties(prototype)
+        .concat(prototype[statePropsKey] as StringKey<T>[] | undefined || []);
 }
 
 function getReducedProperties<T>(model: T) {

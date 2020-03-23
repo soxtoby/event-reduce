@@ -2,7 +2,7 @@ import { Derivation, derive } from "./derivation";
 import { IEventBase } from "./events";
 import { consumeLastAccessed, ObservableValue, withInnerTrackingScope } from "./observableValue";
 import { reduce, Reduction } from "./reduction";
-import { isObject } from "./utils";
+import { getOrAdd, isObject } from "./utils";
 
 export let reduced: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
     return observableValueProperty(target, key, Reduction, true, `@reduced property '${String(key)}' can only be set to the value of a reduction`);
@@ -96,12 +96,6 @@ function getOrAddObservableProperties(prototype: any) {
 
 export function getObservableProperties(prototype: any) {
     return prototype[observableProperties] as Record<string, (instance: any) => ObservableValue<any>> | undefined;
-}
-
-function getOrAdd<T>(target: any, key: string | symbol, create: (base: T | undefined) => T): T {
-    return target.hasOwnProperty(key)
-        ? target[key]
-        : (target[key] = create(target[key]));
 }
 
 export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
