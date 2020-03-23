@@ -1,30 +1,34 @@
-let reactionScope = undefined as (() => void)[] | undefined;
+import { Action, Unsubscribe } from "./types";
 
-export function batchReactions(action: () => void) {
-    let outerScope = reactionScope;
-    let innerScope = reactionScope = [] as (() => void)[];
+let currentReactionScope = undefined as Action[] | undefined;
+
+export function batchReactions(action: Action) {
+    let outerScope = currentReactionScope;
+    let innerScope = currentReactionScope = [] as Action[];
 
     try {
         action();
 
         if (innerScope.length) {
             batchReactions(() => {
-                for (let reaction of innerScope)
+                let reaction: Action | undefined;
+                while (reaction = innerScope.shift()) // Dequeueing in case one reaction cancels a subsequent reaction
                     reaction();
             });
         }
     } finally {
-        reactionScope = outerScope;
+        currentReactionScope = outerScope;
     }
 }
 
-export function addReaction(reaction: () => void) {
-    if (reactionScope) {
+export function addReaction(reaction: Action): Unsubscribe {
+    if (currentReactionScope) {
+        let reactionScope = currentReactionScope;
         reactionScope.push(reaction);
         return () => {
-            let i = reactionScope?.indexOf(reaction)!;
+            let i = reactionScope.indexOf(reaction);
             if (i >= 0)
-                reactionScope?.splice(i, 1);
+                reactionScope.splice(i, 1);
         };
     }
     else {

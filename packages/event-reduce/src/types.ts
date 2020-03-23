@@ -9,3 +9,6 @@ export declare type ObjectOmit<T extends object, U extends object> = Omit<T, key
 };
 
 export declare type StringKey<T> = string & keyof T;
+
+export declare type Action = () => void;
+export declare type Unsubscribe = () => void;

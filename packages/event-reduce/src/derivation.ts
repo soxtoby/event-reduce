@@ -1,6 +1,7 @@
 import { log, sourceTree } from "./logging";
-import { IObservable, Unsubscribe, Observe } from "./observable";
+import { IObservable, Observe } from "./observable";
 import { collectAccessedValues, ObservableValue, withInnerTrackingScope } from "./observableValue";
+import { Unsubscribe } from "./types";
 
 export function derive<T>(getDerivedValue: () => T, name?: string) {
     return new Derivation(() => name || '(anonymous derivation)', getDerivedValue);

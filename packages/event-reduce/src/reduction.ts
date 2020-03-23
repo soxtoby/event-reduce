@@ -1,8 +1,9 @@
 import { log, sourceTree } from "./logging";
-import { allSources, IObservable, isObservable, pathToSource, Unsubscribe } from "./observable";
+import { allSources, IObservable, isObservable, pathToSource } from "./observable";
 import { collectAccessedValues, consumeLastAccessed, IObservableValue, ObservableValue, withInnerTrackingScope } from "./observableValue";
 import { setState, State, StateObject } from "./state";
 import { Subject } from "./subject";
+import { Unsubscribe } from "./types";
 import { isObject } from "./utils";
 
 export function reduce<TValue>(initial: TValue, displayName?: string): IReduction<TValue>;

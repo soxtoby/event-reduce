@@ -1,8 +1,10 @@
 import { log, sourceTree } from "./logging";
-import { IObservable, Observable, Unsubscribe } from "./observable";
+import { IObservable, Observable } from "./observable";
 import { collectAccessedValues } from "./observableValue";
+import { Action } from "./types";
+import { Unsubscribe } from ".";
 
-export function watch(action: () => void, name = '(anonymous watcher)'): IWatcher {
+export function watch(action: Action, name = '(anonymous watcher)'): IWatcher {
     return new Watcher(() => name, action);
 }
 
@@ -15,7 +17,7 @@ class Watcher extends Observable<void> {
 
     constructor(
         public getDisplayName: () => string,
-        private _action: () => void
+        private _action: Action
     ) {
         super(getDisplayName);
         this.run();

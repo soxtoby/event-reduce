@@ -1,7 +1,7 @@
-import { nameOfFunction, filteredName, NamedBase } from "./utils";
+import { Unsubscribe } from "./types";
+import { filteredName, NamedBase, nameOfFunction } from "./utils";
 
 export type Observe<T> = (value: T) => void;
-export type Unsubscribe = () => void;
 
 export interface IObservable<T> {
     subscribe(observe: Observe<T>, getObserverName?: () => string): Unsubscribe;

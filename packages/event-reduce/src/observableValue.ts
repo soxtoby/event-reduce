@@ -1,6 +1,7 @@
-import { ensureValueOwner, valueOwner, unsubscribeOldModelsFromSources } from "./cleanup";
+import { ensureValueOwner, unsubscribeOldModelsFromSources, valueOwner } from "./cleanup";
 import { IObservable, Observable } from "./observable";
 import { Subject } from "./subject";
+import { Action } from "./types";
 
 let valueAccessed: Subject<ObservableValue<any>>;
 let lastValueConsumed: Subject<void>;
@@ -39,7 +40,7 @@ export class ObservableValue<T> extends Observable<T> {
     }
 }
 
-export function collectAccessedValues(action: () => void) {
+export function collectAccessedValues(action: Action) {
     let observables = [] as ObservableValue<any>[];
     let unsubscribeFromAccessed = valueAccessed.subscribe(o => observables.push(o), () => '(accessed value collection)');
     let unsubscribeFromConsumed = lastValueConsumed.subscribe(() => observables.pop());
