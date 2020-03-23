@@ -1,3 +1,6 @@
+import { getObservableProperties } from "./decorators";
+import { getStateProperties } from "./state";
+
 export function filteredName(baseName: string, predicate: Function) {
     return `${baseName}.filter(${nameOfFunction(predicate)})`;
 }
@@ -25,6 +28,12 @@ export function matchesScope<Scope, Value>(scope: Scope, value?: Value) {
         ? matchesScope(scope)(value)
         : <Value extends Scope>(value: Value) => Object.entries(scope)
             .every(([k, v]) => value[k as keyof Scope] === v);
+}
+
+export function isModel(model: any) {
+    return isObject(model)
+        && (!!getObservableProperties(Object.getPrototypeOf(model))
+            || !!getStateProperties(model));
 }
 
 export function isPlainObject(value: any) {

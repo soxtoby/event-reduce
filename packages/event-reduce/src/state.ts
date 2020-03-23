@@ -1,7 +1,7 @@
-import { StringKey } from "./types";
 import { getObservableProperties } from "./decorators";
 import { Reduction } from "./reduction";
-import { isObject } from "./utils";
+import { StringKey } from "./types";
+import { isModel, isObject } from "./utils";
 
 export type State<T> =
     T extends Function ? never
@@ -55,6 +55,8 @@ export function setState<T>(model: T, state: StateObject<T>) {
 }
 
 function getAllStatefulProperties<T>(model: T) {
+    if (!isModel(model))
+        return Object.keys(model) as StringKey<T>[];
     let observableProps = getReducedProperties(model);
     let explicitProps = getStateProperties(model);
     return Object.keys(observableProps).concat(explicitProps || []) as StringKey<T>[];

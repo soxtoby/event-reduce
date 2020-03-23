@@ -1,7 +1,7 @@
-import { getObservableProperties, getObservableValues } from "./decorators";
+import { getObservableValues } from "./decorators";
 import { withInnerTrackingScope } from "./observableValue";
 import { getStateProperties } from "./state";
-import { isObject, isPlainObject } from "./utils";
+import { isModel, isObject, isPlainObject } from "./utils";
 
 export function unsubscribeOldModelsFromSources(oldModel: any, newModel: any) {
     let modelOwner = valueOwner(oldModel);
@@ -56,12 +56,6 @@ export function unsubscribeFromSources(model: any) {
                 unsubscribeFromSources(value);
         });
     }
-}
-
-function isModel(model: any) {
-    return isObject(model)
-        && (!!getObservableProperties(Object.getPrototypeOf(model))
-            || !!getStateProperties(model));
 }
 
 let valueOwners = new WeakMap<any, any>();
