@@ -106,7 +106,7 @@ export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
                 super(...args);
                 Object.keys(this).forEach(key => {
                     let prop = this[key];
-                    if (isObservableEvent(prop)) {
+                    if (hasDisplayName(prop)) {
                         prop.displayName = key;
                         prop.container = this;
                     }
@@ -116,7 +116,7 @@ export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
     }[className];
 }
 
-function isObservableEvent(e: any): e is IEventBase {
-    return typeof e === 'function'
-        && e.displayName;
+function hasDisplayName(e: any): e is IEventBase {
+    return e instanceof Object
+        && 'displayName' in e;
 }

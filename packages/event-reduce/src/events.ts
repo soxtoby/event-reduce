@@ -161,6 +161,10 @@ class ScopedAsyncEvent<Result, ContextIn extends Scope, ContextOut extends Scope
 export function makeEventFunction<Event extends IEventClass>(event: Event) {
     Object.setPrototypeOf(eventFn, event);
     eventFn.apply = Function.prototype.apply;
+    Object.defineProperty(eventFn, 'displayName', { // Delegate to prototype, since already initialised Subjects' displayNames will have captured the prototype as 'this'
+        get() { return event.displayName; },
+        set(value: string) { event.displayName = value; }
+    });
     return eventFn as Event & Event['next'];
 
     function eventFn(...args: any) {
