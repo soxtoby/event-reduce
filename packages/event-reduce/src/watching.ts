@@ -1,8 +1,7 @@
 import { log, sourceTree } from "./logging";
 import { IObservable, Observable } from "./observable";
-import { collectAccessedValues } from "./observableValue";
-import { Action } from "./types";
-import { Unsubscribe } from ".";
+import { collectAccessedValues, IObservableValue } from "./observableValue";
+import { Action, Unsubscribe } from "./types";
 
 export function watch(action: Action, name = '(anonymous watcher)'): IWatcher {
     return new Watcher(() => name, action);
@@ -28,12 +27,15 @@ class Watcher extends Observable<void> {
     run() {
         this.unsubscribeFromSources();
         collectAccessedValues(() => this._action())
-            .forEach(o => this._sources.set(o, o.subscribe(() => this.onDependenciesChanged(), () => this.displayName)));
+            .forEach(o => this._sources.set(o, o.subscribe(() => this.onDependencyChanged(o), () => this.displayName)));
     }
 
-    private onDependenciesChanged() {
+    private onDependencyChanged(value: IObservableValue<any>) {
         if (this._observers.size)
-            log('👀 (watcher)', this.displayName, [], () => ({ Sources: sourceTree(this.sources) }), () => this.notifyObservers());
+            log('👀 (watcher)', this.displayName, [], () => ({
+                Changed: value,
+                Sources: sourceTree(this.sources)
+            }), () => this.notifyObservers());
     }
 
     unsubscribeFromSources() {
