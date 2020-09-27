@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@types/react": ">=16.8",
+    "@types/scheduler": "*",
     "typescript": "~3"
   }
 }

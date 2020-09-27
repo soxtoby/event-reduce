@@ -7,11 +7,11 @@ export function watch(action: Action, name = '(anonymous watcher)'): IWatcher {
     return new Watcher(() => name, action);
 }
 
-export interface IWatcher extends IObservable<void> {
+export interface IWatcher extends IObservable<IObservableValue<unknown>> {
     run(): void;
 }
 
-class Watcher extends Observable<void> {
+class Watcher extends Observable<IObservableValue<unknown>> {
     private _sources = new Map<Observable<any>, Unsubscribe>();
 
     constructor(
@@ -35,7 +35,7 @@ class Watcher extends Observable<void> {
             log('👀 (watcher)', this.displayName, [], () => ({
                 Changed: value,
                 Sources: sourceTree(this.sources)
-            }), () => this.notifyObservers());
+            }), () => this.notifyObservers(value));
     }
 
     unsubscribeFromSources() {
