@@ -73,7 +73,14 @@ export function ensureValueOwner(value: any, owner: any) {
         if (Array.isArray(value))
             value.forEach(item => ensureValueOwner(item, owner));
         else if (isPlainObject(value))
-            Object.values(value).forEach(val => ensureValueOwner(val, owner));
+            Object.values(Object.getOwnPropertyDescriptors(value))
+                .filter(p => p.enumerable)
+                .forEach(p => {
+                    let propValue = typeof p.get == 'function'
+                        ? withInnerTrackingScope(() => p.get!.call(value))
+                        : p.value;
+                    ensureValueOwner(propValue, owner);
+                });
     }
 }
 
