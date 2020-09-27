@@ -30,20 +30,20 @@ function addStateProp(prototype: any, key: string) {
         .push(key);
 }
 
-export function getState<T>(model: T): State<T> {
+export function getState<T>(model: T, includeDerived = false): State<T> {
     if (!isObject(model))
         return model as State<T>;
 
     if (Array.isArray(model))
-        return model.map(getState) as State<T>;
+        return model.map(i => getState(i, includeDerived)) as State<T>;
 
-    let stateProps = getAllStatefulProperties(model);
+    let stateProps = getAllStatefulProperties(model, includeDerived);
 
     let state = {} as StateObject<T>;
     stateProps.forEach(key => {
         let value = model[key as keyof T];
         if (typeof value != 'function')
-            state[key as keyof T] = getState(value);
+            state[key as keyof T] = getState(value, includeDerived);
     });
     return state as State<T>;
 }
@@ -65,12 +65,14 @@ export function setState<T>(model: T, state: StateObject<T>) {
     return model;
 }
 
-function getAllStatefulProperties<T>(model: T) {
+function getAllStatefulProperties<T>(model: T, includeDerived = false) {
     if (!isModel(model))
         return Object.keys(model) as StringKey<T>[];
-    let observableProps = getReducedProperties(model);
+    let observableProps = includeDerived
+        ? Object.keys(getObservableProperties(model) || {})
+        : Object.keys(getReducedProperties(model));
     let explicitProps = getStateProperties(model);
-    return Object.keys(observableProps).concat(explicitProps) as StringKey<T>[];
+    return observableProps.concat(explicitProps) as StringKey<T>[];
 }
 
 export function getStateProperties<T>(model: T): string[] {
