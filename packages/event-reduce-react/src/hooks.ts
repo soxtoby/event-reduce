@@ -1,7 +1,8 @@
 import { asyncEvent, derive, event, IObservableValue, IReduction, reduce } from "event-reduce";
 import { ensureValueOwner } from "event-reduce/lib/cleanup";
-import { getOrSetObservableValue } from "event-reduce/lib/decorators";
+import { getObservableValues, getOrSetObservableValue } from "event-reduce/lib/decorators";
 import { ObservableValue } from "event-reduce/lib/observableValue";
+import { useRef } from "react";
 import { useDispose, useOnce } from "./utils";
 
 export function useEvent<T>(name?: string) {
@@ -29,27 +30,29 @@ export function useReduced<T>(initial: T, name?: string): IReduction<T> {
 }
 
 export function useAsObservableValues<T extends object>(values: T, name?: string) {
-    let observableValues = useOnce(() => ({} as T));
+    let valueModel = useRef({} as T);
+    let previousObservableValues = getObservableValues(valueModel.current) ?? {};
+    valueModel.current = {} as T;
 
     let nameBase = (name || '') + '.';
 
-    let keys = Array.from(new Set(Object.keys(observableValues).concat(Object.keys(values))));
+    let keys = Array.from(new Set(Object.keys(valueModel.current).concat(Object.keys(values))));
 
     for (let key of keys) {
         let propValue = values[key as keyof T];
         ensureValueOwner(propValue, undefined); // Prevent prop value from being owned by observable value below to avoid attempting cleanup
 
-        let observableValue = getOrSetObservableValue(observableValues, key,
-            () => new ObservableValue<any>(() => nameBase + key, propValue));
+        let observableValue = getOrSetObservableValue(valueModel.current, key,
+            () => previousObservableValues[key]
+                ?? new ObservableValue<any>(() => nameBase + key, propValue));
 
         observableValue.setValue(propValue);
 
-        if (!Object.getOwnPropertyDescriptor(observableValues, key))
-            Object.defineProperty(observableValues, key, {
-                get() { return observableValue.value; },
-                enumerable: true
-            });
+        Object.defineProperty(valueModel.current, key, {
+            get() { return observableValue.value; },
+            enumerable: true
+        });
     }
 
-    return observableValues;
+    return valueModel.current;
 }
