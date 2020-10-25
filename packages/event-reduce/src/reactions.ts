@@ -1,38 +1,32 @@
 import { Action, Unsubscribe } from "./types";
 
-let currentReactionScope = undefined as Action[] | undefined;
-
-export function batchReactions(action: Action) {
-    let outerScope = currentReactionScope;
-    let innerScope = currentReactionScope = [] as Action[];
-
-    try {
-        action();
-
-        if (innerScope.length) {
-            batchReactions(() => {
-                let reaction: Action | undefined;
-                while (reaction = innerScope.shift()) // Dequeueing in case one reaction cancels a subsequent reaction
-                    reaction();
-            });
-        }
-    } finally {
-        currentReactionScope = outerScope;
-    }
-}
+let pendingReactions = [] as Action[];
 
 export function addReaction(reaction: Action): Unsubscribe {
-    if (currentReactionScope) {
-        let reactionScope = currentReactionScope;
-        reactionScope.push(reaction);
-        return () => {
-            let i = reactionScope.indexOf(reaction);
-            if (i >= 0)
-                reactionScope.splice(i, 1);
-        };
-    }
-    else {
-        reaction();
-        return () => { };
+    pendingReactions.push(reaction);
+
+    if (pendingReactions.length == 1)
+        Promise.resolve().then(runReactions); // Run reactions asyncronously
+
+    return () => {
+        let i = pendingReactions.indexOf(reaction);
+        if (i >= 0)
+            pendingReactions.splice(i, 1);
+    };
+}
+
+/** 
+ * Run pending reactions.
+ * Will normally be run automatically, asynchronously, but it can be useful to run early in some situations;
+ * e.g. in tests where you want to avoid asynchronous behaviour.
+ */
+export function runReactions() {
+    let reaction: Action | undefined;
+    while (reaction = pendingReactions.shift()) { // Dequeueing in case a reaction changes subsequent reactions
+        try {
+            reaction();
+        } catch (error) {
+            console.error(error);
+        }
     }
 }

@@ -1,6 +1,7 @@
 import { renderHook } from "@testing-library/react-hooks";
 import { useReactive } from "event-reduce-react";
 import { ObservableValue } from "event-reduce/lib/observableValue";
+import { runReactions } from "event-reduce/lib/reactions";
 import { spy } from "sinon";
 import { describe, it, test, then, when } from "wattle";
 
@@ -26,6 +27,7 @@ describe(useReactive.name, function () {
 
     when("accessed observable value changed", () => {
         observableValue.setValue('new value');
+        runReactions();
 
         then("render function called again", () => render.should.have.been.calledTwice);
 
@@ -36,6 +38,7 @@ describe(useReactive.name, function () {
         innerBehaviour = () => observableValue.setValue('new value');
         render.resetHistory();
         sut.rerender();
+        runReactions();
 
         it("doesn't trigger an extra render", () => render.should.have.been.calledOnce);
     });
