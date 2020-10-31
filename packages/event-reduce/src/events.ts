@@ -49,7 +49,7 @@ export interface AsyncError<Context> {
     context: Context;
 }
 
-export function event<T = void>(name = '(anonymous event)'): IEvent<T> {
+export function event<T = void>(name = anonymousEvent): IEvent<T> {
     return makeEventFunction(new EventSubject<T>(() => name));
 }
 
@@ -175,15 +175,16 @@ export function makeEventFunction<Event extends IEventClass>(event: Event) {
 export function fireEvent(type: string, displayName: string, arg: any, getInfo: (() => object) | undefined, runEvent: () => void) {
     logEvent(type, displayName, arg, getInfo, () => {
         try {
-            if (insideEvent)
-                throw new Error("Fired an event in response to another event.");
+            if (currentlyFiringEvent)
+                throw new Error(`Events should not be fired in response to other events. Fired '${displayName || anonymousEvent}' in response to '${currentlyFiringEvent}'.`);
 
-            insideEvent = true;
+            currentlyFiringEvent = displayName || anonymousEvent;
             runEvent();
         } finally {
-            insideEvent = false;
+            currentlyFiringEvent = null;
         }
     });
 }
 
-let insideEvent = false;
+let currentlyFiringEvent = null as string | null;
+const anonymousEvent = '(anonymous event)';

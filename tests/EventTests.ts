@@ -5,7 +5,7 @@ import { describe, it, test, then, when } from 'wattle';
 
 describe(event.name, function () {
     type TestType = { foo: string, bar: number };
-    let sut = event<TestType>();
+    let sut = event<TestType>('sut');
 
     when("subscribed to", () => {
         let subscriber = sinon.stub();
@@ -21,10 +21,10 @@ describe(event.name, function () {
     });
 
     when("handler calls another event", () => {
-        let otherEvent = event();
+        let otherEvent = event('otherEvent');
         sut.subscribe(() => otherEvent());
 
-        it("throws", () => (() => sut({ foo: 'foo', bar: 1 })).should.throw("Fired an event in response to another event."));
+        it("throws", () => (() => sut({ foo: 'foo', bar: 1 })).should.throw("Events should not be fired in response to other events. Fired 'otherEvent' in response to 'sut'."));
     });
 
     test("scope", () => {
