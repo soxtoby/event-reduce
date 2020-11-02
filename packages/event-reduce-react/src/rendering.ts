@@ -2,7 +2,7 @@ import { Unsubscribe, watch } from "event-reduce";
 import { log, sourceTree } from "event-reduce/lib/logging";
 import { collectAccessedValues, ObservableValue } from "event-reduce/lib/observableValue";
 import { reactionQueue } from "event-reduce/lib/reactions";
-import { createElement, forwardRef, ForwardRefExoticComponent, Fragment, FunctionComponent, memo, MemoExoticComponent, PropsWithChildren, PropsWithoutRef, ReactElement, ReactNode, RefAttributes, RefForwardingComponent, useRef, useState, ValidationMap, WeakValidationMap } from "react";
+import { createElement, forwardRef, ForwardRefExoticComponent, ForwardRefRenderFunction, Fragment, FunctionComponent, memo, MemoExoticComponent, PropsWithChildren, PropsWithoutRef, ReactElement, ReactNode, RefAttributes, RefForwardingComponent, useRef, useState, ValidationMap, WeakValidationMap } from "react";
 import { useAsObservableValues } from "./hooks";
 import { trace } from "./trace";
 import { useDispose } from "./utils";
@@ -15,16 +15,16 @@ interface ContextlessFunctionComponent<P = {}> {
     displayName?: string;
 }
 
-export type ReactiveComponent<Component extends ContextlessFunctionComponent<any> | RefForwardingComponent<any, any>> =
+export type ReactiveComponent<Component extends ContextlessFunctionComponent<any> | ForwardRefRenderFunction<any, any>> =
     Component extends ContextlessFunctionComponent<any> ? MemoExoticComponent<Component>
-    : Component extends RefForwardingComponent<infer Ref, infer Props> ? MemoExoticComponent<ForwardRefExoticComponent<PropsWithoutRef<Props> & RefAttributes<Ref>>>
+    : Component extends ForwardRefRenderFunction<infer Ref, infer Props> ? MemoExoticComponent<ForwardRefExoticComponent<PropsWithoutRef<Props> & RefAttributes<Ref>>>
     : never;
 
 export function Reactive(props: { name?: string; children: () => ReactNode; }): ReactElement {
     return useReactive(props.name || 'Derived', () => createElement(Fragment, { children: props.children() }));
 }
 
-export function reactive<Component extends (ContextlessFunctionComponent<any> | RefForwardingComponent<any, any>)>(component: Component): ReactiveComponent<Component> {
+export function reactive<Component extends (ContextlessFunctionComponent<any> | ForwardRefRenderFunction<any, any>)>(component: Component): ReactiveComponent<Component> {
     let componentName = component.displayName || component.name || 'ReactiveComponent';
     let reactiveComponent = ((...args: Parameters<Component>) => { // Important to use rest operator here so react ignores function arity
         return useReactive(componentName, () => {
