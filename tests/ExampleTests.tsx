@@ -2,11 +2,11 @@ import { fireEvent, render } from "@testing-library/react";
 import { expect } from "chai";
 import { Counter, CounterEvents, CounterModel } from "event-reduce-example/Counter";
 import { CounterList, CounterListEvents, CounterListModel } from "event-reduce-example/CounterList";
-import { runReactions } from "event-reduce/lib/reactions";
 import { eventProxy, mutable } from "event-reduce/lib/testing";
 import * as React from "react";
 import { SynchronousPromise } from "synchronous-promise";
 import { describe, it, test, then, when } from "wattle";
+import { runReactions } from "./setup";
 
 describe(CounterListModel.name, function () {
     let events = new CounterListEvents();

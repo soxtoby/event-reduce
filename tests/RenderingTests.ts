@@ -1,9 +1,9 @@
 import { renderHook } from "@testing-library/react-hooks";
 import { useReactive } from "event-reduce-react";
 import { ObservableValue } from "event-reduce/lib/observableValue";
-import { runReactions } from "event-reduce/lib/reactions";
 import { spy } from "sinon";
 import { describe, it, test, then, when } from "wattle";
+import { runReactions } from "./setup";
 
 describe(useReactive.name, function () {
     let observableValue = new ObservableValue(() => 'test value', 'initial value');
