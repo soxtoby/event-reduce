@@ -21,5 +21,5 @@ export class PromiseQueue implements IReactionQueue {
 
 export const reactionQueue = {
     /** Can be replaced for testing purposes */
-    current: new PromiseQueue(Promise.resolve())
+    current: new PromiseQueue(Promise.resolve()) as IReactionQueue
 };
