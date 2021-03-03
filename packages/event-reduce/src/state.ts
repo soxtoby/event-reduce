@@ -1,7 +1,7 @@
 import { getObservableProperties } from "./decorators";
 import { Reduction } from "./reduction";
 import { StringKey } from "./types";
-import { getOrAdd, isModel, isObject, isPlainObject } from "./utils";
+import { getOrAdd, isModel, isObject, isPlainObject, jsonPath } from "./utils";
 
 export type State<T> =
     T extends Function ? never
@@ -30,23 +30,80 @@ function addStateProp(prototype: any, key: string) {
         .push(key);
 }
 
-export function getState<T>(model: T, includeDerived = false): State<T> {
+export interface IStateOptions {
+    /** 
+     * Name of root model, used for errors 
+     * @default $
+     **/
+    name?: string;
+    /** @default false */
+    includeDerivedProperties?: boolean;
+    /** @default 'expect' in production, otherwise 'error' */
+    circularReferences?: CircularReferenceHandling;
+}
+
+export type CircularReferenceHandling = 'error' | 'warn' | 'expect';
+
+export function getState<T>(model: T, options: IStateOptions = {}): State<T> {
+    let { circularReferences, name = '$', ...otherOptions } = options;
+    try {
+        return getStateRecursive(circularReferences == 'expect' ? options : otherOptions, new Map(), name, model);
+    } catch {
+        circularReferences ??= (process.env.NODE_ENV === 'production' ? 'expect' : 'error'); // Silently handle circular references in production
+        return getStateRecursive({ circularReferences, ...otherOptions }, new Map(), name, model);
+    }
+}
+function getStateRecursive<T>(options: IStateOptions, parentPath: Map<unknown, PropertyKey>, key: PropertyKey, model: T): State<T> {
     if (!isObject(model))
         return model as State<T>;
 
-    if (Array.isArray(model))
-        return model.map(i => getState(i, includeDerived)) as State<T>;
+    if (options.circularReferences && parentPath.has(model))
+        return getCircularReference(options.circularReferences, parentPath, key, model);
 
-    let stateProps = getAllStatefulProperties(model, includeDerived);
+    parentPath.set(model, key);
+    let state = Array.isArray(model)
+        ? getArrayState(options, parentPath, model)
+        : getObjectState(options, parentPath, model);
+    parentPath.delete(model);
+    return state;
+}
 
+function getArrayState<T>(options: IStateOptions, parentPath: Map<unknown, PropertyKey>, model: T & any[]) {
+    return model.map((value, key) => getStateRecursive(options, parentPath, key, value)) as State<T>;
+}
+
+function getObjectState<T>(options: IStateOptions, parentPath: Map<unknown, PropertyKey>, model: T) {
     let state = {} as StateObject<T>;
-    stateProps.forEach(key => {
+    for (let key of getAllStatefulProperties(model, options.includeDerivedProperties)) {
         let value = model[key as keyof T];
         if (typeof value != 'function')
-            state[key as keyof T] = getState(value, includeDerived);
-    });
+            state[key as keyof T] = getStateRecursive(options, parentPath, key, value);
+    }
     return state as State<T>;
 }
+
+function getCircularReference<T>(handling: CircularReferenceHandling, parentPath: Map<unknown, PropertyKey>, key: PropertyKey, model: T) {
+    let circularPath = Array.from(parentPath)
+        .map(([value, key]) => [key, value] as const)
+        .concat([[key, model]]);
+
+    let circularPathKeys = circularPath.map(([key]) => key);
+    let referencedPathKeys = circularPathKeys.slice(0, circularPath.findIndex(([, v]) => v == model) + 1);
+    let message = `Detected circular reference in model: ${jsonPath(circularPathKeys)} -> ${jsonPath(referencedPathKeys)}`;
+
+    if (handling == 'error') {
+        console.error(message, new Details(circularPath));
+        throw new Error(message);
+    }
+
+    if (handling == 'warn')
+        console.warn(message, new Details(circularPath));
+
+    return `<ref: ${jsonPath(referencedPathKeys)}>` as any;
+}
+
+// Just for naming in the console
+class Details { constructor(public circularPath: (readonly [PropertyKey, unknown])[]) { } }
 
 export function setState<T>(model: T, state: StateObject<T>) {
     let observableProps = getReducedProperties(model);

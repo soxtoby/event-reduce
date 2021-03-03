@@ -13,6 +13,15 @@ export function nameOfFunction(fn: Function) {
     return (fn as any).displayName || fn.name || String(fn);
 }
 
+export function jsonPath(keys: readonly PropertyKey[]) {
+    return keys.map((key, i) =>
+        i == 0 ? key
+            : typeof key == 'number' || typeof key == 'symbol' ? `[${String(key)}]`
+                : /^[\w\$]+$/.test(key) ? `.${key}`
+                    : `[${JSON.stringify(key)}]`)
+        .join('');
+}
+
 /** Utility base class for anything with a dynamic displayName */
 export class NamedBase {
     constructor(private _getDisplayName: () => string) { }
