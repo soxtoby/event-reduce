@@ -129,13 +129,13 @@ class AsyncEvent<Result, Context> extends AsyncEventBase<Result, Context> {
     readonly rejected = new Subject<AsyncError<Context>>(() => `${this.displayName}.rejected`);
 
     next(promise: PromiseLike<Result>, context: Context) {
-        fireEvent('⚡⌚ (async event)', this.displayName + '.started', context, () => ({ Promise: promise, Container: this.container }),
+        fireEvent('⚡⌚ (async event)', this.displayName + '.started', { promise, context }, () => ({ Promise: promise, Container: this.container }),
             () => this.started.next({ promise, context }));
 
         promise.then(
-            result => fireEvent('⚡✔ (async result)', this.displayName + '.resolved', context, () => ({ Promise: promise, Container: this.container }),
+            result => fireEvent('⚡✔ (async result)', this.displayName + '.resolved', { result, context }, () => ({ Promise: promise, Container: this.container }),
                 () => this.resolved.next({ result, context })),
-            error => fireEvent('⚡❌ (async error)', this.displayName + '.rejected', context, () => ({ Promise: promise, Container: this.container }),
+            error => fireEvent('⚡❌ (async error)', this.displayName + '.rejected', { error, context }, () => ({ Promise: promise, Container: this.container }),
                 () => this.rejected.next({ error, context })));
     }
 }
