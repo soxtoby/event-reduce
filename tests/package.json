@@ -31,7 +31,7 @@
     "sinon-chai": "~3",
     "synchronous-promise": "~2",
     "ts-node": "*",
-    "typescript": "~3",
+    "typescript": "~4",
     "wattle": "~0"
   }
 }
