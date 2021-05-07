@@ -25,8 +25,5 @@
         "ts-node": "*",
         "typescript": "~4",
         "wattle": "~0"
-    },
-    "resolutions": {
-        "**/deasync": "^0.1.20"
     }
 }
