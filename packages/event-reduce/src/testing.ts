@@ -75,10 +75,6 @@ export function modelProxy(model: any = {}) {
             return true;
         },
 
-        enumerate(target: any) {
-            return this.ownKeys!(target);
-        },
-
         ownKeys(target: any) {
             return Array.from(new Set(Object.keys(target).concat(Object.keys(observableValues))));
         },
