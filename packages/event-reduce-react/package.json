@@ -16,14 +16,14 @@
     "lib"
   ],
   "dependencies": {
-    "event-reduce": "^0.4.2"
+    "event-reduce": "^0.4.6"
   },
   "peerDependencies": {
-    "react": ">=16.8"
+    "react": ">=18"
   },
   "devDependencies": {
-    "@types/react": ">=16.8",
     "@types/scheduler": "*",
+    "@types/react": ">=18",
     "typescript": "~4"
   }
 }
