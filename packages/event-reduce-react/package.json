@@ -22,7 +22,6 @@
     "react": ">=18"
   },
   "devDependencies": {
-    "@types/scheduler": "*",
     "@types/react": ">=18",
     "typescript": "~4"
   }
