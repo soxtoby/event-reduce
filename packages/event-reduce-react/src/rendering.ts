@@ -2,9 +2,8 @@ import { Unsubscribe, watch } from "event-reduce";
 import { log, sourceTree } from "event-reduce/lib/logging";
 import { collectAccessedValues, ObservableValue } from "event-reduce/lib/observableValue";
 import { reactionQueue } from "event-reduce/lib/reactions";
-import { createElement, forwardRef, ForwardRefExoticComponent, ForwardRefRenderFunction, Fragment, FunctionComponent, memo, MemoExoticComponent, PropsWithChildren, PropsWithoutRef, ReactElement, ReactNode, RefAttributes, RefForwardingComponent, useRef, useState, ValidationMap, WeakValidationMap } from "react";
+import { createElement, forwardRef, ForwardRefExoticComponent, ForwardRefRenderFunction, Fragment, FunctionComponent, memo, MemoExoticComponent, PropsWithChildren, PropsWithoutRef, ReactElement, ReactNode, RefAttributes, useRef, useState, ValidationMap, WeakValidationMap } from "react";
 import { useAsObservableValues } from "./hooks";
-import { trace } from "./trace";
 import { useDispose } from "./utils";
 
 interface ContextlessFunctionComponent<P = {}> {
@@ -72,8 +71,9 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
     let cancelReaction = undefined as Unsubscribe | undefined;
     let stopWatching = watcher.subscribe(changed => {
         unsubscribeFromThisRender(); // Avoid queueing up extra renders if more sources change
-        cancelReaction = reactionQueue.current.add(() => trace(`${name} reacted to ${changed.displayName}`, performance.now(),
-            () => setRerenderCount(c => c + 1)));
+        cancelReaction = reactionQueue.current.add(() => 
+            setRerenderCount(c => c + 1)
+        );
     });
 
     return value;
