@@ -6285,9 +6285,9 @@ w3c-xmlserializer@^3.0.0:
     xml-name-validator "^4.0.0"
 
 wattle@~0:
-  version "0.8.1"
-  resolved "https://registry.yarnpkg.com/wattle/-/wattle-0.8.1.tgz#376b0cc62133c1ce6ccdba02d6309bb0f214ffd4"
-  integrity sha512-yLLJVLK6a8vAKwaD8tSqmZ7UlIgmSKKs/bDxcRbuhUdaRLBwZsGwgKXWPpfRskEDX3aUz6we+aupnHH1Dg23kw==
+  version "0.8.3"
+  resolved "https://registry.yarnpkg.com/wattle/-/wattle-0.8.3.tgz#25ddb7b15f651d6c196707e84aeb80110dc571ba"
+  integrity sha512-tdLXap/tVpUoKTBylB5vVz/JDzwM335q14OzXL1ZSJQ2zzieq+vLIUzf/S6QyxcfCziToCIShVL2v1aIHF8piA==
   dependencies:
     chalk "^4"
     chokidar "^3"
