@@ -1,11 +1,11 @@
 import { Derivation, derive } from "./derivation";
 import { IEventBase } from "./events";
-import { consumeLastAccessed, ObservableValue, withInnerTrackingScope } from "./observableValue";
+import { consumeLastAccessed, ObservableValue, ValueIsNotObservableError, withInnerTrackingScope } from "./observableValue";
 import { reduce, Reduction } from "./reduction";
 import { getOrAdd, isObject } from "./utils";
 
 export let reduced: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
-    return observableValueProperty(target, key, Reduction, true, `@reduced property '${String(key)}' can only be set to the value of a reduction`);
+    return observableValueProperty(target, key, Reduction, true, () => new InvalidReducedPropertyError(key));
 }
 
 export let derived: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
@@ -20,7 +20,7 @@ export let derived: PropertyDecorator = (target: Object, key: string | symbol): 
         }
     }
 
-    return observableValueProperty(target, key, Derivation, false, `@derived property ${String(key)} must have a getter or be set to the value of a derivation`);
+    return observableValueProperty(target, key, Derivation, false, () => new InvalidDerivedPropertyError(key));
 }
 
 function observableValueProperty<Type extends ObservableValue<any>>(
@@ -28,13 +28,13 @@ function observableValueProperty<Type extends ObservableValue<any>>(
     key: string | symbol,
     type: new (...args: any) => Type,
     enumerable: boolean,
-    typeError: string
+    createInvalidPropertyError: () => Error
 ): PropertyDescriptor {
 
     setObservableProperty(prototype, key, instance => {
         let value = getOrAddObservableValues(instance)[key as string];
         if (!value)
-            throw new Error(typeError);
+            throw createInvalidPropertyError();
         return value;
     });
 
@@ -43,7 +43,7 @@ function observableValueProperty<Type extends ObservableValue<any>>(
     function set(this: any, value: any) {
         let observableValue = consumeLastAccessed()!;
         if (!observableValue || !(observableValue instanceof type) || value !== withInnerTrackingScope(() => observableValue.value))
-            throw new Error(typeError);
+            throw createInvalidPropertyError();
         observableValue.displayName = String(key);
         observableValue.container = this;
         getOrAddObservableValues(this)[key as string] = observableValue;
@@ -61,7 +61,7 @@ export function extend<T>(reducedValue: T) {
     if (source && source instanceof Reduction && withInnerTrackingScope(() => source.value) == reducedValue)
         return reduce(reducedValue)
             .onValueChanged(source.value, (_, val) => val);
-    throw new Error("Couldn't detect reduced value. Make sure you pass in the value of a reduction directly.");
+    throw new ValueIsNotObservableError(reducedValue);
 }
 
 let observableProperties = Symbol('ObservableProperties');
@@ -119,4 +119,20 @@ export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
 function hasDisplayName(e: any): e is IEventBase {
     return e instanceof Object
         && 'displayName' in e;
+}
+
+export class InvalidReducedPropertyError extends Error {
+    constructor(
+        public property: string | symbol
+    ) {
+        super(`@reduced property '${String(property)}' can only be set to the value of a reduction`);
+    }
+}
+
+export class InvalidDerivedPropertyError extends Error {
+    constructor(
+        public property: string | symbol
+    ) {
+        super(`@derived property ${String(property)} must have a getter or be set to the value of a derivation`);
+    }
 }

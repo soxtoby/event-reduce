@@ -83,3 +83,11 @@ export function consumeLastAccessed() {
         return consumed;
     }
 }
+
+export class ValueIsNotObservableError extends Error {
+    constructor(
+        public value: unknown
+    ) {
+        super("Couldn't detect observable value. Make sure you pass in an observable value directly.");
+    }
+}

@@ -1,6 +1,6 @@
 import { log, sourceTree } from "./logging";
 import { allSources, IObservable, isObservable, pathToSource } from "./observable";
-import { collectAccessedValues, consumeLastAccessed, IObservableValue, ObservableValue, withInnerTrackingScope } from "./observableValue";
+import { collectAccessedValues, consumeLastAccessed, IObservableValue, ObservableValue, ValueIsNotObservableError, withInnerTrackingScope } from "./observableValue";
 import { setState, State, StateObject } from "./state";
 import { Subject } from "./subject";
 import { Unsubscribe } from "./types";
@@ -50,7 +50,7 @@ export class Reduction<T> extends ObservableValue<T> {
 
     on<TEvent>(observable: IObservable<TEvent>, reduce: Reducer<T, TEvent>) {
         if (allSources(observable.sources).has(this))
-            throw new Error(`Cannot subscribe to '${observable.displayName}', as it depends on this reduction, '${this.displayName}'.`);
+            throw new CircularSubscriptionError(this, observable);
 
         let unsubscribeExisting = this._sources.get(observable);
         if (unsubscribeExisting)
@@ -64,7 +64,7 @@ export class Reduction<T> extends ObservableValue<T> {
             let triggeringSources = allSources([observable]);
             let commonSource = firstIntersection(accessedSources, triggeringSources);
             if (commonSource)
-                throw new Error(commonSourceError(commonSource, observable, sources));
+                throw new CommonSourceInReductionError(commonSource, observable, sources);
 
             log('🧪 (reduction)', this.displayName, [], () => ({
                 Previous: this._value,
@@ -81,7 +81,7 @@ export class Reduction<T> extends ObservableValue<T> {
         let lastAccessed = consumeLastAccessed();
         if (lastAccessed && withInnerTrackingScope(() => lastAccessed!.value) == observableValue)
             return this.on(lastAccessed, reduce);
-        throw new Error("Couldn't detect observable value. Make sure you pass in an observable value directly.");
+        throw new ValueIsNotObservableError(observableValue);
     }
 
     onRestore(reduce: Reducer<T, State<T>>): this {
@@ -92,12 +92,6 @@ export class Reduction<T> extends ObservableValue<T> {
         this._sources.forEach(unsub => unsub());
         this._sources.clear();
     }
-}
-
-function commonSourceError(commonSource: IObservable<any>, triggeringObservable: IObservable<any>, accessedObservables: Iterable<IObservable<any>>): string | undefined {
-    return `Accessed a reduced value derived from the same event being fired.
-Fired:    ${pathToSource([triggeringObservable], commonSource)!.map(o => o.displayName).join(' -> ')}
-Accessed: ${pathToSource(accessedObservables, commonSource)!.map(o => o.displayName).join(' -> ')}`;
 }
 
 function firstIntersection<T>(a: Set<T>, b: Set<T>) {
@@ -115,5 +109,26 @@ class BoundReduction<TValue, TEvents> extends Reduction<TValue> {
 
     on<TEvent>(observable: ((events: TEvents) => IObservable<TEvent>) | IObservable<TEvent>, reduce: Reducer<TValue, TEvent>): this {
         return super.on(isObservable(observable) ? observable : observable(this._events), reduce);
+    }
+}
+
+export class CircularSubscriptionError extends Error {
+    constructor(
+        public reduction: IReduction<unknown>,
+        public observable: IObservable<unknown>
+    ) {
+        super(`Cannot subscribe to '${observable.displayName}', as it depends on this reduction, '${reduction.displayName}'.`);
+    }
+}
+
+export class CommonSourceInReductionError extends Error {
+    constructor(
+        public commonSource: IObservable<unknown>,
+        public triggeringObservable: IObservable<unknown>,
+        public accessedObservables: Iterable<IObservable<unknown>>
+    ) {
+        super(`Accessed a reduced value derived from the same event being fired.
+Fired:    ${pathToSource([triggeringObservable], commonSource)!.map(o => o.displayName).join(' -> ')}
+Accessed: ${pathToSource(accessedObservables, commonSource)!.map(o => o.displayName).join(' -> ')}`);
     }
 }

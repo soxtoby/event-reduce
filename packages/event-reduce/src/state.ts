@@ -84,22 +84,23 @@ function getObjectState<T>(options: IStateOptions, parentPath: Map<unknown, Prop
 
 function getCircularReference<T>(handling: CircularReferenceHandling, parentPath: Map<unknown, PropertyKey>, key: PropertyKey, model: T) {
     let circularPath = Array.from(parentPath)
-        .map(([value, key]) => [key, value] as const)
+        .map(([value, key]) => [key, value] as [PropertyKey, unknown])
         .concat([[key, model]]);
 
     let circularPathKeys = circularPath.map(([key]) => key);
     let referencedPathKeys = circularPathKeys.slice(0, circularPath.findIndex(([, v]) => v == model) + 1);
-    let message = `Detected circular reference in model: ${jsonPath(circularPathKeys)} -> ${jsonPath(referencedPathKeys)}`;
 
-    if (handling == 'error') {
-        console.error(message, new Details(circularPath));
-        throw new Error(message);
+    if (handling == 'expect')
+        return `<ref: ${jsonPath(referencedPathKeys)}>` as any;
+
+    let error = new CircularReferenceInStateError(circularPath, circularPathKeys, referencedPathKeys);
+
+    if (handling == 'warn') {
+        console.warn(error.message, new Details(circularPath));
+        return;
     }
 
-    if (handling == 'warn')
-        console.warn(message, new Details(circularPath));
-
-    return `<ref: ${jsonPath(referencedPathKeys)}>` as any;
+    throw error;
 }
 
 // Just for naming in the console
@@ -150,4 +151,14 @@ function getReducedProperties<T>(model: T) {
             reducedProps[key] = observableValue;
     }
     return reducedProps;
+}
+
+export class CircularReferenceInStateError extends Error {
+    constructor(
+        public circularPath: ([PropertyKey, unknown])[],
+        public circularPathKeys: PropertyKey[],
+        public referencedPathKeys: PropertyKey[]
+    ) {
+        super(`Detected circular reference in model: ${jsonPath(circularPathKeys)} -> ${jsonPath(referencedPathKeys)}`);
+    }
 }

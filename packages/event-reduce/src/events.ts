@@ -176,7 +176,7 @@ export function fireEvent(type: string, displayName: string, arg: any, getInfo: 
     logEvent(type, displayName, arg, getInfo, () => {
         try {
             if (currentlyFiringEvent)
-                throw new Error(`Events should not be fired in response to other events. Fired '${displayName || anonymousEvent}' in response to '${currentlyFiringEvent}'.`);
+                throw new ChainedEventsError(currentlyFiringEvent, displayName);
 
             currentlyFiringEvent = displayName || anonymousEvent;
             runEvent();
@@ -188,3 +188,12 @@ export function fireEvent(type: string, displayName: string, arg: any, getInfo: 
 
 let currentlyFiringEvent = null as string | null;
 const anonymousEvent = '(anonymous event)';
+
+export class ChainedEventsError extends Error {
+    constructor(
+        public currentEvent: string,
+        public newEvent = anonymousEvent
+    ) {
+        super(`Events should not be fired in response to other events. Fired '${newEvent}' in response to '${currentEvent}'.`)
+    }
+}
