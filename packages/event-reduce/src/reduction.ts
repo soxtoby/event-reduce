@@ -14,7 +14,7 @@ export function reduce<TValue, TEvents>(initial: TValue, events?: TEvents | stri
             : new Reduction(() => displayName, initial);
 }
 
-type Reducer<TValue, TEvent> = (previous: TValue, eventValue: TEvent) => TValue;
+export type Reducer<TValue, TEvent> = (previous: TValue, eventValue: TEvent) => TValue;
 
 export interface IReduction<T> extends IObservableValue<T> {
     on<TEvent>(observable: IObservable<TEvent>, reduce: Reducer<T, TEvent>): this;

@@ -1,7 +1,7 @@
 import { Derivation, derive } from "./derivation";
 import { IEventBase } from "./events";
 import { getUnderlyingObservable, ObservableValue, ValueIsNotObservableError } from "./observableValue";
-import { reduce, Reduction } from "./reduction";
+import { IReduction, reduce, Reducer, Reduction } from "./reduction";
 import { getOrAdd, isObject } from "./utils";
 
 export let reduced: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
@@ -55,12 +55,13 @@ function observableValueProperty<Type extends ObservableValue<any>>(
         });
     }
 }
-
-export function extend<T>(reducedValue: T) {
-    let source = getUnderlyingObservable(reducedValue);
-    if (source && source instanceof Reduction)
-        return reduce(reducedValue).on(source, (_, val) => val);
-    throw new ValueIsNotObservableError(reducedValue);
+export function extend<TValue>(observableValue: TValue): IReduction<TValue>;
+export function extend<TSource, TValue>(observableValue: TSource, initialValue: TValue, reduceFn: Reducer<TValue, TSource>): IReduction<TValue>
+export function extend<TSource, TValue>(observableValue: TSource, initialValue?: TValue, reduceFn: Reducer<TValue, TSource> = (_, v) => v as any) {
+    let source = getUnderlyingObservable(observableValue);
+    if (source)
+        return reduce(reduceFn(initialValue!, observableValue)).on(source, reduceFn);
+    throw new ValueIsNotObservableError(observableValue);
 }
 
 let observableProperties = Symbol('ObservableProperties');
