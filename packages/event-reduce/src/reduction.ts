@@ -1,6 +1,6 @@
 import { log, sourceTree } from "./logging";
 import { allSources, IObservable, isObservable, pathToSource } from "./observable";
-import { collectAccessedValues, consumeLastAccessed, IObservableValue, ObservableValue, ValueIsNotObservableError, withInnerTrackingScope } from "./observableValue";
+import { collectAccessedValues, getUnderlyingObservable, IObservableValue, ObservableValue, ValueIsNotObservableError } from "./observableValue";
 import { setState, State, StateObject } from "./state";
 import { Subject } from "./subject";
 import { Unsubscribe } from "./types";
@@ -78,9 +78,9 @@ export class Reduction<T> extends ObservableValue<T> {
     }
 
     onValueChanged<TValue>(observableValue: TValue, reduce: Reducer<T, TValue>) {
-        let lastAccessed = consumeLastAccessed();
-        if (lastAccessed && withInnerTrackingScope(() => lastAccessed!.value) == observableValue)
-            return this.on(lastAccessed, reduce);
+        let observable = getUnderlyingObservable(observableValue);
+        if (observable)
+            return this.on(observable, reduce);
         throw new ValueIsNotObservableError(observableValue);
     }
 

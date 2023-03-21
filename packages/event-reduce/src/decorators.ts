@@ -1,6 +1,6 @@
 import { Derivation, derive } from "./derivation";
 import { IEventBase } from "./events";
-import { consumeLastAccessed, ObservableValue, ValueIsNotObservableError, withInnerTrackingScope } from "./observableValue";
+import { getUnderlyingObservable, ObservableValue, ValueIsNotObservableError } from "./observableValue";
 import { reduce, Reduction } from "./reduction";
 import { getOrAdd, isObject } from "./utils";
 
@@ -41,14 +41,14 @@ function observableValueProperty<Type extends ObservableValue<any>>(
     return { set };
 
     function set(this: any, value: any) {
-        let observableValue = consumeLastAccessed()!;
-        if (!observableValue || !(observableValue instanceof type) || value !== withInnerTrackingScope(() => observableValue.value))
+        let observableValue = getUnderlyingObservable(value);
+        if (!observableValue || !(observableValue instanceof type))
             throw createInvalidPropertyError();
         observableValue.displayName = String(key);
         observableValue.container = this;
         getOrAddObservableValues(this)[key as string] = observableValue;
         Object.defineProperty(this, key, {
-            get: () => observableValue.value,
+            get: () => observableValue!.value,
             set,
             enumerable,
             configurable: true
@@ -57,10 +57,9 @@ function observableValueProperty<Type extends ObservableValue<any>>(
 }
 
 export function extend<T>(reducedValue: T) {
-    let source = consumeLastAccessed() as Reduction<T>;
-    if (source && source instanceof Reduction && withInnerTrackingScope(() => source.value) == reducedValue)
-        return reduce(reducedValue)
-            .onValueChanged(source.value, (_, val) => val);
+    let source = getUnderlyingObservable(reducedValue);
+    if (source && source instanceof Reduction)
+        return reduce(reducedValue).on(source, (_, val) => val);
     throw new ValueIsNotObservableError(reducedValue);
 }
 

@@ -75,6 +75,12 @@ function startTrackingScope() {
     return valueAccessed.subscribe(accessedValue => lastAccessed = accessedValue, () => '(last accessed)');
 }
 
+export function getUnderlyingObservable<T>(value: T): ObservableValue<T> | undefined {
+    let lastAccessed = consumeLastAccessed();
+    if (lastAccessed && withInnerTrackingScope(() => lastAccessed!.value) == value)
+        return lastAccessed;
+}
+
 export function consumeLastAccessed() {
     if (lastAccessed) {
         let consumed = lastAccessed
