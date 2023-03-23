@@ -1,5 +1,6 @@
 import { reduce } from 'event-reduce';
 import { collectAccessedValues } from 'event-reduce/lib/observableValue';
+import { CircularSubscriptionError, CommonSourceInReductionError } from "event-reduce/lib/reduction";
 import { Subject } from 'event-reduce/lib/subject';
 import * as sinon from 'sinon';
 import { describe, it, test, then, when } from 'wattle';
@@ -44,7 +45,11 @@ describe(reduce.name, function () {
             when("other value based on same event", () => {
                 other.on(subject, () => 0);
 
-                it("throws", () => (() => subject.next(0)).should.throw("Accessed a reduced value derived from the same event being fired."));
+                it("throws", () => {
+                    let err = (() => subject.next(0)).should.throw(CommonSourceInReductionError);
+                    err.has.property('commonSource', subject);
+                    err.has.property('triggeringObservable', subject);
+                });
             });
 
             when("other value not based on same event", () => {
@@ -56,38 +61,42 @@ describe(reduce.name, function () {
             let observable = sut.filter(n => n > 3);
             let action = () => sut.on(observable, (_, n) => n);
 
-            it("throws", () => action.should.throw("Cannot subscribe to 'sut.filter(n => n > 3)', as it depends on this reduction, 'sut'."));
-        });
-    });
-
-    when("bound to events object", () => {
-        let events = {};
-        let sut = reduce(1, events);
-
-        when("subscribing to an observable", () => {
-            let subject = new Subject<string>(() => 'test');
-            let getEvent = sinon.spy(() => subject);
-            let reducer = sinon.stub();
-            sut.on(getEvent, reducer);
-
-            then("event getter called with bound events", () => getEvent.should.have.been.calledWith(events));
-
-            then("reduction subscribed to result of event getter", () => {
-                subject.next('foo');
-                reducer.should.have.been.calledWith(1, 'foo');
+            it("throws", () => {
+                let err = action.should.throw(CircularSubscriptionError);
+                err.has.property('observable', observable);
+                err.has.property('reduction', sut);
             });
         });
     });
+});
 
-    test("accessed reductions updated when value is accessed", () => {
-        let r1 = reduce(1);
-        let r2 = reduce(2);
+when("bound to events object", () => {
+    let events = {};
+    let sut = reduce(1, events);
 
-        let accessed = collectAccessedValues(() => {
-            r1.value;
-            r2.value;
+    when("subscribing to an observable", () => {
+        let subject = new Subject<string>(() => 'test');
+        let getEvent = sinon.spy(() => subject);
+        let reducer = sinon.stub();
+        sut.on(getEvent, reducer);
+
+        then("event getter called with bound events", () => getEvent.should.have.been.calledWith(events));
+
+        then("reduction subscribed to result of event getter", () => {
+            subject.next('foo');
+            reducer.should.have.been.calledWith(1, 'foo');
         });
-
-        Array.from(accessed).should.have.members([r1, r2]);
     });
+});
+
+test("accessed reductions updated when value is accessed", () => {
+    let r1 = reduce(1);
+    let r2 = reduce(2);
+
+    let accessed = collectAccessedValues(() => {
+        r1.value;
+        r2.value;
+    });
+
+    Array.from(accessed).should.have.members([r1, r2]);
 });

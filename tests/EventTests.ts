@@ -1,4 +1,5 @@
 import { asyncEvent, event } from 'event-reduce';
+import { ChainedEventsError } from "event-reduce/lib/events";
 import * as sinon from 'sinon';
 import { SynchronousPromise } from 'synchronous-promise';
 import { describe, it, test, then, when } from 'wattle';
@@ -24,7 +25,11 @@ describe(event.name, function () {
         let otherEvent = event('otherEvent');
         sut.subscribe(() => otherEvent());
 
-        it("throws", () => (() => sut({ foo: 'foo', bar: 1 })).should.throw("Events should not be fired in response to other events. Fired 'otherEvent' in response to 'sut'."));
+        it("throws", () => {
+            let err = (() => sut({ foo: 'foo', bar: 1 })).should.throw(ChainedEventsError);
+            err.has.property('currentEvent', sut.displayName);
+            err.has.property('newEvent', otherEvent.displayName);
+        });
     });
 
     test("scope", () => {
