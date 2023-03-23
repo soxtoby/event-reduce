@@ -1,6 +1,6 @@
 import { log, sourceTree } from "./logging";
-import { allSources, IObservable, isObservable, pathToSource } from "./observable";
-import { collectAccessedValues, getUnderlyingObservable, IObservableValue, ObservableValue, ValueIsNotObservableError } from "./observableValue";
+import { allSources, IObservable, isObservable } from "./observable";
+import { getUnderlyingObservable, IObservableValue, ObservableValue, protectAgainstAccessingValueWithCommonSource, ValueIsNotObservableError } from "./observableValue";
 import { setState, State, StateObject } from "./state";
 import { Subject } from "./subject";
 import { Unsubscribe } from "./types";
@@ -58,13 +58,7 @@ export class Reduction<T> extends ObservableValue<T> {
 
         this._sources.set(observable, observable.subscribe(eventValue => {
             let value!: T;
-            let sources = collectAccessedValues(() => value = reduce(this._value, eventValue));
-
-            let accessedSources = allSources(sources);
-            let triggeringSources = allSources([observable]);
-            let commonSource = firstIntersection(accessedSources, triggeringSources);
-            if (commonSource)
-                throw new CommonSourceInReductionError(commonSource, observable, sources);
+            protectAgainstAccessingValueWithCommonSource(observable, () => value = reduce(this._value, eventValue));
 
             log('🧪 (reduction)', this.displayName, [], () => ({
                 Previous: this._value,
@@ -94,12 +88,6 @@ export class Reduction<T> extends ObservableValue<T> {
     }
 }
 
-function firstIntersection<T>(a: Set<T>, b: Set<T>) {
-    for (let item of a)
-        if (b.has(item))
-            return item;
-}
-
 class BoundReduction<TValue, TEvents> extends Reduction<TValue> {
     constructor(
         getDisplayName: () => string,
@@ -118,17 +106,5 @@ export class CircularSubscriptionError extends Error {
         public observable: IObservable<unknown>
     ) {
         super(`Cannot subscribe to '${observable.displayName}', as it depends on this reduction, '${reduction.displayName}'.`);
-    }
-}
-
-export class CommonSourceInReductionError extends Error {
-    constructor(
-        public commonSource: IObservable<unknown>,
-        public triggeringObservable: IObservable<unknown>,
-        public accessedObservables: Iterable<IObservable<unknown>>
-    ) {
-        super(`Accessed a reduced value derived from the same event being fired.
-Fired:    ${pathToSource([triggeringObservable], commonSource)!.map(o => o.displayName).join(' -> ')}
-Accessed: ${pathToSource(accessedObservables, commonSource)!.map(o => o.displayName).join(' -> ')}`);
     }
 }

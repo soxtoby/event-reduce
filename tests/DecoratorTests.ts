@@ -1,4 +1,5 @@
 import { asyncEvent, derived, event, events, extend, reduce, reduced, derive } from "event-reduce";
+import { AccessedValueWithCommonSourceError } from "event-reduce/lib/observableValue";
 import { describe, it, test, then, when } from "wattle";
 
 describe("model decorators", function () {
@@ -79,6 +80,20 @@ describe("model decorators", function () {
             increment();
             parentModel.child!.should.be.an.instanceof(TestModel);
         })
+    });
+
+    when("initial value of a model's reduced property is derived from the same event that's creating the model", () => {
+        reduce(null as ChildModel | null)
+            .on(increment, () => new ChildModel());
+
+        class ChildModel {
+            @reduced
+            property = reduce(model.property)
+                .on(decrement, c => c - 1)
+                .value;
+        }
+
+        it("throws", () => increment.should.throw(AccessedValueWithCommonSourceError));
     });
 });
 

@@ -1,6 +1,6 @@
 import { reduce } from 'event-reduce';
-import { collectAccessedValues } from 'event-reduce/lib/observableValue';
-import { CircularSubscriptionError, CommonSourceInReductionError } from "event-reduce/lib/reduction";
+import { AccessedValueWithCommonSourceError, collectAccessedValues } from 'event-reduce/lib/observableValue';
+import { CircularSubscriptionError } from "event-reduce/lib/reduction";
 import { Subject } from 'event-reduce/lib/subject';
 import * as sinon from 'sinon';
 import { describe, it, test, then, when } from 'wattle';
@@ -46,9 +46,10 @@ describe(reduce.name, function () {
                 other.on(subject, () => 0);
 
                 it("throws", () => {
-                    let err = (() => subject.next(0)).should.throw(CommonSourceInReductionError);
+                    let err = (() => subject.next(0)).should.throw(AccessedValueWithCommonSourceError);
                     err.has.property('commonSource', subject);
                     err.has.property('triggeringObservable', subject);
+                    err.has.property('accessedObservable', other);
                 });
             });
 

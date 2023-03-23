@@ -59,3 +59,9 @@ export function getOrAdd<T>(target: any, key: string | symbol, create: (base: T 
         ? target[key]
         : (target[key] = create(target[key]));
 }
+
+export function firstIntersection<T>(a: Set<T>, b: Set<T>) {
+    for (let item of a)
+        if (b.has(item))
+            return item;
+}
