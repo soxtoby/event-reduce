@@ -1,6 +1,6 @@
 import { Derivation, derive } from "./derivation";
 import { IEventBase } from "./events";
-import { getUnderlyingObservable, ObservableValue, ValueIsNotObservableError } from "./observableValue";
+import { getUnderlyingObservable, ObservableValue, startTrackingScope, ValueIsNotObservableError } from "./observableValue";
 import { reduce, Reduction } from "./reduction";
 import { getOrAdd, isObject } from "./utils";
 
@@ -97,6 +97,10 @@ export function getObservableProperties(prototype: any) {
     return prototype[observableProperties] as Record<string, (instance: any) => ObservableValue<any>> | undefined;
 }
 
+/**
+ * Marks a class as an events class.
+ * Automatically populates the names of event properties.
+ */
 export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
     const className = (target as any).displayName || target.name;
     return {
@@ -110,6 +114,27 @@ export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
                         prop.container = this;
                     }
                 });
+            }
+        }
+    }[className];
+}
+
+/** 
+ * Marks a class as a model.
+ * Observable values accessed during construction will not be tracked.
+ **/
+export function model<T extends { new(...args: any[]): any }>(target: T): T {
+    getOrAddObservableProperties(target.prototype);
+    const className = (target as any).displayName || target.name;
+    return {
+        [className]: class extends target {
+            constructor(...args: any[]) {
+                let endScope = startTrackingScope();
+                try {
+                    super(...args);
+                } finally {
+                    endScope();
+                }
             }
         }
     }[className];

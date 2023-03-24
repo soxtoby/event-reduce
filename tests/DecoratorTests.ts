@@ -1,10 +1,12 @@
-import { asyncEvent, derived, event, events, extend, reduce, reduced, derive } from "event-reduce";
+import { asyncEvent, derived, event, events, extend, reduce, reduced, derive, model } from "event-reduce";
 import { AccessedValueWithCommonSourceError } from "event-reduce/lib/observableValue";
 import { describe, it, test, then, when } from "wattle";
 
 describe("model decorators", function () {
     let increment = event();
     let decrement = event();
+
+    @model
     class TestModel {
         @reduced
         property = reduce(1)
@@ -29,8 +31,9 @@ describe("model decorators", function () {
             .onValueChanged(this.derivedProperty, (_, d) => d)
             .value;
     }
-    let model = new TestModel();
+    let testModel = new TestModel();
 
+    @model
     class ExtendedModel extends TestModel {
         property: number = extend(this.property)
             .on(decrement, c => c - 1)
@@ -38,32 +41,42 @@ describe("model decorators", function () {
     }
     let extendedModel = new ExtendedModel();
 
-    test("property has initial value", () => model.property.should.equal(1));
+    test("property has initial value", () => testModel.property.should.equal(1));
 
     test("extended property has same initial value", () => extendedModel.property.should.equal(1));
 
     when("reduction updated", () => {
         increment();
 
-        then("property value updated", () => model.property.should.equal(2));
+        then("property value updated", () => testModel.property.should.equal(2));
 
-        then("dependent property value updated", () => model.dependentProperty.should.equal(2));
+        then("dependent property value updated", () => testModel.dependentProperty.should.equal(2));
 
         then("extended property value updated", () => extendedModel.property.should.equal(2));
 
-        then("derived property value updated", () => model.derivedProperty.should.equal(4));
+        then("derived property value updated", () => testModel.derivedProperty.should.equal(4));
 
-        then("derived field value updated", () => model.derivedField.should.equal(4));
+        then("derived field value updated", () => testModel.derivedField.should.equal(4));
 
-        then("property based on derived value updated", () => model.basedOnDerivedProperty.should.equal(4));
+        then("property based on derived value updated", () => testModel.basedOnDerivedProperty.should.equal(4));
     });
 
     when("extended reduction updated", () => {
         decrement();
 
-        then("property value unaffected", () => model.property.should.equal(1));
+        then("property value unaffected", () => testModel.property.should.equal(1));
 
         then("extended property value updated", () => extendedModel.property.should.equal(0));
+    });
+
+    when("derivation creates a new model that accesses an observable value in its constructor", () => {
+        //@model
+        class DerivedModel {
+            property = testModel.property;
+        }
+        let derivation = derive(() => new DerivedModel());
+
+        then("accessed observable value is not counted as a source for the derivation", () => derivation.sources.should.be.empty);
     });
 
     when("reducer creates a new model that observes the same event that created it", () => {
@@ -88,7 +101,7 @@ describe("model decorators", function () {
 
         class ChildModel {
             @reduced
-            property = reduce(model.property)
+            property = reduce(testModel.property)
                 .on(decrement, c => c - 1)
                 .value;
         }

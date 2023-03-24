@@ -1,7 +1,7 @@
 import { ensureValueOwner, unsubscribeOldModelsFromSources, valueOwner } from "./cleanup";
 import { allSources, IObservable, Observable, pathToSource } from "./observable";
 import { Subject } from "./subject";
-import { Action } from "./types";
+import { Action, Unsubscribe } from "./types";
 import { firstIntersection } from "./utils";
 
 interface IValueAccess {
@@ -100,7 +100,7 @@ export function withInnerTrackingScope<T>(action: () => T) {
     }
 }
 
-function startTrackingScope() {
+export function startTrackingScope(): Unsubscribe {
     let outerValueAccessed = valueAccessed;
     let outerLastValueConsumed = lastValueConsumed;
 
