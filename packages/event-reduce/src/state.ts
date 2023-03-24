@@ -15,7 +15,7 @@ export type StateObject<T> = { [P in keyof T]: State<T[P]> };
 const statePropsKey = Symbol('stateProps');
 
 /** Mark a constructor parameter as a state property by specifying its name. */
-export function state(parameterName: string): ParameterDecorator;
+export function state(parameterName: string): (target: Function, key: any, index: number) => void;
 /** Mark a property as a state property. */
 export function state(target: any, key: string): void;
 export function state(paramNameOrTarget: any, key?: string) {
@@ -125,7 +125,7 @@ export function setState<T>(model: T, state: StateObject<T>) {
 
 function getAllStatefulProperties<T>(model: T, includeDerived = false) {
     if (!isModel(model))
-        return Object.keys(model) as StringKey<T>[];
+        return Object.keys(model as object) as StringKey<T>[];
     let observableProps = includeDerived
         ? Object.keys(getObservableProperties(model) || {})
         : Object.keys(getReducedProperties(model));

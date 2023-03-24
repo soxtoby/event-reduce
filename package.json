@@ -23,7 +23,7 @@
     },
     "devDependencies": {
         "ts-node": "*",
-        "typescript": "~4",
+        "typescript": "~5",
         "wattle": "~0"
     },
     "resolutions": {

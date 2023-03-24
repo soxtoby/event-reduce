@@ -30,9 +30,9 @@ export class NamedBase {
     set displayName(name: string) { this._getDisplayName = () => name; }
 }
 
-export function matchesScope<Scope>(scope: Scope): <Value>(value: Value) => boolean;
-export function matchesScope<Scope, Value>(scope: Scope, value: Value): boolean;
-export function matchesScope<Scope, Value>(scope: Scope, value?: Value) {
+export function matchesScope<Scope extends object>(scope: Scope): <Value>(value: Value) => boolean;
+export function matchesScope<Scope extends object, Value>(scope: Scope, value: Value): boolean;
+export function matchesScope<Scope extends object, Value>(scope: Scope, value?: Value) {
     return arguments.length == 2
         ? matchesScope(scope)(value)
         : <Value extends Scope>(value: Value) => Object.entries(scope)
