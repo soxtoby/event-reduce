@@ -1,4 +1,4 @@
-import { ensureValueOwner, unsubscribeFromSources, unsubscribeOldModelsFromSources, valueOwner } from "./cleanup";
+import { changeOwnedValue } from "./cleanup";
 import { allSources, IObservable, Observable, pathToSource } from "./observable";
 import { Subject } from "./subject";
 import { Action, Unsubscribe } from "./types";
@@ -27,7 +27,7 @@ export class ObservableValue<T> extends Observable<T> {
         protected _value: T
     ) {
         super(getDisplayName);
-        ensureValueOwner(_value, this);
+        changeOwnedValue(this, undefined, _value);
     }
 
     container?: any;
@@ -43,18 +43,15 @@ export class ObservableValue<T> extends Observable<T> {
 
     setValue(value: T) {
         if (value !== this._value) {
-            if (valueOwner(this._value) == this)
-                unsubscribeOldModelsFromSources(this._value, value);
+            changeOwnedValue(this, this._value, value);
             this._value = value;
-            ensureValueOwner(value, this);
             this.notifyObservers(value);
         }
     }
 
     override dispose() {
         super.dispose();
-        if (valueOwner(this._value) == this)
-            unsubscribeFromSources(this._value);
+        changeOwnedValue(this, this._value, undefined);
         // Keep the value, in case this is still being held onto (e.g. with useDerredValue)
     }
 }

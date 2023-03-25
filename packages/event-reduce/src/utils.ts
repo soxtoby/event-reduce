@@ -45,13 +45,13 @@ export function isModel(model: any) {
             || !!getStateProperties(model).length);
 }
 
-export function isPlainObject(value: any) {
+export function isPlainObject<T>(value: T): value is T & object {
     return isObject(value)
         && Object.getPrototypeOf(value) == Object.prototype;
 }
 
-export function isObject(value: any) {
-    return value && typeof value == 'object';
+export function isObject<T>(value: T): value is T & object {
+    return !!value && typeof value == 'object';
 }
 
 export function getOrAdd<T>(target: any, key: string | symbol, create: (base: T | undefined) => T): T {

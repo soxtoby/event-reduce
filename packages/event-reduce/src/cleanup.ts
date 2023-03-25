@@ -1,94 +1,70 @@
+import { log } from "./logging";
 import { getObservableValues } from "./decorators";
-import { withInnerTrackingScope } from "./observableValue";
+import { ObservableValue } from "./observableValue";
 import { getStateProperties } from "./state";
-import { isModel, isObject, isPlainObject } from "./utils";
+import { isModel, isPlainObject, nameOfFunction } from "./utils";
 
-export function unsubscribeOldModelsFromSources(oldModel: any, newModel: any) {
-    let modelOwner = valueOwner(oldModel);
+/** value -> owners */
+const ownerRegistry = new WeakMap<TrackableValue, Set<TrackableValue>>();
 
-    if (isModel(oldModel)) {
-        if (oldModel != newModel)
-            unsubscribeFromSources(oldModel);
-    } else if (Array.isArray(oldModel)) {
-        if (Array.isArray(newModel)) {
-            for (let oldItem of oldModel) {
-                if (modelOwner && valueOwner(oldItem) == modelOwner && !newModel.includes(oldItem))
-                    unsubscribeFromSources(oldItem);
-            }
-        } else {
-            unsubscribeFromSources(oldModel);
+type Model = object;
+type TrackableValue = Model | ObservableValue<unknown>;
+
+export function changeOwnedValue(owner: TrackableValue, oldValue: unknown, newValue: unknown) {
+    if (oldValue !== newValue) {
+        let oldTrackableValues = findTrackableValues(oldValue);
+        let newTrackableValues = findTrackableValues(newValue);
+
+        for (let oldValue of oldTrackableValues)
+            if (!newTrackableValues.has(oldValue))
+                removeOwner(owner, oldValue);
+
+        for (let newValue of newTrackableValues)
+            if (!oldTrackableValues.has(newValue))
+                addOwner(owner, newValue);
+    }
+}
+
+function addOwner(owner: TrackableValue, value: TrackableValue) {
+    ownerRegistry.get(value)?.add(owner)
+        ?? ownerRegistry.set(value, new Set([owner]));
+}
+
+function removeOwner(owner: TrackableValue, value: TrackableValue) {
+    let owners = ownerRegistry.get(value);
+    owners?.delete(owner);
+    if (!owners?.size)
+        disposeModel(value);
+}
+
+export function disposeModel(model: Model) {
+    log('🗑️ (dispose)', nameOfFunction(model.constructor), [], undefined, () => {
+        ownerRegistry.delete(model);
+        if (model instanceof ObservableValue) {
+            model.dispose();
+        } else if (isModel(model)) {
+            for (let value of Object.values(getObservableValues(model)))
+                removeOwner(model, value);
+            for (let key of getStateProperties(model))
+                changeOwnedValue(model, model[key as keyof unknown], undefined);
         }
-    } else if (isPlainObject(oldModel)) {
-        if (isPlainObject(newModel)) {
-            Object.entries(oldModel)
-                .forEach(([key, oldValue]) => {
-                    if (modelOwner && valueOwner(oldModel[key]) == modelOwner && newModel[key] !== oldValue)
-                        unsubscribeFromSources(oldValue);
-                });
-        } else {
-            unsubscribeFromSources(oldModel);
+    });
+}
+
+function findTrackableValues(value: unknown, trackableValues: Set<TrackableValue> = new Set(), searchedIn: Set<unknown> = new Set()) {
+    if (!searchedIn.has(value)) {
+        searchedIn.add(value);
+
+        if (value instanceof ObservableValue || isModel(value)) {
+            trackableValues.add(value);
+        } else if (Array.isArray(value)) {
+            for (let item of value)
+                findTrackableValues(item, trackableValues, searchedIn);
+        } else if (isPlainObject(value)) {
+            for (let key in value)
+                findTrackableValues(value[key as keyof unknown], trackableValues, searchedIn);
         }
     }
-}
 
-export function unsubscribeFromSources(model: any) {
-    let modelOwner = valueOwner(model);
-    removeValueOwner(model);
-
-    if (isModel(model)) {
-        Object.values(getObservableValues(model) || {})
-            .forEach(observableValue => {
-                observableValue.dispose();
-                let value = withInnerTrackingScope(() => observableValue.value);
-                if (valueOwner(value) == observableValue)
-                    unsubscribeFromSources(value);
-            });
-        getStateProperties(model)
-            .forEach(stateProp => {
-                let stateValue = model[stateProp];
-                let stateOwner = valueOwner(stateValue);
-                if (!stateOwner || stateOwner == modelOwner)
-                    unsubscribeFromSources(stateValue);
-            });
-    } else if (Array.isArray(model)) {
-        model.forEach(item => {
-            if (modelOwner && valueOwner(item) == modelOwner)
-                unsubscribeFromSources(item);
-        });
-    } else if (isPlainObject(model)) {
-        Object.values(model).forEach(value => {
-            if (modelOwner && valueOwner(value) == modelOwner)
-                unsubscribeFromSources(value);
-        });
-    }
-}
-
-let valueOwners = new WeakMap<any, any>();
-
-export function valueOwner(value: any) {
-    return isObject(value)
-        ? valueOwners.get(value)
-        : undefined;
-}
-
-/** Sets value owner if it doesn't already have one */
-export function ensureValueOwner(value: any, owner: any) {
-    if (isObject(value) && !valueOwners.has(value)) {
-        valueOwners.set(value, owner);
-        if (Array.isArray(value))
-            value.forEach(item => ensureValueOwner(item, owner));
-        else if (isPlainObject(value))
-            Object.values(Object.getOwnPropertyDescriptors(value))
-                .filter(p => p.enumerable)
-                .forEach(p => {
-                    let propValue = typeof p.get == 'function'
-                        ? withInnerTrackingScope(() => p.get!.call(value))
-                        : p.value;
-                    ensureValueOwner(propValue, owner);
-                });
-    }
-}
-
-function removeValueOwner(value: any) {
-    valueOwners.delete(value);
+    return trackableValues;
 }

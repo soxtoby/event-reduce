@@ -1,9 +1,21 @@
 import { asyncEvent, derive, event, IObservableValue, IReduction, reduce } from "event-reduce";
-import { ensureValueOwner } from "event-reduce/lib/cleanup";
+import { changeOwnedValue, disposeModel } from "event-reduce/lib/cleanup";
 import { getObservableValues, getOrSetObservableValue } from "event-reduce/lib/decorators";
 import { ObservableValue } from "event-reduce/lib/observableValue";
 import { useRef } from "react";
 import { useDispose, useOnce } from "./utils";
+
+/** Creates a model that persists across renders of the component and cleans up when the component is unmounted. */
+export function useModel<T extends object>(createModel: () => T) {
+    let modelOwner = useOnce(() => ({})); // Effectively makes the component the owner of the model for cleanup purposes
+    let model = useOnce(() => {
+        let model = createModel();
+        changeOwnedValue(modelOwner, undefined, model);
+        return model;
+    });
+    useDispose(() => disposeModel(modelOwner));
+    return model;
+}
 
 export function useEvent<T>(name?: string) {
     return useOnce(() => event<T>(name));
@@ -40,7 +52,6 @@ export function useAsObservableValues<T extends object>(values: T, name?: string
 
     for (let key of keys) {
         let propValue = values[key as keyof T];
-        ensureValueOwner(propValue, undefined); // Prevent prop value from being owned by observable value below to avoid attempting cleanup
 
         let observableValue = getOrSetObservableValue(valueModel.current, key,
             () => previousObservableValues[key]

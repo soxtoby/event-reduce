@@ -1,11 +1,12 @@
+import { changeOwnedValue } from "./cleanup";
 import { Derivation, derive } from "./derivation";
 import { IEventBase } from "./events";
-import { getUnderlyingObservable, ObservableValue, startTrackingScope, ValueIsNotObservableError } from "./observableValue";
-import { reduce, Reduction } from "./reduction";
+import { ObservableValue, ValueIsNotObservableError, getUnderlyingObservable, startTrackingScope } from "./observableValue";
+import { Reduction, reduce } from "./reduction";
 import { getOrAdd, isObject } from "./utils";
 
 export let reduced: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
-    return observableValueProperty(target, key, Reduction, true, () => new InvalidReducedPropertyError(key));
+    return observableValueProperty(target, key, Reduction, () => new InvalidReducedPropertyError(key));
 }
 
 export let derived: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
@@ -16,18 +17,18 @@ export let derived: PropertyDecorator = (target: Object, key: string | symbol): 
         setObservableProperty(target, key, getObservableValue);
         return {
             get() { return getObservableValue(this).value; },
+            enumerable: true,
             configurable: true
         }
     }
 
-    return observableValueProperty(target, key, Derivation, false, () => new InvalidDerivedPropertyError(key));
+    return observableValueProperty(target, key, Derivation, () => new InvalidDerivedPropertyError(key));
 }
 
 function observableValueProperty<Type extends ObservableValue<any>>(
     prototype: any,
     key: string | symbol,
     type: new (...args: any) => Type,
-    enumerable: boolean,
     createInvalidPropertyError: () => Error
 ): PropertyDescriptor {
 
@@ -50,7 +51,7 @@ function observableValueProperty<Type extends ObservableValue<any>>(
         Object.defineProperty(this, key, {
             get: () => observableValue!.value,
             set,
-            enumerable,
+            enumerable: true,
             configurable: true
         });
     }
@@ -78,10 +79,10 @@ function getOrAddObservableValues(instance: any) {
     return getOrAdd(instance, observableValues, () => ({} as Record<string, ObservableValue<any>>));
 }
 
-export function getObservableValues(instance: any) {
-    return isObject(instance)
-        ? instance[observableValues] as Record<string, ObservableValue<any>> | undefined
-        : undefined;
+export function getObservableValues(instance: any): { [property: string]: ObservableValue<unknown> } {
+    return isObject(instance) && observableValues in instance
+        ? instance[observableValues]
+        : {};
 }
 
 export function getObservableProperty(prototype: any, key: string) {
@@ -122,6 +123,7 @@ export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
 /** 
  * Marks a class as a model.
  * Observable values accessed during construction will not be tracked.
+ * The model instance will take ownership of all observable and state properties.
  **/
 export function model<T extends { new(...args: any[]): any }>(target: T): T {
     getOrAddObservableProperties(target.prototype);
@@ -135,6 +137,12 @@ export function model<T extends { new(...args: any[]): any }>(target: T): T {
                 } finally {
                     endScope();
                 }
+
+                for (let value of Object.values(getObservableValues(this)))
+                    changeOwnedValue(this, undefined, value)
+
+                for (let key of getStateProperties(this))
+                    changeOwnedValue(this, undefined, this[key]);
             }
         }
     }[className];
