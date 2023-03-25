@@ -13,7 +13,7 @@
         {
             "label": "Run tests",
             "type": "shell",
-            "command": "./node_modules/.bin/wattle.cmd",
+            "command": "yarn wattle",
             "options": {
                 "cwd": "${workspaceFolder}" // Change this if your tests aren't using the top-level node_modules
             },
