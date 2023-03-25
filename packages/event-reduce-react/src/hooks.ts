@@ -2,7 +2,6 @@ import { asyncEvent, derive, event, IObservableValue, IReduction, reduce } from 
 import { changeOwnedValue, disposeModel } from "event-reduce/lib/cleanup";
 import { getObservableValues, getOrSetObservableValue } from "event-reduce/lib/decorators";
 import { ObservableValue } from "event-reduce/lib/observableValue";
-import { useRef } from "react";
 import { useDispose, useOnce } from "./utils";
 
 /** Creates a model that persists across renders of the component and cleans up when the component is unmounted. */
@@ -42,28 +41,21 @@ export function useReduced<T>(initial: T, name?: string): IReduction<T> {
 }
 
 export function useAsObservableValues<T extends object>(values: T, name?: string) {
-    let valueModel = useRef({} as T);
-    let previousObservableValues = getObservableValues(valueModel.current) ?? {};
-    valueModel.current = {} as T;
-
+    let observableValues = useOnce(() => ({} as Record<string, ObservableValue<unknown>>));
     let nameBase = (name || '') + '.';
 
-    let keys = Array.from(new Set(Object.keys(valueModel.current).concat(Object.keys(values))));
+    // Update any values that are already being observed
+    for (let [key, observableValue] of Object.entries(getObservableValues(observableValues) ?? {}))
+        observableValue.setValue(values[key as keyof T]);
 
-    for (let key of keys) {
-        let propValue = values[key as keyof T];
-
-        let observableValue = getOrSetObservableValue(valueModel.current, key,
-            () => previousObservableValues[key]
-                ?? new ObservableValue<any>(() => nameBase + key, propValue));
-
-        observableValue.setValue(propValue);
-
-        Object.defineProperty(valueModel.current, key, {
-            get() { return observableValue.value; },
-            enumerable: true
-        });
-    }
-
-    return valueModel.current;
+    // Create observable values as properties are accessed
+    return new Proxy({ ...values } as T, { // Copy of values to avoid proxy restrictions on frozen objects
+        get(initialValues, key) {
+            return getOrSetObservableValue(
+                observableValues,
+                key,
+                () => new ObservableValue(() => nameBase + String(key), initialValues[key as keyof T])
+            ).value;
+        }
+    });
 }
