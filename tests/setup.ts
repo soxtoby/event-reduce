@@ -27,7 +27,7 @@ export function runReactions() {
 }
 
 class Middleware extends TestMiddleware {
-    run(test: ITest, context: ITestContext, next: () => void) {
+    override run(test: ITest, context: ITestContext, next: () => void) {
         if (!test.parent) {
             SynchronousPromise.installGlobally(() => { });
         }

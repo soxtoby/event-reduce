@@ -18,9 +18,9 @@ export class Derivation<T> extends ObservableValue<T> {
         super(getDisplayName, undefined!);
     }
 
-    get sources() { return Array.from(this._sources.keys()); }
+    override get sources() { return Array.from(this._sources.keys()); }
 
-    get value() {
+    override get value() {
         if (this._requiresUpdate)
             withInnerTrackingScope(() => this.update());
         return super.value;
@@ -40,7 +40,7 @@ export class Derivation<T> extends ObservableValue<T> {
         }), () => this.setValue(value));
     }
 
-    setValue(value: T) {
+    override setValue(value: T) {
         this._requiresUpdate = false;
         super.setValue(value);
     }
@@ -53,14 +53,14 @@ export class Derivation<T> extends ObservableValue<T> {
             this.update();
     }
 
-    subscribe(observe: Observe<T>, getObserverName?: () => string) {
+    override subscribe(observe: Observe<T>, getObserverName?: () => string) {
         if (this._requiresUpdate)
             withInnerTrackingScope(() => this.update());
 
         return super.subscribe(observe, getObserverName);
     }
 
-    unsubscribeFromSources() {
+    override unsubscribeFromSources() {
         this._sources.forEach(unsub => unsub());
         this._sources.clear();
     }

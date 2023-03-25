@@ -42,7 +42,7 @@ export class Reduction<T> extends ObservableValue<T> {
         });
     }
 
-    get sources() { return Array.from(this._sources.keys()); }
+    override get sources() { return Array.from(this._sources.keys()); }
 
     restore(state: State<T>): void {
         this._restore.next(state);
@@ -82,7 +82,7 @@ export class Reduction<T> extends ObservableValue<T> {
         return this.on(this._restore, reduce);
     }
 
-    unsubscribeFromSources() {
+    override unsubscribeFromSources() {
         this._sources.forEach(unsub => unsub());
         this._sources.clear();
     }
@@ -95,7 +95,7 @@ class BoundReduction<TValue, TEvents> extends Reduction<TValue> {
         private _events: TEvents = {} as TEvents
     ) { super(getDisplayName, initial); }
 
-    on<TEvent>(observable: ((events: TEvents) => IObservable<TEvent>) | IObservable<TEvent>, reduce: Reducer<TValue, TEvent>): this {
+    override on<TEvent>(observable: ((events: TEvents) => IObservable<TEvent>) | IObservable<TEvent>, reduce: Reducer<TValue, TEvent>): this {
         return super.on(isObservable(observable) ? observable : observable(this._events), reduce);
     }
 }

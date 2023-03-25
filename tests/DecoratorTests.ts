@@ -35,7 +35,7 @@ describe("model decorators", function () {
 
     @model
     class ExtendedModel extends TestModel {
-        property: number = extend(this.property)
+        override property: number = extend(this.property)
             .on(decrement, c => c - 1)
             .value;
     }

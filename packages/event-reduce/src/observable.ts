@@ -70,22 +70,22 @@ export class ObservableOperation<T> extends Observable<T> {
         super(getDisplayName);
     }
 
-    get sources() { return this._sources; }
+    override get sources() { return this._sources; }
 
-    subscribe(observer: Observe<T>, getObserverName = () => '(anonymous observer)'): Unsubscribe {
+    override subscribe(observer: Observe<T>, getObserverName = () => '(anonymous observer)'): Unsubscribe {
         let unsubscribe = super.subscribe(observer, getObserverName);
         if (this._observers.size == 1)
             this._unsubscribeFromSources = this._subscribeToSources({ getDisplayName: () => this.displayName, next: this.notifyObservers.bind(this) });
         return unsubscribe;
     }
 
-    protected unsubscribe(observer: IObserver<T>) {
+    protected override unsubscribe(observer: IObserver<T>) {
         super.unsubscribe(observer);
         if (!this._observers.size)
             this.unsubscribeFromSources();
     }
 
-    unsubscribeFromSources() {
+    override unsubscribeFromSources() {
         if (this._unsubscribeFromSources)
             this._unsubscribeFromSources();
     }

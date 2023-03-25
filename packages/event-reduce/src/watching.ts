@@ -22,7 +22,7 @@ class Watcher extends Observable<IObservableValue<unknown>> {
         this.run();
     }
 
-    get sources() { return Array.from(this._sources.keys()); }
+    override get sources() { return Array.from(this._sources.keys()); }
 
     run() {
         this.unsubscribeFromSources();
@@ -38,7 +38,7 @@ class Watcher extends Observable<IObservableValue<unknown>> {
             }), () => this.notifyObservers(value));
     }
 
-    unsubscribeFromSources() {
+    override unsubscribeFromSources() {
         this._sources.forEach(unsub => unsub());
         this._sources.clear();
     }
