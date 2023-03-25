@@ -81,6 +81,6 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
     function unsubscribeFromThisRender() {
         cancelReaction?.();
         stopWatching();
-        watcher.unsubscribeFromSources();
+        watcher.dispose();
     }
 }

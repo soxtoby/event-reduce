@@ -1,4 +1,4 @@
-import { ensureValueOwner, unsubscribeOldModelsFromSources, valueOwner } from "./cleanup";
+import { ensureValueOwner, unsubscribeFromSources, unsubscribeOldModelsFromSources, valueOwner } from "./cleanup";
 import { allSources, IObservable, Observable, pathToSource } from "./observable";
 import { Subject } from "./subject";
 import { Action, Unsubscribe } from "./types";
@@ -49,6 +49,13 @@ export class ObservableValue<T> extends Observable<T> {
             ensureValueOwner(value, this);
             this.notifyObservers(value);
         }
+    }
+
+    override dispose() {
+        super.dispose();
+        if (valueOwner(this._value) == this)
+            unsubscribeFromSources(this._value);
+        // Keep the value, in case this is still being held onto (e.g. with useDerredValue)
     }
 }
 

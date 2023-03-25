@@ -38,7 +38,7 @@ export function unsubscribeFromSources(model: any) {
     if (isModel(model)) {
         Object.values(getObservableValues(model) || {})
             .forEach(observableValue => {
-                observableValue.unsubscribeFromSources();
+                observableValue.dispose();
                 let value = withInnerTrackingScope(() => observableValue.value);
                 if (valueOwner(value) == observableValue)
                     unsubscribeFromSources(value);

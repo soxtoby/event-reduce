@@ -13,7 +13,7 @@ export function mutable<T>(model: T): Mutable<T> {
                     get() { return getObservableValue(model).value; },
                     set(value) {
                         let observableValue = getObservableValue(model);
-                        observableValue.unsubscribeFromSources();
+                        (observableValue as any).unsubscribeFromSources();
                         observableValue.setValue(value);
                     },
                     enumerable: base.enumerable,

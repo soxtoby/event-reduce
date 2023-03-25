@@ -16,7 +16,7 @@ export function useAsyncEvent<Result = void, Context = void>(name?: string) {
 export function useDerived<T>(getValue: () => T, name?: string): IObservableValue<T> {
     let derived = useOnce(() => derive(getValue, name));
 
-    useDispose(() => derived.unsubscribeFromSources());
+    useDispose(() => derived.dispose());
 
     return derived;
 }
@@ -24,7 +24,7 @@ export function useDerived<T>(getValue: () => T, name?: string): IObservableValu
 export function useReduced<T>(initial: T, name?: string): IReduction<T> {
     let reduction = useOnce(() => reduce(initial, name));
 
-    useDispose(() => reduction.unsubscribeFromSources());
+    useDispose(() => reduction.dispose());
 
     return reduction;
 }

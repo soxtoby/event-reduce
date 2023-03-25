@@ -70,7 +70,7 @@ describe(useDerived.name, function () {
     });
 
     when("disposed", () => {
-        let unsubscribe = spy(initialResult, 'unsubscribeFromSources');
+        let unsubscribe = spy(initialResult, 'dispose');
         sut.unmount();
 
         it("unsubscribes derivation from its sources", () => unsubscribe.should.have.been.called);
@@ -99,7 +99,7 @@ describe(useReduced.name, function () {
     });
 
     when("disposed", () => {
-        let unsubscribe = spy(initialResult, 'unsubscribeFromSources');
+        let unsubscribe = spy(initialResult, 'dispose');
         sut.unmount();
 
         it("unsubscribes reduction from its sources", () => unsubscribe.should.have.been.called);

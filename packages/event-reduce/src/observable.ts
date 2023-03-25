@@ -5,7 +5,7 @@ export type Observe<T> = (value: T) => void;
 
 export interface IObservable<T> {
     subscribe(observe: Observe<T>, getObserverName?: () => string): Unsubscribe;
-    unsubscribeFromSources(): void;
+    dispose(): void;
     filter(condition: (value: T) => boolean, getDisplayName?: () => string): IObservable<T>;
     map<U>(select: (value: T) => U, getDisplayName?: () => string): IObservable<U>;
 
@@ -40,6 +40,11 @@ export class Observable<T> extends NamedBase {
 
     protected unsubscribe(observer: IObserver<T>) {
         this._observers.delete(observer);
+    }
+
+    dispose() {
+        this.unsubscribeFromSources();
+        this._observers.clear();
     }
 
     protected notifyObservers(value: T) {

@@ -46,8 +46,8 @@ describe(watch.name, function () {
         });
     });
 
-    when("unsubscribed from sources", () => {
-        result.unsubscribeFromSources();
+    when("disposed", () => {
+        result.dispose();
 
         when("source value changed", () => {
             sourceA.setValue('A');
