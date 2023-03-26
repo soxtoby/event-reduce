@@ -1,4 +1,5 @@
-import { derive } from "event-reduce";
+import { derive, event } from "event-reduce";
+import { SideEffectInDerivationError } from "event-reduce/lib/derivation";
 import { consumeLastAccessed, ObservableValue } from "event-reduce/lib/observableValue";
 import { spy, stub } from "sinon";
 import { describe, it, then, when } from "wattle";
@@ -61,6 +62,17 @@ describe(derive.name, () => {
 
                 it("notifies observer of new value", () => observe.should.have.been.calledWith('Ab'));
             });
+        });
+    });
+
+    when("derivation fires an event", () => {
+        let sideEffect = event('some event');
+        let sut = derive(() => sideEffect());
+
+        it("throws", () => {
+            let err = (() => sut.value).should.throw(SideEffectInDerivationError);
+            err.has.property('derivation', sut);
+            err.has.property('sideEffect', 'some event');
         });
     });
 });

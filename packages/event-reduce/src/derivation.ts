@@ -4,6 +4,8 @@ import { IObservableValue, ObservableValue, collectAccessedValues, withInnerTrac
 import { Subject } from "./subject";
 import { Unsubscribe } from "./types";
 
+let currentlyRunningDerivation = null as IDerivation<unknown> | null;
+
 export function derive<T>(getDerivedValue: () => T, name?: string) {
     return new Derivation(() => name || '(anonymous derivation)', getDerivedValue);
 }
@@ -41,8 +43,17 @@ export class Derivation<T> extends ObservableValue<T> implements IDerivation<T> 
             let value!: T;
 
             this.unsubscribeFromSources();
-            collectAccessedValues(() => value = this._deriveValue())
-                .forEach(o => this._sources.set(o, o.subscribe(() => this.invalidate(), () => this.displayName)));
+            let newSources = collectAccessedValues(() => {
+                let previouslyRunningDerivation = currentlyRunningDerivation;
+                currentlyRunningDerivation = this;
+                try {
+                    value = this._deriveValue();
+                } finally {
+                    currentlyRunningDerivation = previouslyRunningDerivation;
+                }
+            });
+            for (let source of newSources)
+                this._sources.set(source, source.subscribe(() => this.invalidate(), () => this.displayName));
 
             log('🔗 (derivation)', this.displayName, [], () => ({
                 Previous: this._value,
@@ -78,4 +89,16 @@ export class Derivation<T> extends ObservableValue<T> implements IDerivation<T> 
         this._sources.forEach(unsub => unsub());
         this._sources.clear();
     }
+}
+
+export function ensureNotInsideDerivation(sideEffect: string) {
+    if (currentlyRunningDerivation)
+        throw new SideEffectInDerivationError(currentlyRunningDerivation, sideEffect);
+}
+
+export class SideEffectInDerivationError extends Error {
+    constructor(
+        public derivation: IDerivation<unknown>,
+        public sideEffect: string
+    ) { super(`Derivation ${derivation.displayName} triggered side effect ${sideEffect}. Derivations cannot have side effects.`); }
 }

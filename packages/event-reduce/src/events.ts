@@ -1,8 +1,9 @@
+import { ensureNotInsideDerivation } from "./derivation";
 import { log, logEvent } from "./logging";
 import { IObservable, ObservableOperation } from "./observable";
 import { ISubject, Subject } from "./subject";
 import { ObjectOmit } from "./types";
-import { filteredName, matchesScope, NamedBase, scopedName } from "./utils";
+import { NamedBase, filteredName, matchesScope, scopedName } from "./utils";
 
 export interface IEventBase {
     displayName: string;
@@ -176,6 +177,8 @@ export function fireEvent(type: string, displayName: string, arg: any, getInfo: 
         try {
             if (currentlyFiringEvent)
                 throw new ChainedEventsError(currentlyFiringEvent, displayName);
+
+            ensureNotInsideDerivation(displayName || anonymousEvent);
 
             currentlyFiringEvent = displayName || anonymousEvent;
             runEvent();
