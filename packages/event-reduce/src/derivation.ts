@@ -1,15 +1,21 @@
 import { log, sourceTree } from "./logging";
-import { IObservable, Observe } from "./observable";
-import { collectAccessedValues, ObservableValue, withInnerTrackingScope } from "./observableValue";
+import { IObservable } from "./observable";
+import { IObservableValue, ObservableValue, collectAccessedValues, withInnerTrackingScope } from "./observableValue";
+import { Subject } from "./subject";
 import { Unsubscribe } from "./types";
 
 export function derive<T>(getDerivedValue: () => T, name?: string) {
     return new Derivation(() => name || '(anonymous derivation)', getDerivedValue);
 }
 
-export class Derivation<T> extends ObservableValue<T> {
+export interface IDerivation<T> extends IObservableValue<T> {
+    invalidation: IObservable<void>;
+}
+
+export class Derivation<T> extends ObservableValue<T> implements IDerivation<T> {
     private _requiresUpdate = true;
     private _sources = new Map<IObservable<any>, Unsubscribe>();
+    private _invalidation = new Subject<void>();
 
     constructor(
         getDisplayName: () => string,
@@ -26,7 +32,10 @@ export class Derivation<T> extends ObservableValue<T> {
         return super.value;
     }
 
+    get invalidation() { return this._invalidation; }
+
     private update() {
+        this._requiresUpdate = false;
         let value!: T;
 
         collectAccessedValues(() => value = this._deriveValue())
@@ -40,24 +49,25 @@ export class Derivation<T> extends ObservableValue<T> {
         }), () => this.setValue(value));
     }
 
-    override setValue(value: T) {
-        this._requiresUpdate = false;
-        super.setValue(value);
-    }
-
     private invalidate() {
+        let oldSources = this.sources;
         this.unsubscribeFromSources();
         this._requiresUpdate = true;
 
-        if (this._observers.size)
+        if (this._invalidation.isObserved)
+            log('🔗🚩 (derivation invalidated)', this.displayName, [], () => ({
+                Previous: this._value,
+                Container: this.container,
+                Sources: sourceTree(oldSources)
+            }), () => this._invalidation.next());
+
+        if (this.isObserved)
             this.update();
     }
 
-    override subscribe(observe: Observe<T>, getObserverName?: () => string) {
-        if (this._requiresUpdate)
-            withInnerTrackingScope(() => this.update());
-
-        return super.subscribe(observe, getObserverName);
+    override dispose() {
+        this._invalidation.dispose();
+        super.dispose();
     }
 
     override unsubscribeFromSources() {

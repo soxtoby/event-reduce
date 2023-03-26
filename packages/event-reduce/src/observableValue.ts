@@ -17,11 +17,11 @@ let triggeringObservable: IObservable<any> | undefined;
 
 startTrackingScope();
 
-export interface IObservableValue<T> extends IObservable<T> {
+export interface IObservableValue<T> extends IObservable<T> { 
     readonly value: T;
 }
 
-export class ObservableValue<T> extends Observable<T> {
+export class ObservableValue<T> extends Observable<T> implements IObservableValue<T> {
     constructor(
         getDisplayName: () => string,
         protected _value: T

@@ -32,6 +32,8 @@ export class Observable<T> extends NamedBase {
 
     get sources() { return [] as readonly IObservable<any>[]; }
 
+    get isObserved() { return this._observers.size > 0; }
+
     subscribe(observe: Observe<T>, getObserverName = () => '(anonymous observer)'): Unsubscribe {
         let observer = { getDisplayName: getObserverName, next: observe };
         this._observers.add(observer);
@@ -91,8 +93,7 @@ export class ObservableOperation<T> extends Observable<T> {
     }
 
     override unsubscribeFromSources() {
-        if (this._unsubscribeFromSources)
-            this._unsubscribeFromSources();
+        this._unsubscribeFromSources?.();
     }
 }
 

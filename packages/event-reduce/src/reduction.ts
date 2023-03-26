@@ -1,7 +1,7 @@
 import { log, sourceTree } from "./logging";
-import { allSources, IObservable, isObservable } from "./observable";
-import { getUnderlyingObservable, IObservableValue, ObservableValue, protectAgainstAccessingValueWithCommonSource, ValueIsNotObservableError } from "./observableValue";
-import { setState, State } from "./state";
+import { IObservable, allSources, isObservable } from "./observable";
+import { IObservableValue, ObservableValue, ValueIsNotObservableError, getUnderlyingObservable, protectAgainstAccessingValueWithCommonSource } from "./observableValue";
+import { State, setState } from "./state";
 import { Subject } from "./subject";
 import { Unsubscribe } from "./types";
 import { isObject } from "./utils";
@@ -26,7 +26,7 @@ export interface IBoundReduction<T, TEvents> extends IReduction<T> {
     on<TEvent>(observable: ((events: TEvents) => IObservable<TEvent>) | IObservable<TEvent>, reduce: Reducer<T, TEvent>): this;
 }
 
-export class Reduction<T> extends ObservableValue<T> {
+export class Reduction<T> extends ObservableValue<T> implements IReduction<T> {
     private _sources = new Map<IObservable<any>, Unsubscribe>();
     private _restore = new Subject<State<T>>(() => `${this.displayName}.restored`);
 
@@ -88,7 +88,7 @@ export class Reduction<T> extends ObservableValue<T> {
     }
 }
 
-class BoundReduction<TValue, TEvents> extends Reduction<TValue> {
+class BoundReduction<TValue, TEvents> extends Reduction<TValue> implements IBoundReduction<TValue, TEvents> {
     constructor(
         getDisplayName: () => string,
         initial: TValue,
