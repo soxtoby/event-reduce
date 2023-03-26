@@ -1,7 +1,7 @@
 import { log, sourceTree } from "./logging";
 import { allSources, IObservable, isObservable } from "./observable";
 import { getUnderlyingObservable, IObservableValue, ObservableValue, protectAgainstAccessingValueWithCommonSource, ValueIsNotObservableError } from "./observableValue";
-import { setState, State, StateObject } from "./state";
+import { setState, State } from "./state";
 import { Subject } from "./subject";
 import { Unsubscribe } from "./types";
 import { isObject } from "./utils";
@@ -35,7 +35,7 @@ export class Reduction<T> extends ObservableValue<T> {
 
         this.onRestore((current, state) => {
             if (isObject(current)) {
-                setState(current, state as StateObject<T>);
+                setState(current, state);
                 return current;
             }
             return state as T;

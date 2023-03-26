@@ -6,7 +6,7 @@ export { enableLogging } from "./logging";
 export { allSources, IObservable, IObserver, merge, Observable, Observe } from "./observable";
 export { IObservableValue } from "./observableValue";
 export { IBoundReduction, IReduction, reduce } from "./reduction";
-export { getState, setState, State, state, StateArray, StateObject } from "./state";
+export { State, getState, setState, state } from "./state";
 export { ISubject, Subject } from "./subject";
 export { Unsubscribe } from "./types";
 export { filteredName, matchesScope, NamedBase, nameOfFunction, scopedName } from "./utils";

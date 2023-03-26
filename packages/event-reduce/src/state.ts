@@ -1,16 +1,15 @@
 import { getObservableProperties } from "./decorators";
 import { Reduction } from "./reduction";
-import { StringKey } from "./types";
+import { OmitValues, StringKey } from "./types";
 import { getOrAdd, isModel, isObject, isPlainObject, jsonPath } from "./utils";
 
 export type State<T> =
     T extends Function ? never
-    : T extends Array<infer U> ? StateArray<U>
-    : T extends object ? StateObject<T>
+    : T extends Array<infer U> ? State<U>[]
+    : T extends object ? { [K in StringKey<OmitValues<T, Function>>]: State<T[K]> }
     : T;
 
-export interface StateArray<T> extends Array<State<T>> { }
-export type StateObject<T> = { [P in keyof T]: State<T[P]> };
+export type StateKey<T> = Extract<keyof T, keyof State<T>>;
 
 const statePropsKey = Symbol('stateProps');
 
@@ -73,13 +72,13 @@ function getArrayState<T>(options: IStateOptions, parentPath: Map<unknown, Prope
 }
 
 function getObjectState<T>(options: IStateOptions, parentPath: Map<unknown, PropertyKey>, model: T) {
-    let state = {} as StateObject<T>;
+    let state = {} as State<T>;
     for (let key of getAllStatefulProperties(model, options.includeDerivedProperties)) {
-        let value = model[key as keyof T];
+        let value = model[key];
         if (typeof value != 'function')
-            state[key as keyof T] = getStateRecursive(options, parentPath, key, value);
+            state[key] = getStateRecursive(options, parentPath, key, value) as State<T>[StateKey<T>];
     }
-    return state as State<T>;
+    return state;
 }
 
 function getCircularReference<T>(handling: CircularReferenceHandling, parentPath: Map<unknown, PropertyKey>, key: PropertyKey, model: T) {
@@ -106,31 +105,31 @@ function getCircularReference<T>(handling: CircularReferenceHandling, parentPath
 // Just for naming in the console
 class Details { constructor(public circularPath: (readonly [PropertyKey, unknown])[]) { } }
 
-export function setState<T>(model: T, state: StateObject<T>) {
+export function setState<T>(model: T, state: State<T>) {
     let observableProps = getReducedProperties(model);
     let stateProps = getAllStatefulProperties(model)
-        .filter(key => key in state);
+        .filter(key => key in (state as object));
 
     stateProps.forEach(key => {
         if (key in observableProps)
             observableProps[key].restore(state[key]);
         else if (isObject(model[key]))
-            setState(model[key], state[key] as StateObject<T[StringKey<T>]>);
+            setState(model[key], state[key] as State<T[StateKey<T>]>);
         else
-            model[key] = state[key] as T[StringKey<T>];
+            model[key] = state[key] as T[StateKey<T>];
     });
 
     return model;
 }
 
-function getAllStatefulProperties<T>(model: T, includeDerived = false) {
+function getAllStatefulProperties<T>(model: T, includeDerived = false): StateKey<T>[] {
     if (!isModel(model))
-        return Object.keys(model as object) as StringKey<T>[];
+        return Object.keys(model as object) as StateKey<T>[];
     let observableProps = includeDerived
         ? Object.keys(getObservableProperties(model) || {})
         : Object.keys(getReducedProperties(model));
     let explicitProps = getStateProperties(model);
-    return observableProps.concat(explicitProps) as StringKey<T>[];
+    return observableProps.concat(explicitProps) as StateKey<T>[];
 }
 
 export function getStateProperties<T>(model: T): string[] {
@@ -143,12 +142,12 @@ export function getStateProperties<T>(model: T): string[] {
 }
 
 function getReducedProperties<T>(model: T) {
-    let reducedProps = {} as Record<string, Reduction<any>>;
+    let reducedProps = {} as Record<StateKey<T>, Reduction<unknown>>;
     let observableProps = getObservableProperties(Object.getPrototypeOf(model)) || {};
     for (let key in observableProps) {
         let observableValue = observableProps[key](model);
         if (observableValue instanceof Reduction)
-            reducedProps[key] = observableValue;
+            reducedProps[key as StateKey<T>] = observableValue;
     }
     return reducedProps;
 }
