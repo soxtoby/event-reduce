@@ -12,11 +12,11 @@ export interface IEventBase {
 
 /** Event implementation */
 export interface IEventClass extends IEventBase {
-    next(...args: any): void;
+    next(...args: any): any;
 }
 
 export interface IEvent<TIn = void, TOut = TIn> extends IObservable<TOut>, IEventBase {
-    (eventValue: TIn): void;
+    (eventValue: TIn): TIn;
     scope<ObjectIn extends Scope, ObjectOut extends Scope, Scope extends object>(this: IEvent<ObjectIn, ObjectOut>, scope: Scope): IEvent<ObjectOmit<ObjectIn, Scope>, ObjectOut>;
 }
 
@@ -31,7 +31,7 @@ export interface IFilterableAsyncObservables<Result = void, Context = void> exte
 }
 
 export interface IAsyncEvent<Result = void, ContextIn = void, ContextOut = ContextIn> extends IFilterableAsyncObservables<Result, ContextOut> {
-    (promise: PromiseLike<Result>, context: ContextIn): void;
+    <Promise extends PromiseLike<Result>>(promise: Promise, context: ContextIn): Promise;
     scope<ObjectContext extends Scope, Scope extends object>(this: IAsyncEvent<Result, ObjectContext>, scope: Scope): IAsyncEvent<Result, ObjectOmit<ObjectContext, Scope>, ObjectContext>;
 }
 
@@ -62,7 +62,7 @@ class EventBase<TOut> extends ObservableOperation<TOut> {
     }
 }
 
-class EventSubject<T> extends EventBase<T> {
+class EventSubject<T> extends EventBase<T> implements IEventClass {
     private _subject: ISubject<T>;
 
     constructor(getDisplayName: () => string) {
@@ -74,10 +74,11 @@ class EventSubject<T> extends EventBase<T> {
     next(value: T) {
         fireEvent('⚡ (event)', this.displayName, value, () => ({ Container: this.container }),
             () => this._subject.next(value));
+        return value;
     }
 }
 
-class ScopedEventSubject<ObjectIn extends Scope, ObjectOut extends Scope, Scope extends object> extends EventBase<ObjectOut> {
+class ScopedEventSubject<ObjectIn extends Scope, ObjectOut extends Scope, Scope extends object> extends EventBase<ObjectOut> implements IEventClass {
     constructor(private _source: IEvent<ObjectIn, ObjectOut>, private _scope: Scope) {
         super(() => scopedName(_source.displayName, _scope), [_source],
             observer => _source.subscribe(value => matchesScope(_scope, value) && observer.next(value), observer.getDisplayName));
@@ -87,6 +88,7 @@ class ScopedEventSubject<ObjectIn extends Scope, ObjectOut extends Scope, Scope 
         // Using plain log so only the unscoped event is logged as an event
         log('{⚡} (scoped event)', this.displayName, [partial], () => ({ Scope: this._scope, Container: this.container }),
             () => this._source({ ...partial, ...this._scope } as ObjectIn));
+        return partial;
     }
 }
 
@@ -123,12 +125,12 @@ abstract class AsyncEventBase<Result, Context> extends FilterableAsyncObservable
     }
 }
 
-class AsyncEvent<Result, Context> extends AsyncEventBase<Result, Context> {
+class AsyncEvent<Result, Context> extends AsyncEventBase<Result, Context> implements IEventClass {
     readonly started = new Subject<AsyncStart<Result, Context>>(() => `${this.displayName}.started`);
     readonly resolved = new Subject<AsyncResult<Result, Context>>(() => `${this.displayName}.resolved`);
     readonly rejected = new Subject<AsyncError<Context>>(() => `${this.displayName}.rejected`);
 
-    next(promise: PromiseLike<Result>, context: Context) {
+    next<Promise extends PromiseLike<Result>>(promise: Promise, context: Context) {
         fireEvent('⚡⌚ (async event)', this.displayName + '.started', { promise, context }, () => ({ Promise: promise, Container: this.container }),
             () => this.started.next({ promise, context }));
 
@@ -137,10 +139,12 @@ class AsyncEvent<Result, Context> extends AsyncEventBase<Result, Context> {
                 () => this.resolved.next({ result, context })),
             error => fireEvent('⚡❌ (async error)', this.displayName + '.rejected', { error, context }, () => ({ Promise: promise, Container: this.container }),
                 () => this.rejected.next({ error, context })));
+
+        return promise;
     }
 }
 
-class ScopedAsyncEvent<Result, ContextIn extends Scope, ContextOut extends Scope, Scope extends object> extends AsyncEventBase<Result, ContextOut> {
+class ScopedAsyncEvent<Result, ContextIn extends Scope, ContextOut extends Scope, Scope extends object> extends AsyncEventBase<Result, ContextOut> implements IEventClass {
     constructor(private _source: IAsyncEvent<Result, ContextIn, ContextOut>, private _scope: Scope) {
         super(() => scopedName(_source.displayName, _scope));
     }
@@ -149,10 +153,11 @@ class ScopedAsyncEvent<Result, ContextIn extends Scope, ContextOut extends Scope
     readonly resolved = this._source.resolved.filter(r => matchesScope(this._scope, r.context), () => `${this.displayName}.resolved`);
     readonly rejected = this._source.rejected.filter(e => matchesScope(this._scope, e.context), () => `${this.displayName}.rejected`);
 
-    next(promise: PromiseLike<Result>, partialContext: ObjectOmit<ContextIn, Scope>) {
+    next<Promise extends PromiseLike<Result>>(promise: Promise, partialContext: ObjectOmit<ContextIn, Scope>) {
         // Using plain log so only the unscoped event is logged as an event
         log('{⚡⌚} (scoped async event)', this.displayName, [partialContext], () => ({ Scope: this._scope, Container: this.container }),
             () => this._source(promise, { ...this._scope, ...partialContext } as ContextIn));
+        return promise;
     }
 }
 
@@ -167,7 +172,7 @@ export function makeEventFunction<Event extends IEventClass>(event: Event) {
     return eventFn as Event & Event['next'];
 
     function eventFn(...args: any) {
-        event.next.apply(eventFn, args);
+        return event.next.apply(eventFn, args);
     }
 }
 
