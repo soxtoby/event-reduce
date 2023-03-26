@@ -28,25 +28,29 @@ export class Derivation<T> extends ObservableValue<T> implements IDerivation<T> 
 
     override get value() {
         if (this._requiresUpdate)
-            withInnerTrackingScope(() => this.update());
+            this.update();
         return super.value;
     }
 
     get invalidation() { return this._invalidation; }
 
-    private update() {
-        this._requiresUpdate = false;
-        let value!: T;
+    /** Forces the value to be re-calculated. */
+    update() {
+        withInnerTrackingScope(() => {
+            this._requiresUpdate = false;
+            let value!: T;
 
-        collectAccessedValues(() => value = this._deriveValue())
-            .forEach(o => this._sources.set(o, o.subscribe(() => this.invalidate(), () => this.displayName)));
+            this.unsubscribeFromSources();
+            collectAccessedValues(() => value = this._deriveValue())
+                .forEach(o => this._sources.set(o, o.subscribe(() => this.invalidate(), () => this.displayName)));
 
-        log('🔗 (derivation)', this.displayName, [], () => ({
-            Previous: this._value,
-            Current: value,
-            Container: this.container,
-            Sources: sourceTree(this.sources)
-        }), () => this.setValue(value));
+            log('🔗 (derivation)', this.displayName, [], () => ({
+                Previous: this._value,
+                Current: value,
+                Container: this.container,
+                Sources: sourceTree(this.sources)
+            }), () => this.setValue(value));
+        });
     }
 
     private invalidate() {

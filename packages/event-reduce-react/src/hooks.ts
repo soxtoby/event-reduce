@@ -1,4 +1,4 @@
-import { asyncEvent, derive, event, IObservableValue, IReduction, reduce } from "event-reduce";
+import { IDerivation, IReduction, asyncEvent, derive, event, reduce } from "event-reduce";
 import { changeOwnedValue, disposeModel } from "event-reduce/lib/cleanup";
 import { getObservableValues, getOrSetObservableValue } from "event-reduce/lib/models";
 import { ObservableValue } from "event-reduce/lib/observableValue";
@@ -24,7 +24,7 @@ export function useAsyncEvent<Result = void, Context = void>(name?: string) {
     return useOnce(() => asyncEvent<Result, Context>(name))
 }
 
-export function useDerived<T>(getValue: () => T, name?: string): IObservableValue<T> {
+export function useDerived<T>(getValue: () => T, name?: string): IDerivation<T> {
     let derived = useOnce(() => derive(getValue, name));
 
     useDispose(() => derived.dispose());

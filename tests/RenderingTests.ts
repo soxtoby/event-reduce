@@ -3,7 +3,6 @@ import { useReactive } from "event-reduce-react";
 import { ObservableValue } from "event-reduce/lib/observableValue";
 import { spy } from "sinon";
 import { describe, it, test, then, when } from "wattle";
-import { runReactions } from "./setup";
 
 describe(useReactive.name, function () {
     let observableValue = new ObservableValue(() => 'test value', 'initial value');
@@ -22,12 +21,11 @@ describe(useReactive.name, function () {
     when("re-rendered", () => {
         sut.rerender();
 
-        then("render function called again", () => render.should.have.been.calledTwice);
+        then("render function called again", () => render.should.have.been.calledTwice); // In case render function uses hooks
     });
 
     when("accessed observable value changed", () => {
         observableValue.setValue('new value');
-        runReactions();
 
         then("render function called again", () => render.should.have.been.calledTwice);
 
@@ -38,7 +36,6 @@ describe(useReactive.name, function () {
         innerBehaviour = () => observableValue.setValue('new value');
         render.resetHistory();
         sut.rerender();
-        runReactions();
 
         it("doesn't trigger an extra render", () => render.should.have.been.calledOnce);
     });

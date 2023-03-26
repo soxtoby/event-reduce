@@ -10,4 +10,3 @@ export { State, getState, setState, state } from "./state";
 export { ISubject, Subject } from "./subject";
 export { Unsubscribe } from "./types";
 export { filteredName, matchesScope, NamedBase, nameOfCallback, nameOfFunction, scopedName } from "./utils";
-export { IWatcher, watch } from "./watching";

@@ -1,10 +1,7 @@
-import { Unsubscribe, watch } from "event-reduce";
-import { log, sourceTree } from "event-reduce/lib/logging";
-import { collectAccessedValues, ObservableValue } from "event-reduce/lib/observableValue";
+import { Derivation } from "event-reduce/lib/derivation";
 import { reactionQueue } from "event-reduce/lib/reactions";
-import { createElement, forwardRef, ForwardRefExoticComponent, ForwardRefRenderFunction, Fragment, FunctionComponent, memo, MemoExoticComponent, PropsWithChildren, PropsWithoutRef, ReactElement, ReactNode, RefAttributes, useRef, useState, ValidationMap, WeakValidationMap } from "react";
-import { useAsObservableValues } from "./hooks";
-import { useDispose } from "./utils";
+import { ForwardRefExoticComponent, ForwardRefRenderFunction, Fragment, FunctionComponent, MemoExoticComponent, PropsWithChildren, PropsWithoutRef, ReactElement, ReactNode, RefAttributes, ValidationMap, WeakValidationMap, createElement, forwardRef, memo, useEffect, useState } from "react";
+import { useAsObservableValues, useDerived } from "./hooks";
 
 interface ContextlessFunctionComponent<P = {}> {
     (props: PropsWithChildren<P>): ReactElement | null;
@@ -25,12 +22,11 @@ export function Reactive(props: { name?: string; children: () => ReactNode; }): 
 
 export function reactive<Component extends (ContextlessFunctionComponent<any> | ForwardRefRenderFunction<any, any>)>(component: Component): ReactiveComponent<Component> {
     let componentName = component.displayName || component.name || 'ReactiveComponent';
+
     let reactiveComponent = ((...args: Parameters<Component>) => { // Important to use rest operator here so react ignores function arity
-        return useReactive(componentName, () => {
-            let [props, ...otherArgs] = args;
-            let observableProps = useAsObservableValues(props, `${componentName}.props`);
-            return component(observableProps, ...otherArgs as [any])
-        });
+        let [props, ...otherArgs] = args;
+        let observableProps = useAsObservableValues(props, `${componentName}.props`);
+        return useReactive(componentName, () => component(observableProps, ...otherArgs as [any]));
     }) as ReactiveComponent<Component>;
     reactiveComponent.displayName = componentName;
 
@@ -38,6 +34,7 @@ export function reactive<Component extends (ContextlessFunctionComponent<any> | 
         reactiveComponent = forwardRef(reactiveComponent) as ReactiveComponent<Component>;
     reactiveComponent = memo<Component>(reactiveComponent as FunctionComponent<any>) as ReactiveComponent<Component>;
     reactiveComponent.displayName = componentName;
+
     return reactiveComponent;
 }
 
@@ -48,39 +45,12 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
         ? [nameOrDeriveValue, maybeDeriveValue!]
         : ['ReactiveValue', nameOrDeriveValue];
 
-    let [reactionCount, setRerenderCount] = useState(0);
+    let [, setRerenderCount] = useState(0);
 
-    // Unsubscribe from previous render before rendering again
-    let unsubscribeFromLatestRender = useRef((() => { }) as Unsubscribe);
-    unsubscribeFromLatestRender.current();
-    unsubscribeFromLatestRender.current = unsubscribeFromThisRender;
-    useDispose(() => unsubscribeFromLatestRender.current());
+    let derivedValue = useDerived(deriveValue, name) as Derivation<T>;
 
-    let value!: T;
+    useEffect(() => derivedValue.invalidation.subscribe(() => reactionQueue.current.add(() => setRerenderCount(r => r + 1))), []);
 
-    let watcher = watch(
-        () => {
-            let newSources: Set<ObservableValue<any>>;
-            log('⚛ (render)', name, [], () => ({
-                'Reaction count': reactionCount,
-                Sources: { get list() { return sourceTree(Array.from(newSources)); } }
-            }), () => newSources = collectAccessedValues(() => value = deriveValue()));
-        },
-        name);
-
-    let cancelReaction = undefined as Unsubscribe | undefined;
-    let stopWatching = watcher.subscribe(changed => {
-        unsubscribeFromThisRender(); // Avoid queueing up extra renders if more sources change
-        cancelReaction = reactionQueue.current.add(() => 
-            setRerenderCount(c => c + 1)
-        );
-    });
-
-    return value;
-
-    function unsubscribeFromThisRender() {
-        cancelReaction?.();
-        stopWatching();
-        watcher.dispose();
-    }
+    derivedValue.update();
+    return derivedValue.value;
 }
