@@ -1,6 +1,6 @@
 import { asyncEvent, derive, event, IObservableValue, IReduction, reduce } from "event-reduce";
 import { changeOwnedValue, disposeModel } from "event-reduce/lib/cleanup";
-import { getObservableValues, getOrSetObservableValue } from "event-reduce/lib/decorators";
+import { getObservableValues, getOrSetObservableValue } from "event-reduce/lib/models";
 import { ObservableValue } from "event-reduce/lib/observableValue";
 import { useDispose, useOnce } from "./utils";
 

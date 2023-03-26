@@ -1,6 +1,6 @@
 import { derive, derived, event, reduce, reduced, state } from "event-reduce";
 import { changeOwnedValue } from "event-reduce/lib/cleanup";
-import { getObservableValues } from "event-reduce/lib/decorators";
+import { getObservableValues } from "event-reduce/lib/models";
 import { ObservableValue } from "event-reduce/lib/observableValue";
 import { StringKey } from "event-reduce/lib/types";
 import { spy } from "sinon";

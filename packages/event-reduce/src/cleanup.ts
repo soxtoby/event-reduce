@@ -1,8 +1,8 @@
 import { log } from "./logging";
-import { getObservableValues } from "./decorators";
+import { getObservableValues, isModel } from "./models";
 import { ObservableValue } from "./observableValue";
 import { getStateProperties } from "./state";
-import { isModel, isPlainObject, nameOfFunction } from "./utils";
+import { isPlainObject, nameOfFunction } from "./utils";
 
 /** value -> owners */
 const ownerRegistry = new WeakMap<TrackableValue, Set<TrackableValue>>();

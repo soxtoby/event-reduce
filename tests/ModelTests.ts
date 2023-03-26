@@ -1,4 +1,4 @@
-import { asyncEvent, derived, event, events, extend, reduce, reduced, derive, model } from "event-reduce";
+import { asyncEvent, derive, derived, event, events, extend, model, reduce, reduced } from "event-reduce";
 import { AccessedValueWithCommonSourceError } from "event-reduce/lib/observableValue";
 import { describe, it, test, then, when } from "wattle";
 

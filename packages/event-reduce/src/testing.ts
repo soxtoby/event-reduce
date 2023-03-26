@@ -1,4 +1,4 @@
-import { getObservableProperty } from "./decorators";
+import { getObservableProperty } from "./models";
 import { event } from "./events";
 import { ObservableValue } from "./observableValue";
 import { isObject } from "./utils";

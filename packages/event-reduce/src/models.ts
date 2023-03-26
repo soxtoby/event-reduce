@@ -3,6 +3,7 @@ import { Derivation, derive } from "./derivation";
 import { IEventBase } from "./events";
 import { ObservableValue, ValueIsNotObservableError, getUnderlyingObservable, startTrackingScope } from "./observableValue";
 import { Reduction, reduce } from "./reduction";
+import { getStateProperties } from "./state";
 import { getOrAdd, isObject } from "./utils";
 
 export let reduced: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
@@ -23,6 +24,12 @@ export let derived: PropertyDecorator = (target: Object, key: string | symbol): 
     }
 
     return observableValueProperty(target, key, Derivation, () => new InvalidDerivedPropertyError(key));
+}
+
+export function isModel<T>(model: T): model is T & object {
+    return isObject(model)
+        && (!!getObservableProperties(Object.getPrototypeOf(model))
+            || !!getStateProperties(model).length);
 }
 
 function observableValueProperty<Type extends ObservableValue<any>>(

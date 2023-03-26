@@ -1,4 +1,4 @@
-export { derived, events, extend, model, reduced } from "./decorators";
+export { derived, events, extend, model, reduced } from "./models";
 export { derive } from "./derivation";
 export { enableDevTools } from "./devtools";
 export { AsyncError, asyncEvent, AsyncResult, AsyncStart, event, fireEvent, IAsyncEvent, IAsyncObservables, IEvent, IEventBase, IFilterableAsyncObservables, makeEventFunction } from "./events";

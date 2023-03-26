@@ -1,7 +1,7 @@
-import { getObservableProperties } from "./decorators";
+import { getObservableProperties, isModel } from "./models";
 import { Reduction } from "./reduction";
 import { OmitValues, StringKey } from "./types";
-import { getOrAdd, isModel, isObject, isPlainObject, jsonPath } from "./utils";
+import { getOrAdd, isObject, isPlainObject, jsonPath } from "./utils";
 
 export type State<T> =
     T extends Function ? never
