@@ -44,20 +44,15 @@ export interface IStateOptions {
 export type CircularReferenceHandling = 'error' | 'warn' | 'expect';
 
 export function getState<T>(model: T, options: IStateOptions = {}): State<T> {
-    let { circularReferences, name = '$', ...otherOptions } = options;
-    try {
-        return getStateRecursive(circularReferences == 'expect' ? options : otherOptions, new Map(), name, model);
-    } catch {
-        circularReferences ??= (process.env.NODE_ENV === 'production' ? 'expect' : 'error'); // Silently handle circular references in production
-        return getStateRecursive({ circularReferences, ...otherOptions }, new Map(), name, model);
-    }
+    return getStateRecursive(options, new Map(), options.name ?? '$', model);
 }
+
 function getStateRecursive<T>(options: IStateOptions, parentPath: Map<unknown, PropertyKey>, key: PropertyKey, model: T): State<T> {
     if (!isObject(model))
         return model as State<T>;
 
-    if (options.circularReferences && parentPath.has(model))
-        return getCircularReference(options.circularReferences, parentPath, key, model);
+    if (parentPath.has(model))
+        return getCircularReference(options.circularReferences ?? (process.env.NODE_ENV === 'production' ? 'expect' : 'error'), parentPath, key, model);
 
     parentPath.set(model, key);
     let state = Array.isArray(model)
@@ -89,17 +84,13 @@ function getCircularReference<T>(handling: CircularReferenceHandling, parentPath
     let circularPathKeys = circularPath.map(([key]) => key);
     let referencedPathKeys = circularPathKeys.slice(0, circularPath.findIndex(([, v]) => v == model) + 1);
 
-    if (handling == 'expect')
-        return `<ref: ${jsonPath(referencedPathKeys)}>` as any;
+    if (handling == 'warn')
+        console.warn(CircularReferenceInStateError.message(circularPathKeys, referencedPathKeys), new Details(circularPath));
 
-    let error = new CircularReferenceInStateError(circularPath, circularPathKeys, referencedPathKeys);
+    if (handling == 'error')
+        throw new CircularReferenceInStateError(circularPath, circularPathKeys, referencedPathKeys);
 
-    if (handling == 'warn') {
-        console.warn(error.message, new Details(circularPath));
-        return;
-    }
-
-    throw error;
+    return `<ref: ${jsonPath(referencedPathKeys)}>` as State<T>;
 }
 
 // Just for naming in the console
@@ -158,6 +149,10 @@ export class CircularReferenceInStateError extends Error {
         public circularPathKeys: PropertyKey[],
         public referencedPathKeys: PropertyKey[]
     ) {
-        super(`Detected circular reference in model: ${jsonPath(circularPathKeys)} -> ${jsonPath(referencedPathKeys)}`);
+        super(CircularReferenceInStateError.message(circularPathKeys, referencedPathKeys));
+    }
+
+    static message(circularPathKeys: PropertyKey[], referencedPathKeys: PropertyKey[]) {
+        return `Detected circular reference in model: ${jsonPath(circularPathKeys)} -> ${jsonPath(referencedPathKeys)}`;
     }
 }
