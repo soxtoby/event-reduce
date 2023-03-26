@@ -2,7 +2,7 @@ import { ensureNotInsideDerivation } from "./derivation";
 import { log, logEvent } from "./logging";
 import { IObservable, ObservableOperation } from "./observable";
 import { ISubject, Subject } from "./subject";
-import { ObjectOmit } from "./types";
+import { Scoped } from "./types";
 import { NamedBase, filteredName, matchesScope, scopedName } from "./utils";
 
 export interface IEventBase {
@@ -17,7 +17,7 @@ export interface IEventClass extends IEventBase {
 
 export interface IEvent<TIn = void, TOut = TIn> extends IObservable<TOut>, IEventBase {
     (eventValue: TIn): TIn;
-    scope<ObjectIn extends Scope, ObjectOut extends Scope, Scope extends object>(this: IEvent<ObjectIn, ObjectOut>, scope: Scope): IEvent<ObjectOmit<ObjectIn, Scope>, ObjectOut>;
+    scope<ObjectIn extends Scope, ObjectOut extends Scope, Scope extends object>(this: IEvent<ObjectIn, ObjectOut>, scope: Scope): IEvent<Scoped<ObjectIn, Scope>, ObjectOut>;
 }
 
 export interface IAsyncObservables<Result = void, Context = void> {
@@ -32,7 +32,7 @@ export interface IFilterableAsyncObservables<Result = void, Context = void> exte
 
 export interface IAsyncEvent<Result = void, ContextIn = void, ContextOut = ContextIn> extends IFilterableAsyncObservables<Result, ContextOut> {
     <Promise extends PromiseLike<Result>>(promise: Promise, context: ContextIn): Promise;
-    scope<ObjectContext extends Scope, Scope extends object>(this: IAsyncEvent<Result, ObjectContext>, scope: Scope): IAsyncEvent<Result, ObjectOmit<ObjectContext, Scope>, ObjectContext>;
+    scope<ObjectContext extends Scope, Scope extends object>(this: IAsyncEvent<Result, ObjectContext>, scope: Scope): IAsyncEvent<Result, Scoped<ObjectContext, Scope>, ObjectContext>;
 }
 
 export interface AsyncStart<Result, Context> {
@@ -84,7 +84,7 @@ class ScopedEventSubject<ObjectIn extends Scope, ObjectOut extends Scope, Scope 
             observer => _source.subscribe(value => matchesScope(_scope, value) && observer.next(value), observer.getDisplayName));
     }
 
-    next(partial: ObjectOmit<ObjectIn, Scope>) {
+    next(partial: Scoped<ObjectIn, Scope>) {
         // Using plain log so only the unscoped event is logged as an event
         log('{⚡} (scoped event)', this.displayName, [partial], () => ({ Scope: this._scope, Container: this.container }),
             () => this._source({ ...partial, ...this._scope } as ObjectIn));
@@ -153,7 +153,7 @@ class ScopedAsyncEvent<Result, ContextIn extends Scope, ContextOut extends Scope
     readonly resolved = this._source.resolved.filter(r => matchesScope(this._scope, r.context), () => `${this.displayName}.resolved`);
     readonly rejected = this._source.rejected.filter(e => matchesScope(this._scope, e.context), () => `${this.displayName}.rejected`);
 
-    next<Promise extends PromiseLike<Result>>(promise: Promise, partialContext: ObjectOmit<ContextIn, Scope>) {
+    next<Promise extends PromiseLike<Result>>(promise: Promise, partialContext: Scoped<ContextIn, Scope>) {
         // Using plain log so only the unscoped event is logged as an event
         log('{⚡⌚} (scoped async event)', this.displayName, [partialContext], () => ({ Scope: this._scope, Container: this.container }),
             () => this._source(promise, { ...this._scope, ...partialContext } as ContextIn));
