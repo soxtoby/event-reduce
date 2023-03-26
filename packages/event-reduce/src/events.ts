@@ -85,8 +85,7 @@ class ScopedEventSubject<ObjectIn extends Scope, ObjectOut extends Scope, Scope 
     next(partial: ObjectOmit<ObjectIn, Scope>) {
         // Using plain log so only the unscoped event is logged as an event
         log('{⚡} (scoped event)', this.displayName, [partial], () => ({ Scope: this._scope, Container: this.container }),
-            () => this._source({ ...partial, ...this._scope } as any as ObjectIn));
-
+            () => this._source({ ...partial, ...this._scope } as ObjectIn));
     }
 }
 
@@ -152,7 +151,7 @@ class ScopedAsyncEvent<Result, ContextIn extends Scope, ContextOut extends Scope
     next(promise: PromiseLike<Result>, partialContext: ObjectOmit<ContextIn, Scope>) {
         // Using plain log so only the unscoped event is logged as an event
         log('{⚡⌚} (scoped async event)', this.displayName, [partialContext], () => ({ Scope: this._scope, Container: this.container }),
-            () => this._source(promise, { ...this._scope, ...partialContext } as any as ContextIn));
+            () => this._source(promise, { ...this._scope, ...partialContext } as ContextIn));
     }
 }
 

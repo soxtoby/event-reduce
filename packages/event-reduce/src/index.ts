@@ -1,12 +1,12 @@
-export { derived, events, extend, model, reduced } from "./models";
 export { IDerivation, derive } from "./derivation";
 export { enableDevTools } from "./devtools";
-export { AsyncError, asyncEvent, AsyncResult, AsyncStart, event, fireEvent, IAsyncEvent, IAsyncObservables, IEvent, IEventBase, IFilterableAsyncObservables, makeEventFunction } from "./events";
+export { AsyncError, AsyncResult, AsyncStart, IAsyncEvent, IAsyncObservables, IEvent, IEventBase, IFilterableAsyncObservables, asyncEvent, event, fireEvent, makeEventFunction } from "./events";
 export { enableLogging } from "./logging";
-export { allSources, IObservable, IObserver, merge, Observable, Observe } from "./observable";
+export { derived, events, extend, model, reduced } from "./models";
+export { IObservable, IObserver, Observable, Observe, allSources, merge } from "./observable";
 export { IObservableValue } from "./observableValue";
 export { IBoundReduction, IReduction, reduce } from "./reduction";
 export { State, getState, setState, state } from "./state";
 export { ISubject, Subject } from "./subject";
 export { Unsubscribe } from "./types";
-export { filteredName, matchesScope, NamedBase, nameOfCallback, nameOfFunction, scopedName } from "./utils";
+export { NamedBase, filteredName, matchesScope, nameOfCallback, nameOfFunction, scopedName } from "./utils";

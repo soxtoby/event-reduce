@@ -13,7 +13,7 @@ export function mutable<T>(model: T): Mutable<T> {
                     get() { return getObservableValue(model).value; },
                     set(value) {
                         let observableValue = getObservableValue(model);
-                        (observableValue as any).unsubscribeFromSources();
+                        observableValue.unsubscribeFromSources();
                         observableValue.setValue(value);
                     },
                     enumerable: base.enumerable,
@@ -40,7 +40,7 @@ function allProperties(obj: unknown) {
 
 export function modelProxy<T>(initialState: T): Mutable<T>;
 export function modelProxy<T = any>(): Mutable<T>;
-export function modelProxy(model: any = {}) {
+export function modelProxy<T>(model: T = {} as T) {
     if (!isObject(model) || Array.isArray(model))
         return model;
 
@@ -53,7 +53,7 @@ export function modelProxy(model: any = {}) {
                 observableValues[key] = new ObservableValue(() => String(key), prop.value);
         });
 
-    let proxy = new Proxy(model, {
+    let proxy: T = new Proxy(model, {
         get(target: any, key: PropertyKey) {
             if (key == 'readonly')
                 return proxy;
@@ -81,13 +81,13 @@ export function modelProxy(model: any = {}) {
 
         has(target: any, key: PropertyKey) {
             return key in target || key in observableValues;
-        },
-    }) as any;
+        }
+    });
 
     return proxy;
 
     function getOrAddObservableValue(key: PropertyKey): ObservableValue<any> {
-        return observableValues[key as string] || (observableValues[key as string] = new ObservableValue(() => String(key), model[key]));
+        return observableValues[key as string] || (observableValues[key as string] = new ObservableValue(() => String(key), model[key as keyof T]));
     }
 }
 

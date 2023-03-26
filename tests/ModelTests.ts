@@ -2,9 +2,9 @@ import { asyncEvent, derive, derived, event, events, extend, model, reduce, redu
 import { AccessedValueWithCommonSourceError } from "event-reduce/lib/observableValue";
 import { describe, it, test, then, when } from "wattle";
 
-describe("model decorators", function () {
-    let increment = event();
-    let decrement = event();
+describe("models", function () {
+    let increment = event('increment');
+    let decrement = event('decrement');
 
     @model
     class TestModel {

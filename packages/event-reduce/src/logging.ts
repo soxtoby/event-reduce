@@ -1,5 +1,6 @@
 import { sendEvent } from "./devtools";
 import { IObservable } from "./observable";
+import { StringKey } from "./types";
 
 let loggingEnabled = false;
 let loggingDepth = 0;
@@ -13,7 +14,7 @@ export function logEvent(type: string, displayName: string, arg: any, getInfo: (
     sendEvent(displayName, arg);
 }
 
-export function log(type: string, displayName: string, args: any[], getInfo?: () => object, work?: () => void) {
+export function log<Info extends object>(type: string, displayName: string, args: any[], getInfo?: () => Info, work?: () => void) {
     if (process.env.NODE_ENV !== 'production') {
         if (!loggingEnabled)
             return void (work && work());
@@ -35,8 +36,8 @@ export function log(type: string, displayName: string, args: any[], getInfo?: ()
         function logMessage(group: boolean) {
             let message = [`${displayName} %c${type}`, 'color: grey; font-weight: normal;', ...args];
 
-            let info = getInfo && getInfo() || {};
-            let infoKeys = Object.keys(info);
+            let info = getInfo?.() ?? {} as Info;
+            let infoKeys = Object.keys(info) as StringKey<Info>[];
             if (infoKeys.length || group) {
                 if (loggingDepth)
                     console.group(...message);
@@ -44,7 +45,7 @@ export function log(type: string, displayName: string, args: any[], getInfo?: ()
                     console.groupCollapsed(...message);
 
                 for (let key of infoKeys)
-                    console.log(`${key}:`, (info as any)[key]);
+                    console.log(`${key}:`, info[key]);
 
                 if (!group)
                     console.groupEnd();
