@@ -1,13 +1,19 @@
 export function filteredName(baseName: string, predicate: Function) {
-    return `${baseName}.filter(${nameOfFunction(predicate)})`;
+    return `${baseName}.filter(${nameOfCallback(predicate)})`;
 }
 
 export function scopedName(baseName: string, scope: object) {
     return `${baseName}.scoped({ ${Object.entries(scope).map(([k, v]) => `${k}: ${v}`).join(', ')} })`;
 }
 
+/** Returns explicit name of function, falling back to function content. */
+export function nameOfCallback(fn: Function) {
+    return nameOfFunction(fn) || String(fn);
+}
+
+/** Returns explicit name of function. */
 export function nameOfFunction(fn: Function) {
-    return (fn as any).displayName || fn.name || String(fn);
+    return (fn as any).displayName as string || fn.name;
 }
 
 export function jsonPath(keys: readonly PropertyKey[]) {

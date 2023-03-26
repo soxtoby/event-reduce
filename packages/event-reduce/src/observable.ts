@@ -1,5 +1,5 @@
 import { Unsubscribe } from "./types";
-import { filteredName, NamedBase, nameOfFunction } from "./utils";
+import { filteredName, NamedBase, nameOfCallback } from "./utils";
 
 export type Observe<T> = (value: T) => void;
 
@@ -58,7 +58,7 @@ export class Observable<T> extends NamedBase {
             observer => this.subscribe(value => condition(value) && observer.next(value), getDisplayName));
     }
 
-    map<U>(select: (value: T) => U, getDisplayName: () => string = () => `${this.displayName}.map(${nameOfFunction(select)})`): IObservable<U> {
+    map<U>(select: (value: T) => U, getDisplayName: () => string = () => `${this.displayName}.map(${nameOfCallback(select)})`): IObservable<U> {
         return new ObservableOperation<U>(getDisplayName, [this],
             observer => this.subscribe(value => observer.next(select(value)), getDisplayName));
     }

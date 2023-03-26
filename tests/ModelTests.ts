@@ -120,7 +120,7 @@ describe("events decorator", function () {
     it("keeps class name", () => TestEvents.name.should.equal('TestEvents'));
 
     it("sets event name", () => {
-        (sut.promiseEvent as any).displayName.should.equal('promiseEvent');
+        sut.promiseEvent.displayName.should.equal('promiseEvent');
         sut.promiseEvent.started.displayName.should.equal('promiseEvent.started');
         sut.promiseEvent.resolved.displayName.should.equal('promiseEvent.resolved');
         sut.promiseEvent.rejected.displayName.should.equal('promiseEvent.rejected');

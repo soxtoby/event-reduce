@@ -4,7 +4,7 @@ import { IEventBase } from "./events";
 import { ObservableValue, ValueIsNotObservableError, getUnderlyingObservable, startTrackingScope } from "./observableValue";
 import { Reduction, reduce } from "./reduction";
 import { getStateProperties } from "./state";
-import { getOrAdd, isObject } from "./utils";
+import { getOrAdd, isObject, nameOfFunction } from "./utils";
 
 export let reduced: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
     return observableValueProperty(target, key, Reduction, () => new InvalidReducedPropertyError(key));
@@ -110,7 +110,7 @@ export function getObservableProperties(prototype: any) {
  * Automatically populates the names of event properties.
  */
 export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
-    const className = (target as any).displayName || target.name;
+    const className = nameOfFunction(target);
     return {
         [className]: class extends target {
             constructor(...args: any[]) {
@@ -134,7 +134,7 @@ export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
  **/
 export function model<T extends { new(...args: any[]): any }>(target: T): T {
     getOrAddObservableProperties(target.prototype);
-    const className = (target as any).displayName || target.name;
+    const className = nameOfFunction(target);
     return {
         [className]: class extends target {
             constructor(...args: any[]) {
