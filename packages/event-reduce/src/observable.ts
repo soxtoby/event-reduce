@@ -8,6 +8,7 @@ export interface IObservable<T> {
     dispose(): void;
     filter(condition: (value: T) => boolean, getDisplayName?: () => string): IObservable<T>;
     map<U>(select: (value: T) => U, getDisplayName?: () => string): IObservable<U>;
+    filterMap<U>(select: (value: T) => U | undefined, getDisplayName?: () => string): IObservable<U>;
 
     displayName: string;
     readonly sources: readonly IObservable<any>[];
@@ -63,6 +64,16 @@ export class Observable<T> extends NamedBase {
     map<U>(select: (value: T) => U, getDisplayName: () => string = () => `${this.displayName}.map(${nameOfCallback(select)})`): IObservable<U> {
         return new ObservableOperation<U>(getDisplayName, [this],
             observer => this.subscribe(value => observer.next(select(value)), getDisplayName));
+    }
+
+    /** Maps values to a new type, filtering out undefined results. */
+    filterMap<U>(select: (value: T) => U | undefined, getDisplayName: () => string = () => `${this.displayName}.filterMap(${nameOfCallback(select)})`): IObservable<U> {
+        return new ObservableOperation<U>(getDisplayName, [this],
+            observer => this.subscribe(value => {
+                let mapped = select(value);
+                if (mapped !== undefined)
+                    observer.next(mapped);
+            }, getDisplayName));
     }
 }
 
