@@ -1,7 +1,10 @@
 import { Derivation } from "event-reduce/lib/derivation";
+import { ObservableValue } from "event-reduce/lib/observableValue";
 import { reactionQueue } from "event-reduce/lib/reactions";
-import { ForwardRefExoticComponent, ForwardRefRenderFunction, Fragment, FunctionComponent, MemoExoticComponent, PropsWithChildren, PropsWithoutRef, ReactElement, ReactNode, RefAttributes, ValidationMap, WeakValidationMap, createElement, forwardRef, memo, useEffect, useState } from "react";
+import { ForwardRefExoticComponent, ForwardRefRenderFunction, Fragment, FunctionComponent, MemoExoticComponent, PropsWithChildren, PropsWithoutRef, ReactElement, ReactNode, RefAttributes, ValidationMap, WeakValidationMap, createElement, forwardRef, memo, useCallback, useEffect } from "react";
+import { useSyncExternalStore } from "use-sync-external-store/shim";
 import { useAsObservableValues, useDerived } from "./hooks";
+import { useOnce } from "./utils";
 
 interface ContextlessFunctionComponent<P = {}> {
     (props: PropsWithChildren<P>): ReactElement | null;
@@ -45,11 +48,13 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
         ? [nameOrDeriveValue, maybeDeriveValue!]
         : ['ReactiveValue', nameOrDeriveValue];
 
-    let [, setRerenderCount] = useState(0);
-
     let derivedValue = useDerived(deriveValue, name) as Derivation<T>;
 
-    useEffect(() => derivedValue.invalidation.subscribe(() => reactionQueue.current.add(() => setRerenderCount(r => r + 1))), []);
+    let render = useOnce(() => new ObservableValue(() => `${name}.render`, 0));
+
+    useEffect(() => derivedValue.invalidation.subscribe(() => reactionQueue.current.add(() => render.setValue(render.value + 1))), []);
+    
+    useSyncExternalStore(useCallback(o => render.subscribe(o), []), () => render.value);
 
     derivedValue.update();
     return derivedValue.value;
