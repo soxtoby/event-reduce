@@ -17,7 +17,8 @@ export interface IDerivation<T> extends IObservableValue<T> {
 export class Derivation<T> extends ObservableValue<T> implements IDerivation<T> {
     private _requiresUpdate = true;
     private _sources = new Map<IObservable<any>, Unsubscribe>();
-    private _invalidation = new Subject<void>();
+    private _invalidation = new Subject<void>(() => `${this.displayName}.invalidated`);
+    private _invalidatingSource?: IObservable<unknown>;
 
     constructor(
         getDisplayName: () => string,
@@ -37,9 +38,11 @@ export class Derivation<T> extends ObservableValue<T> implements IDerivation<T> 
     get invalidation() { return this._invalidation; }
 
     /** Forces the value to be re-calculated. */
-    update() {
+    update(reason?: string) {
         withInnerTrackingScope(() => {
             this._requiresUpdate = false;
+            let trigger = this._invalidatingSource;
+            delete this._invalidatingSource;
             let value!: T;
 
             this.unsubscribeFromSources();
@@ -53,21 +56,23 @@ export class Derivation<T> extends ObservableValue<T> implements IDerivation<T> 
                 }
             });
             for (let source of newSources)
-                this._sources.set(source, source.subscribe(() => this.invalidate(), () => this.displayName));
+                this._sources.set(source, source.subscribe(() => this.invalidate(source), () => this.displayName));
 
             log('🔗 (derivation)', this.displayName, [], () => ({
                 Previous: this._value,
                 Current: value,
                 Container: this.container,
-                Sources: sourceTree(this.sources)
+                Sources: sourceTree(this.sources),
+                TriggeredBy: trigger ?? reason
             }), () => this.setValue(value));
         });
     }
 
-    private invalidate() {
+    private invalidate(source: IObservable<unknown>) {
         let oldSources = this.sources;
         this.unsubscribeFromSources();
         this._requiresUpdate = true;
+        this._invalidatingSource = source;
 
         if (this._invalidation.isObserved)
             log('🔗🚩 (derivation invalidated)', this.displayName, [], () => ({

@@ -56,6 +56,6 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
     
     useSyncExternalStore(useCallback(o => render.subscribe(o), []), () => render.value);
 
-    derivedValue.update();
+    derivedValue.update('render');
     return derivedValue.value;
 }
