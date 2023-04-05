@@ -1,7 +1,7 @@
 import { IDerivation, IReduction, asyncEvent, derive, event, reduce } from "event-reduce";
 import { changeOwnedValue, disposeModel } from "event-reduce/lib/cleanup";
-import { getObservableValues, getOrSetObservableValue } from "event-reduce/lib/models";
 import { ObservableValue } from "event-reduce/lib/observableValue";
+import { ValueOf } from "event-reduce/lib/types";
 import { useDispose, useOnce } from "./utils";
 
 /** Creates a model that persists across renders of the component and cleans up when the component is unmounted. */
@@ -40,22 +40,24 @@ export function useReduced<T>(initial: T, name?: string): IReduction<T> {
     return reduction;
 }
 
-export function useAsObservableValues<T extends object>(values: T, name?: string) {
-    let observableValues = useOnce(() => ({} as Record<string, ObservableValue<unknown>>));
+export function useObservedProps<T extends object>(values: T, name: string = '(anonymous observed values)') {
+    let observableValues = useOnce(() => ({} as Record<keyof T, ObservableValue<ValueOf<T>>>));
     let nameBase = (name || '') + '.';
 
     // Update any values that are already being observed
-    for (let [key, observableValue] of Object.entries(getObservableValues(observableValues) ?? {}))
+    for (let [key, observableValue] of Object.entries(observableValues) as [keyof T, ObservableValue<ValueOf<T>>][])
         observableValue.setValue(values[key as keyof T]);
 
     // Create observable values as properties are accessed
-    return new Proxy({ ...values } as T, { // Copy of values to avoid proxy restrictions on frozen objects
+    return new Proxy(Object.isFrozen(values) ? { ...values } : values, {
         get(initialValues, key) {
-            return getOrSetObservableValue(
-                observableValues,
-                key,
-                () => new ObservableValue(() => nameBase + String(key), initialValues[key as keyof T])
-            ).value;
+            return (observableValues[key as keyof T] ??= new ObservableValue(() => nameBase + String(key), initialValues[key as keyof T])).value;
         }
     });
+}
+
+export function useObserved<T>(value: T, name: string = '(anonymous observed value)') {
+    let observableValue = useOnce(() => new ObservableValue(() => name, value));
+    observableValue.setValue(value);
+    return observableValue;
 }
