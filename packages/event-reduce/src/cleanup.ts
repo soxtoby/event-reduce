@@ -1,7 +1,6 @@
 import { log } from "./logging";
-import { getObservableValues, isModel } from "./models";
+import { getObservableValues, getStateProperties, isModel } from "./models";
 import { ObservableValue } from "./observableValue";
-import { getStateProperties } from "./state";
 import { isPlainObject, nameOfFunction } from "./utils";
 
 /** value -> owners */

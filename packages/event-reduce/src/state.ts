@@ -1,7 +1,7 @@
-import { getObservableProperties, isModel } from "./models";
+import { getObservableProperties, getStateProperties, isModel } from "./models";
 import { Reduction } from "./reduction";
 import { OmitValues, StringKey } from "./types";
-import { getOrAdd, isObject, isPlainObject, jsonPath } from "./utils";
+import { isObject, jsonPath } from "./utils";
 
 export type State<T> =
     T extends Function ? never
@@ -10,24 +10,6 @@ export type State<T> =
     : T;
 
 export type StateKey<T> = Extract<keyof T, keyof State<T>>;
-
-const statePropsKey = Symbol('stateProps');
-
-/** Mark a constructor parameter as a state property by specifying its name. */
-export function state(parameterName: string): (target: Function, key: any, index: number) => void;
-/** Mark a property as a state property. */
-export function state(target: any, key: string): void;
-export function state(paramNameOrTarget: any, key?: string) {
-    if (typeof paramNameOrTarget == 'string')
-        return (constructor: Function, key: any, index: number) => addStateProp(constructor.prototype, paramNameOrTarget);
-
-    addStateProp(paramNameOrTarget.constructor.prototype, key!);
-}
-
-function addStateProp(prototype: any, key: string) {
-    getOrAdd(prototype, statePropsKey, () => [] as string[])
-        .push(key);
-}
 
 export interface IStateOptions {
     /** 
@@ -121,15 +103,6 @@ function getAllStatefulProperties<T>(model: T, includeDerived = false): StateKey
         : Object.keys(getReducedProperties(model));
     let explicitProps = getStateProperties(model);
     return observableProps.concat(explicitProps) as StateKey<T>[];
-}
-
-export function getStateProperties<T>(model: T): string[] {
-    if (isPlainObject(model))
-        return [];
-
-    let prototype = Object.getPrototypeOf(model);
-    return getStateProperties(prototype)
-        .concat(prototype[statePropsKey] as StringKey<T>[] | undefined || []);
 }
 
 function getReducedProperties<T>(model: T) {
