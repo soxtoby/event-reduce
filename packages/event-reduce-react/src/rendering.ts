@@ -37,7 +37,7 @@ export function reactive<Component extends (ContextlessFunctionComponent<any> | 
         render.current = params;
 
         return useReactive(componentName, () => {
-            useEffect(render.current.props.commit);
+            useEffect(render.current.props.commitProps);
             return component(render.current.props.tracked, ...render.current.otherArgs);
         });
     }, (prev, next) => Array.from(prev.props.accessed).every(key => Object.is(prev.props.untracked[key], next.props.untracked[key])));
@@ -63,6 +63,11 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
         ? [nameOrDeriveValue, maybeDeriveValue!]
         : ['ReactiveValue', nameOrDeriveValue];
 
+    let derivedValue = useSyncDerivation<T>(deriveValue, name);
+    return useRenderValue<T>(derivedValue);
+}
+
+function useSyncDerivation<T>(deriveValue: () => T, name: string) {
     let derivedValue = useDerived(deriveValue, name) as Derivation<T>;
 
     let render = useOnce(() => new ObservableValue(() => `${name}.render`, 0));
@@ -71,7 +76,11 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
 
     useSyncExternalStore(useCallback(o => render.subscribe(o), []), () => render.value);
 
-    derivedValue.update('render');
+    return derivedValue;
+}
+
+function useRenderValue<T>(derivedValue: Derivation<T>) {
+    useCallback(function update() { derivedValue.update('render') }, [])(); // need to use a hook to be considered a hook
     return derivedValue.value;
 }
 
@@ -79,7 +88,7 @@ interface ITrackedProps<T> {
     accessed: Set<keyof T>;
     untracked: T;
     tracked: T;
-    commit(): void;
+    commitProps(): void;
 }
 
 function useLatestProps<T extends object>(props: T): ITrackedProps<T> {
@@ -101,7 +110,7 @@ function useLatestProps<T extends object>(props: T): ITrackedProps<T> {
             },
             set() { return true; }
         }),
-        commit() {
+        commitProps() {
             rendered = true;
             Object.assign(latestProps, props);
         }
