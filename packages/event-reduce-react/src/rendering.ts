@@ -1,7 +1,7 @@
 import { Derivation } from "event-reduce/lib/derivation";
 import { ObservableValue } from "event-reduce/lib/observableValue";
 import { reactionQueue } from "event-reduce/lib/reactions";
-import { ForwardRefExoticComponent, ForwardRefRenderFunction, Fragment, FunctionComponent, MemoExoticComponent, PropsWithChildren, PropsWithoutRef, ReactElement, ReactNode, RefAttributes, ValidationMap, WeakValidationMap, createElement, forwardRef, memo, useCallback, useEffect, useRef } from "react";
+import { ForwardRefExoticComponent, ForwardRefRenderFunction, Fragment, FunctionComponent, MemoExoticComponent, PropsWithChildren, PropsWithoutRef, ReactElement, ReactNode, Ref, RefAttributes, ValidationMap, WeakValidationMap, createElement, forwardRef, memo, useCallback, useEffect } from "react";
 import { useSyncExternalStore } from "use-sync-external-store/shim";
 import { useDerived } from "./hooks";
 import { useOnce } from "./utils";
@@ -23,24 +23,18 @@ export function Reactive(props: { name?: string; children: () => ReactNode; }): 
     return useReactive(props.name || 'Derived', () => createElement(Fragment, { children: props.children() }));
 }
 
-interface ITrackedComponentProps<Props> {
-    props: ITrackedProps<Props>;
-    otherArgs: [any];
-}
-
 export function reactive<Component extends (ContextlessFunctionComponent<any> | ForwardRefRenderFunction<any, any>)>(component: Component): ReactiveComponent<Component> {
     let componentName = component.displayName || component.name || 'ReactiveComponent';
 
-    let innerComponent = memo(({ props, otherArgs }: ITrackedComponentProps<any>) => {
-        useEffect(props.commitProps);
-        return useReactive(componentName, () => component(props.tracked, ...otherArgs));
-    }, (prev, next) => Array.from(prev.props.accessed).every(key => Object.is(prev.props.untracked[key], next.props.untracked[key])));
+    let innerComponent = memo(forwardRef(({ __propTracking, ...currentProps }: { __propTracking: IPropTracking<any> }, ref: Ref<any>) => {
+        let trackedProps = useTrackedProps(__propTracking, currentProps);
+        return useReactive(componentName, () => component(trackedProps, ref));
+    }), (prev, next) => Array.from(prev.__propTracking.accessed).every(key => Object.is(prev[key as keyof unknown], next[key as keyof unknown])));
     innerComponent.displayName = componentName;
 
     let outerComponent = ((...args: Parameters<Component>) => { // Important to use rest operator here so react ignores function arity
-        let [currentProps, ...otherArgs] = args;
-        let props = useLatestProps(currentProps);
-        return createElement(innerComponent as FunctionComponent<any>, { props, otherArgs });
+        let [currentProps, ref] = args;
+        return createElement(innerComponent as FunctionComponent<any>, { ...currentProps, ref, __propTracking: usePropTracking() });
     }) as ReactiveComponent<Component>;
     outerComponent.displayName = `reactive(${componentName})`;
 
@@ -78,35 +72,38 @@ function useRenderValue<T>(derivation: Derivation<T>, deriveValue: () => T) {
     return derivation.value;
 }
 
-interface ITrackedProps<T> {
+interface IPropTracking<T> {
+    latestProps: T;
     accessed: Set<keyof T>;
-    untracked: T;
-    tracked: T;
-    commitProps(): void;
+    commitProps(props: T): void;
 }
 
-function useLatestProps<T extends object>(props: T): ITrackedProps<T> {
+function usePropTracking<T extends object>(): IPropTracking<T> {
     let latestProps = useOnce(() => ({} as T));
-    let rendered = false;
     let accessed = new Set<keyof T>();
 
     return {
+        latestProps,
         accessed,
-        untracked: props,
-        tracked: new Proxy({ ...props } as any, {
-            get(currentProps, key) {
-                if (rendered) {
-                    return latestProps[key as keyof T];
-                } else {
-                    accessed.add(key as keyof T);
-                    return currentProps[key as keyof T];
-                }
-            },
-            set() { return true; }
-        }),
-        commitProps() {
-            rendered = true;
-            Object.assign(latestProps, props);
-        }
-    }
+        commitProps(props: T) { Object.assign(latestProps, props); }
+    };
+}
+
+function useTrackedProps<P>(tracking: IPropTracking<P>, currentProps: P): P {
+    let rendered = false;
+    useEffect(() => {
+        rendered = true;
+        tracking.commitProps(currentProps);
+    });
+    return new Proxy({ ...currentProps } as any, {
+        get(currentProps, key) {
+            if (rendered) {
+                return tracking.latestProps[key as keyof P];
+            } else {
+                tracking.accessed.add(key as keyof P);
+                return currentProps[key as keyof P];
+            }
+        },
+        set() { return true; }
+    });
 }
