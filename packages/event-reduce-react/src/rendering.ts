@@ -31,15 +31,9 @@ interface ITrackedComponentProps<Props> {
 export function reactive<Component extends (ContextlessFunctionComponent<any> | ForwardRefRenderFunction<any, any>)>(component: Component): ReactiveComponent<Component> {
     let componentName = component.displayName || component.name || 'ReactiveComponent';
 
-    let innerComponent = memo((params: ITrackedComponentProps<any>) => {
-        // useReactive captures the callback on first render, so we need a ref to pass updated props to it
-        let render = useRef(params);
-        render.current = params;
-
-        return useReactive(componentName, () => {
-            useEffect(render.current.props.commitProps);
-            return component(render.current.props.tracked, ...render.current.otherArgs);
-        });
+    let innerComponent = memo(({ props, otherArgs }: ITrackedComponentProps<any>) => {
+        useEffect(props.commitProps);
+        return useReactive(componentName, () => component(props.tracked, ...otherArgs));
     }, (prev, next) => Array.from(prev.props.accessed).every(key => Object.is(prev.props.untracked[key], next.props.untracked[key])));
     innerComponent.displayName = componentName;
 
@@ -63,12 +57,12 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
         ? [nameOrDeriveValue, maybeDeriveValue!]
         : ['ReactiveValue', nameOrDeriveValue];
 
-    let derivedValue = useSyncDerivation<T>(deriveValue, name);
-    return useRenderValue<T>(derivedValue);
+    let derivation = useSyncDerivation<T>(name);
+    return useRenderValue<T>(derivation, deriveValue);
 }
 
-function useSyncDerivation<T>(deriveValue: () => T, name: string) {
-    let derivedValue = useDerived(deriveValue, name) as Derivation<T>;
+function useSyncDerivation<T>(name: string) {
+    let derivedValue = useDerived(() => undefined as T, name) as Derivation<T>; // Bogus derive function because we'll provide a new one every render
 
     let render = useOnce(() => new ObservableValue(() => `${name}.render`, 0));
 
@@ -79,9 +73,9 @@ function useSyncDerivation<T>(deriveValue: () => T, name: string) {
     return derivedValue;
 }
 
-function useRenderValue<T>(derivedValue: Derivation<T>) {
-    useCallback(function update() { derivedValue.update('render') }, [])(); // need to use a hook to be considered a hook
-    return derivedValue.value;
+function useRenderValue<T>(derivation: Derivation<T>, deriveValue: () => T) {
+    useCallback(function update() { derivation.update(deriveValue, 'render'); }, [deriveValue])(); // need to use a hook to be considered a hook in devtools
+    return derivation.value;
 }
 
 interface ITrackedProps<T> {

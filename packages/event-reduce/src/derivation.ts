@@ -37,8 +37,12 @@ export class Derivation<T> extends ObservableValue<T> implements IDerivation<T> 
 
     get invalidation() { return this._invalidation; }
 
-    /** Forces the value to be re-calculated. */
-    update(reason?: string) {
+    /** 
+     * Forces the value to be re-calculated. 
+     * @param deriveValue Optional function to use to derive the value. If not provided, the original derivation function will be used.
+     * @param reason Optional reason for the update. If not invalidated by a source change, this will be used as the reason for the update.
+     **/
+    update(deriveValue = this._deriveValue, reason?: string) {
         withInnerTrackingScope(() => {
             this._requiresUpdate = false;
             let trigger = this._invalidatingSource;
@@ -50,7 +54,7 @@ export class Derivation<T> extends ObservableValue<T> implements IDerivation<T> 
                 let previouslyRunningDerivation = currentlyRunningDerivation;
                 currentlyRunningDerivation = this;
                 try {
-                    value = this._deriveValue();
+                    value = (deriveValue ?? this._deriveValue)();
                 } finally {
                     currentlyRunningDerivation = previouslyRunningDerivation;
                 }
