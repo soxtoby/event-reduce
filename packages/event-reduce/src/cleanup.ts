@@ -59,7 +59,7 @@ function findTrackableValues(value: unknown, trackableValues: Set<TrackableValue
         } else if (Array.isArray(value)) {
             for (let item of value)
                 findTrackableValues(item, trackableValues, searchedIn);
-        } else if (isPlainObject(value)) {
+        } else if (isPlainObject(value) && !cleanupOptions.skipCleanup(value)) {
             for (let key in value)
                 findTrackableValues(value[key as keyof unknown], trackableValues, searchedIn);
         }
@@ -67,3 +67,10 @@ function findTrackableValues(value: unknown, trackableValues: Set<TrackableValue
 
     return trackableValues;
 }
+
+const cleanupOptions = {
+    /** Override this to avoid trying to clean up objects that are known not to contain any state. */
+    skipCleanup(value: object) { return false; }
+};
+
+export { cleanupOptions };
