@@ -36,7 +36,7 @@ describe(CounterListModel.name, function () {
     });
 });
 
-describe(CounterList.displayName!, function () {
+describe(CounterList.name, function () {
     let model = new CounterListModel(new CounterListEvents());
     let sut = render(<CounterList model={model} />);
 
@@ -108,7 +108,7 @@ describe(CounterModel.name, function () {
     });
 });
 
-describe(Counter.displayName!, function () {
+describe(Counter.name, function () {
     let id = 1;
     let model = new CounterModel(new CounterEvents(eventProxy(), id), { id, count: 3 });
     let sut = render(<Counter model={model} />);
