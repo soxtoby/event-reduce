@@ -36,7 +36,7 @@ function useSyncDerivation<T>(name: string) {
 
     let render = useOnce(() => new ObservableValue(() => `${name}.render`, 0));
 
-    useEffect(() => derivedValue.invalidation.subscribe(() => reactionQueue.current.add(() => render.setValue(render.value + 1))), []);
+    useEffect(() => derivedValue.subscribe(() => reactionQueue.current.add(() => render.setValue(render.value + 1))), []);
 
     useSyncExternalStore(useCallback(o => render.subscribe(o), []), () => render.value);
 

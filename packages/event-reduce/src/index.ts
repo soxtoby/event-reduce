@@ -1,4 +1,4 @@
-export { IDerivation, derive } from "./derivation";
+export { derive } from "./derivation";
 export { enableDevTools } from "./devtools";
 export { AsyncError, AsyncResult, AsyncStart, IAsyncEvent, IAsyncObservables, IEvent, IEventBase, IFilterableAsyncObservables, asyncEvent, event, fireEvent, makeEventFunction } from "./events";
 export { enableLogging } from "./logging";

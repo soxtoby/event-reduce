@@ -1,23 +1,17 @@
 import { log, sourceTree } from "./logging";
 import { IObservable } from "./observable";
 import { IObservableValue, ObservableValue, collectAccessedValues, withInnerTrackingScope } from "./observableValue";
-import { Subject } from "./subject";
 import { Unsubscribe } from "./types";
 
-let currentlyRunningDerivation = null as IDerivation<unknown> | null;
+let currentlyRunningDerivation = null as IObservableValue<unknown> | null;
 
 export function derive<T>(getDerivedValue: () => T, name?: string) {
     return new Derivation(() => name || '(anonymous derivation)', getDerivedValue);
 }
 
-export interface IDerivation<T> extends IObservableValue<T> {
-    invalidation: IObservable<void>;
-}
-
-export class Derivation<T> extends ObservableValue<T> implements IDerivation<T> {
+export class Derivation<T> extends ObservableValue<T> implements IObservableValue<T> {
     private _requiresUpdate = true;
     private _sources = new Map<IObservable<any>, Unsubscribe>();
-    private _invalidation = new Subject<void>(() => `${this.displayName}.invalidated`);
     private _invalidatingSource?: IObservable<unknown>;
 
     constructor(
@@ -34,8 +28,6 @@ export class Derivation<T> extends ObservableValue<T> implements IDerivation<T> 
             this.update();
         return super.value;
     }
-
-    get invalidation() { return this._invalidation; }
 
     /** 
      * Forces the value to be re-calculated. 
@@ -68,7 +60,7 @@ export class Derivation<T> extends ObservableValue<T> implements IDerivation<T> 
                 Container: this.container,
                 Sources: sourceTree(this.sources),
                 TriggeredBy: trigger ?? reason
-            }), () => this.setValue(value));
+            }), () => this.setValue(value, false));
         });
     }
 
@@ -78,20 +70,11 @@ export class Derivation<T> extends ObservableValue<T> implements IDerivation<T> 
         this._requiresUpdate = true;
         this._invalidatingSource = source;
 
-        if (this._invalidation.isObserved)
-            log('🔗🚩 (derivation invalidated)', this.displayName, [], () => ({
-                Previous: this._value,
-                Container: this.container,
-                Sources: sourceTree(oldSources)
-            }), () => this._invalidation.next());
-
-        if (this.isObserved)
-            this.update();
-    }
-
-    override dispose() {
-        this._invalidation.dispose();
-        super.dispose();
+        log('🔗🚩 (derivation invalidated)', this.displayName, [], () => ({
+            Previous: this._value,
+            Container: this.container,
+            Sources: sourceTree(oldSources)
+        }), () => this.notifyObservers());
     }
 
     override unsubscribeFromSources() {
@@ -107,7 +90,7 @@ export function ensureNotInsideDerivation(sideEffect: string) {
 
 export class SideEffectInDerivationError extends Error {
     constructor(
-        public derivation: IDerivation<unknown>,
+        public derivation: IObservableValue<unknown>,
         public sideEffect: string
     ) { super(`Derivation ${derivation.displayName} triggered side effect ${sideEffect}. Derivations cannot have side effects.`); }
 }

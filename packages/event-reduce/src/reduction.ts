@@ -74,7 +74,7 @@ export class Reduction<T> extends ObservableValue<T> implements IReduction<T> {
     onValueChanged<TValue>(observableValue: TValue, reduce: Reducer<T, TValue>) {
         let observable = getUnderlyingObservable(observableValue);
         if (observable)
-            return this.on(observable, reduce);
+            return this.on(observable.values, reduce);
         throw new ValueIsNotObservableError(observableValue);
     }
 

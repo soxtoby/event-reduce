@@ -17,11 +17,12 @@ let triggeringObservable: IObservable<any> | undefined;
 
 startTrackingScope();
 
-export interface IObservableValue<T> extends IObservable<T> { 
+export interface IObservableValue<T> extends IObservable<void> {
     readonly value: T;
+    readonly values: IObservable<T>;
 }
 
-export class ObservableValue<T> extends Observable<T> implements IObservableValue<T> {
+export class ObservableValue<T> extends Observable<void> implements IObservableValue<T> {
     constructor(
         getDisplayName: () => string,
         protected _value: T
@@ -41,11 +42,14 @@ export class ObservableValue<T> extends Observable<T> implements IObservableValu
         return this._value;
     }
 
-    setValue(value: T) {
+    get values() { return this.map(() => this.value); }
+
+    setValue(value: T, notifyObservers = true) {
         if (value !== this._value) {
             changeOwnedValue(this, this._value, value);
             this._value = value;
-            this.notifyObservers(value);
+            if (notifyObservers)
+                this.notifyObservers();
         }
     }
 
