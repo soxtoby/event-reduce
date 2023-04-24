@@ -32,7 +32,7 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
 }
 
 function useSyncDerivation<T>(name: string) {
-    let derivedValue = useDerived(() => undefined as T, name) as Derivation<T>; // Bogus derive function because we'll provide a new one every render
+    let derivedValue = useDerived(() => undefined as T, [], name) as Derivation<T>; // Bogus derive function because we'll provide a new one every render
 
     let render = useOnce(() => new ObservableValue(() => `${name}.render`, 0));
 

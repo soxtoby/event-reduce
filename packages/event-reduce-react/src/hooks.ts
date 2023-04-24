@@ -2,6 +2,7 @@ import { IObservableValue, IReduction, asyncEvent, derive, event, reduce } from 
 import { changeOwnedValue, disposeModel } from "event-reduce/lib/cleanup";
 import { ObservableValue } from "event-reduce/lib/observableValue";
 import { ValueOf } from "event-reduce/lib/types";
+import { DependencyList, useMemo, useRef } from "react";
 import { useDispose, useOnce } from "./utils";
 
 /** Creates a model that persists across renders of the component and cleans up when the component is unmounted. */
@@ -24,8 +25,22 @@ export function useAsyncEvent<Result = void, Context = void>(name?: string) {
     return useOnce(() => asyncEvent<Result, Context>(name))
 }
 
-export function useDerived<T>(getValue: () => T, name?: string): IObservableValue<T> {
+/**
+ * Creates a derived value that persists across renders of the component and cleans up when the component is unmounted.
+ * @param unobservableDependencies - A list of dependencies that are not observable. The derived value will be updated when any of these change.
+ * If not specified, the derived value will be updated every render, but will still only *trigger* a re-render inside a reactive component if the derived value changes.
+ */
+export function useDerived<T>(getValue: () => T, name?: string): IObservableValue<T>;
+export function useDerived<T>(getValue: () => T, unobservableDependencies?: DependencyList, name?: string): IObservableValue<T>;
+export function useDerived<T>(getValue: () => T, nameOrUnobservableDependencies?: string | DependencyList, name?: string): IObservableValue<T> {
+    let unobservableDependencies: DependencyList | undefined;
+    [name, unobservableDependencies] = typeof nameOrUnobservableDependencies === 'string'
+        ? [nameOrUnobservableDependencies, undefined]
+        : [name, nameOrUnobservableDependencies];
+
     let derived = useOnce(() => derive(getValue, name));
+
+    useMemo(() => derived.update(getValue, 'render'), unobservableDependencies);
 
     useDispose(() => derived.dispose());
 
