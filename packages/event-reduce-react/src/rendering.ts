@@ -34,9 +34,12 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
 function useSyncDerivation<T>(name: string) {
     let derivedValue = useDerived(() => undefined as T, [], name) as Derivation<T>; // Bogus derive function because we'll provide a new one every render
 
-    let render = useOnce(() => new ObservableValue(() => `${name}.render`, 0));
+    let render = useOnce(() => new ObservableValue(() => `${name}.render`, { invalidatedBy: "(nothing)" }));
 
-    useEffect(() => derivedValue.subscribe(() => reactionQueue.current.add(() => render.setValue(render.value + 1))), []);
+    useEffect(() => derivedValue.subscribe(() => {
+        let invalidatedBy = derivedValue.invalidatedBy ?? "(unknown)";
+        reactionQueue.current.add(() => render.setValue({ invalidatedBy }));
+    }), []);
 
     useSyncExternalStore(useCallback(o => render.subscribe(o), []), () => render.value);
 

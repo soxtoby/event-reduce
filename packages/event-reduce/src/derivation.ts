@@ -29,6 +29,8 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
         return super.value;
     }
 
+    get invalidatedBy() { return this._invalidatingSource?.displayName; }
+
     /** 
      * Forces the value to be re-calculated. 
      * @param deriveValue Optional function to use to derive the value. If not provided, the original derivation function will be used.
