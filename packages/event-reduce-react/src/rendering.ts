@@ -38,7 +38,10 @@ function useSyncDerivation<T>(name: string) {
 
     useEffect(() => derivedValue.subscribe(() => {
         let invalidatedBy = derivedValue.invalidatedBy ?? "(unknown)";
-        reactionQueue.current.add(() => render.setValue({ invalidatedBy }));
+        reactionQueue.current.add(() => {
+            if (derivedValue.invalidatedBy == invalidatedBy) // Avoid unnecessary renders
+                render.setValue({ invalidatedBy })
+        });
     }), []);
 
     useSyncExternalStore(useCallback(o => render.subscribe(o), []), () => render.value);
