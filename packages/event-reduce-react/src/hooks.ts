@@ -63,10 +63,17 @@ export function useObservedProps<T extends object>(values: T, name: string = '(a
     for (let [key, observableValue] of Object.entries(observableValues) as [keyof T, ObservableValue<ValueOf<T>>][])
         observableValue.setValue(values[key as keyof T]);
 
+    let latestValues = useRef(values);
+    latestValues.current = values;
+
     // Create observable values as properties are accessed
-    return new Proxy(Object.isFrozen(values) ? { ...values } : values, {
-        get(initialValues, key) {
-            return (observableValues[key as keyof T] ??= new ObservableValue(() => nameBase + String(key), initialValues[key as keyof T])).value;
+    return new Proxy({} as T, {
+        get(_, key) {
+            return (observableValues[key as keyof T]
+                ??= new ObservableValue(
+                    () => nameBase + String(key),
+                    (latestValues.current)[key as keyof T]))
+                .value;
         }
     });
 }
