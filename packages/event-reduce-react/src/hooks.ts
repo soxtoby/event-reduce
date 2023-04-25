@@ -56,7 +56,7 @@ export function useReduced<T>(initial: T, name?: string): IReduction<T> {
 }
 
 export function useObservedProps<T extends object>(values: T, name: string = '(anonymous observed values)') {
-    let observableValues = useOnce(() => ({} as Record<keyof T, ObservableValue<ValueOf<T>>>));
+    let observableValues = useModel(() => ({} as Record<keyof T, ObservableValue<ValueOf<T>>>));
     let nameBase = (name || '') + '.';
 
     // Update any values that are already being observed
@@ -79,7 +79,7 @@ export function useObservedProps<T extends object>(values: T, name: string = '(a
 }
 
 export function useObserved<T>(value: T, name: string = '(anonymous observed value)') {
-    let observableValue = useOnce(() => new ObservableValue(() => name, value));
+    let observableValue = useModel(() => new ObservableValue(() => name, value));
     observableValue.setValue(value);
     return observableValue;
 }
