@@ -35,16 +35,19 @@ export interface IAsyncEvent<Result = void, ContextIn = void, ContextOut = Conte
 }
 
 export interface AsyncStart<Result, Context> {
+    id: number;
     promise: PromiseLike<Result>;
     context: Context;
 }
 
 export interface AsyncResult<Result, Context> {
+    id: number;
     result: Result;
     context: Context;
 }
 
 export interface AsyncError<Context> {
+    id: number;
     error: any;
     context: Context;
 }
@@ -128,15 +131,18 @@ class AsyncEvent<Result, Context> extends AsyncEventBase<Result, Context> {
     readonly resolved = new Subject<AsyncResult<Result, Context>>(() => `${this.displayName}.resolved`);
     readonly rejected = new Subject<AsyncError<Context>>(() => `${this.displayName}.rejected`);
 
+    private _nextEventId = 0;
+
     next(promise: PromiseLike<Result>, context: Context) {
+        const id = this._nextEventId++;
         fireEvent('⚡⌚ (async event)', this.displayName + '.started', { promise, context }, () => ({ Promise: promise, Container: this.container }),
-            () => this.started.next({ promise, context }));
+            () => this.started.next({ id, promise, context }));
 
         promise.then(
             result => fireEvent('⚡✔ (async result)', this.displayName + '.resolved', { result, context }, () => ({ Promise: promise, Container: this.container }),
-                () => this.resolved.next({ result, context })),
+                () => this.resolved.next({ id, result, context })),
             error => fireEvent('⚡❌ (async error)', this.displayName + '.rejected', { error, context }, () => ({ Promise: promise, Container: this.container }),
-                () => this.rejected.next({ error, context })));
+                () => this.rejected.next({ id, error, context })));
     }
 }
 
