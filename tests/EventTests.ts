@@ -1,5 +1,5 @@
 import { asyncEvent, event } from 'event-reduce';
-import { ChainedEventsError } from "event-reduce/lib/events";
+import { AsyncError, AsyncResult, AsyncStart, ChainedEventsError } from "event-reduce/lib/events";
 import * as sinon from 'sinon';
 import { SynchronousPromise } from 'synchronous-promise';
 import { describe, it, test, then, when } from 'wattle';
@@ -68,9 +68,9 @@ describe(asyncEvent.name, function () {
     type Context = { bar: string; };
     let sut = asyncEvent<Result, Context>();
 
-    let started = sinon.stub();
-    let resolved = sinon.stub();
-    let rejected = sinon.stub();
+    let started = sinon.stub<[AsyncStart<Result, Context>]>();
+    let resolved = sinon.stub<[AsyncResult<Result, Context>]>();
+    let rejected = sinon.stub<[AsyncError<Context>]>();
     sut.started.subscribe(started);
     sut.resolved.subscribe(resolved);
     sut.rejected.subscribe(rejected);
@@ -96,4 +96,115 @@ describe(asyncEvent.name, function () {
             then("rejected event fired", () => rejected.should.have.been.calledWith(sinon.match({ error, context })));
         });
     });
+
+    test("correlation id", () => {
+        started.resetHistory();
+        resolved.resetHistory();
+        rejected.resetHistory();
+        let context = { bar: 'context' };
+
+        when("async event called twice", () => {
+            let firstPromise = SynchronousPromise.unresolved<Result>();
+            let secondPromise = SynchronousPromise.unresolved<Result>();
+
+            sut(firstPromise, context);
+            sut(secondPromise, context);
+
+            then("started event fired with different ids", () => {
+                started.should.have.been.calledTwice;
+                started.firstCall.args[0].id.should.not.equal(started.secondCall.args[0].id);
+            });
+
+            test("first promise completes first", () => {
+
+                when("first promise resolved", () => {
+                    let firstResult = { foo: 'first' };
+                    firstPromise.resolve(firstResult);
+
+                    then("resolved event fired with id for first promise", () => resolved.should.have.been.calledWith(sinon.match({ id: started.firstCall.args[0].id, result: firstResult })));
+
+                    when("second promise resolved", () => {
+                        let secondResult = { foo: 'second' };
+                        secondPromise.resolve(secondResult);
+
+                        then("resolved event fired with id for second promise", () => resolved.should.have.been.calledWith(sinon.match({ id: started.secondCall.args[0].id, result: secondResult })));
+                    });
+
+                    when("second promise rejected", () => {
+                        let error = { message: 'second promise rejected' };
+                        secondPromise.reject(error);
+
+                        then("rejected event fired with id for second promise", () => rejected.should.have.been.calledWith(sinon.match({ id: started.secondCall.args[0].id, error })));
+                    });
+                });
+
+                when("first promise rejected", () => {
+                    let firstError = { message: 'first promise rejected' };
+                    firstPromise.reject(firstError);
+
+                    then("rejected event fired with id for first promise", () => rejected.should.have.been.calledWith(sinon.match({ id: started.firstCall.args[0].id, error: firstError })));
+
+                    when("second promise resolved", () => {
+                        let secondResult = { foo: 'second' };
+                        secondPromise.resolve(secondResult);
+
+                        then("resolved event fired with id for second promise", () => resolved.should.have.been.calledWith(sinon.match({ id: started.secondCall.args[0].id, result: secondResult })));
+                    });
+
+                    when("second promise rejected", () => {
+                        let secondError = { message: 'second promise rejected' };
+                        secondPromise.reject(secondError);
+
+                        then("rejected event fired with id for second promise", () => rejected.should.have.been.calledWith(sinon.match({ id: started.secondCall.args[0].id, error: secondError })));
+                    });
+                });
+            });
+
+            test("second promise completes first", () => {
+
+                when("second promise resolved", () => {
+                    let secondResult = { foo: 'second' };
+                    secondPromise.resolve(secondResult);
+
+                    then("resolved event fired with id for second promise", () => resolved.should.have.been.calledWith(sinon.match({ id: started.secondCall.args[0].id, result: secondResult })));
+
+                    when("first promise resolved", () => {
+                        let firstResult = { foo: 'first' };
+                        firstPromise.resolve(firstResult);
+
+                        then("resolved event fired with id for first promise", () => resolved.should.have.been.calledWith(sinon.match({ id: started.firstCall.args[0].id, result: firstResult })));
+                    });
+
+                    when("first promise rejected", () => {
+                        let error = { message: 'first promise rejected' };
+                        firstPromise.reject(error);
+
+                        then("rejected event fired with id for first promise", () => rejected.should.have.been.calledWith(sinon.match({ id: started.firstCall.args[0].id, error })));
+                    });
+                });
+
+                when("second promise rejected", () => {
+                    let secondError = { message: 'second promise rejected' };
+                    secondPromise.reject(secondError);
+
+                    then("rejected event fired with id for second promise", () => rejected.should.have.been.calledWith(sinon.match({ id: started.secondCall.args[0].id, error: secondError })));
+
+                    when("first promise resolved", () => {
+                        let firstResult = { foo: 'first' };
+                        firstPromise.resolve(firstResult);
+
+                        then("resolved event fired with id for first promise", () => resolved.should.have.been.calledWith(sinon.match({ id: started.firstCall.args[0].id, result: firstResult })));
+                    });
+
+                    when("first promise rejected", () => {
+                        let firstError = { message: 'first promise rejected' };
+                        firstPromise.reject(firstError);
+
+                        then("rejected event fired with id for first promise", () => rejected.should.have.been.calledWith(sinon.match({ id: started.firstCall.args[0].id, error: firstError })));
+                    });
+                });
+            });
+        });
+    });
 });
+
