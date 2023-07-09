@@ -38,9 +38,9 @@ function allProperties(obj: unknown) {
     return props;
 }
 
-export function modelProxy<T>(initialState: T): Mutable<T>;
-export function modelProxy<T = any>(): Mutable<T>;
-export function modelProxy<T>(model: T = {} as T) {
+export function modelProxy<T extends object>(initialState: T): Mutable<T>;
+export function modelProxy<T extends object = any>(): Mutable<T>;
+export function modelProxy<T extends object>(model: T = {} as T) {
     if (!isObject(model) || Array.isArray(model))
         return model;
 
@@ -54,32 +54,32 @@ export function modelProxy<T>(model: T = {} as T) {
         });
 
     let proxy: T = new Proxy(model, {
-        get(target: any, key: PropertyKey) {
-            if (key == 'readonly')
+        get(target: T, key: PropertyKey, receiver: T) {
+            if (key == 'target' || key == 'readonly')
                 return proxy;
 
             if (observableValues.hasOwnProperty(key))
                 return observableValues[key as string].value;
 
             if (key in target)
-                return target[key];
+                return Reflect.get(target, key, receiver);
 
             return getOrAddObservableValue(key).value;
         },
 
-        set(target: any, key: PropertyKey, value: any) {
-            if (key == 'readonly')
+        set(target: T, key: PropertyKey, value: any) {
+            if (key == 'target' || key == 'readonly')
                 return false;
 
             getOrAddObservableValue(key).setValue(value);
             return true;
         },
 
-        ownKeys(target: any) {
+        ownKeys(target: T) {
             return Array.from(new Set(Object.keys(target).concat(Object.keys(observableValues))));
         },
 
-        has(target: any, key: PropertyKey) {
+        has(target: T, key: PropertyKey) {
             return key in target || key in observableValues;
         }
     });
@@ -94,7 +94,9 @@ export function modelProxy<T>(model: T = {} as T) {
 export type Mutable<T> = {
     -readonly [P in keyof T]: T[P]
 } & {
-    /** The model as the original type */
+    /** The model proxy as the original type */
+    readonly target: T;
+    /** @deprecated Use `target` instead */
     readonly readonly: T;
 }
 
