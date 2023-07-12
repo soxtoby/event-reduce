@@ -2,9 +2,10 @@ import { nameOfFunction } from "event-reduce";
 import { Derivation } from "event-reduce/lib/derivation";
 import { ObservableValue } from "event-reduce/lib/observableValue";
 import { reactionQueue } from "event-reduce/lib/reactions";
-import { Fragment, ReactElement, ReactNode, createElement, useCallback, useEffect } from "react";
+import { Children, Fragment, ReactElement, ReactNode, createElement, isValidElement, useCallback, useEffect } from "react";
 import { useSyncExternalStore } from "use-sync-external-store/shim";
 import { useDispose, useOnce } from "./utils";
+import { LogValue } from "event-reduce/lib/logging";
 
 export function Reactive(props: { name?: string; children: () => ReactNode; }): ReactElement {
     return useReactive(props.name || 'Derived', () => createElement(Fragment, { children: props.children() }));
@@ -32,7 +33,7 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
 
 function useSyncDerivation<T>(name: string) {
     // Using a bogus derive function because we'll provide a new one every render
-    let derivedValue = useOnce(() => new Derivation<T>(() => name, () => undefined!));
+    let derivedValue = useOnce(() => new RenderedValue<T>(() => name, () => undefined!));
     useDispose(() => derivedValue.dispose());
 
     let render = useOnce(() => new ObservableValue(() => `${name}.render`, { invalidatedBy: "(nothing)" }));
@@ -50,7 +51,37 @@ function useSyncDerivation<T>(name: string) {
     return derivedValue;
 }
 
-function useRenderValue<T>(derivation: Derivation<T>, deriveValue: () => T) {
+function useRenderValue<T>(derivation: RenderedValue<T>, deriveValue: () => T) {
     useCallback(function update() { derivation.update(deriveValue, 'render'); }, [deriveValue])(); // need to use a hook to be considered a hook in devtools
     return derivation.value;
+}
+
+class RenderedValue<T> extends Derivation<T> {
+    protected override updatedEvent = '⚛️ (render)';
+    protected override invalidatedEvent = '⚛️🚩 (render invalidated)';
+    protected override loggedValue(value: T) {
+        if (process.env.NODE_ENV !== 'production' && isValidElement(value)) {
+            let xmlDoc = document.implementation.createDocument(null, null);
+            return new LogValue([
+                xmlTree(value),
+                { ['React element']: value }
+            ]);
+
+            function xmlTree<T>(node: T): Node {
+                if (isValidElement(node)) {
+                    let type = (typeof node.type == 'string' ? node.type
+                        : typeof node.type == 'function' ? nameOfFunction(node.type)
+                            : typeof node.type == 'symbol' ? String(node.type)
+                                : '???')
+                        .split('(').at(-1)!.split(')')[0]; // Unwrap HOC names
+                    let el = xmlDoc.createElement(type);
+                    for (let child of Children.toArray((node.props as any).children))
+                        el.appendChild(xmlTree(child));
+                    return el;
+                }
+                return document.createTextNode(String(node));
+            }
+        }
+        return value;
+    }
 }

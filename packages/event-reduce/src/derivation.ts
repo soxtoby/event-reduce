@@ -14,6 +14,9 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
     private _sources = new Map<IObservable<any>, Unsubscribe>();
     private _invalidatingSource?: IObservable<unknown>;
 
+    protected updatedEvent = '🔗 (derivation)';
+    protected invalidatedEvent = '🔗🚩 (derivation invalidated)';
+
     constructor(
         getDisplayName: () => string,
         private _deriveValue: () => T
@@ -56,9 +59,9 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
             for (let source of newSources)
                 this._sources.set(source, source.subscribe(() => this.invalidate(source), () => this.displayName));
 
-            log('🔗 (derivation)', this.displayName, [], () => ({
-                Previous: this._value,
-                Current: value,
+            log(this.updatedEvent, this.displayName, [], () => ({
+                Previous: this.loggedValue(this._value),
+                Current: this.loggedValue(value),
                 Container: this.container,
                 Sources: sourceTree(this.sources),
                 TriggeredBy: trigger ?? reason
@@ -72,12 +75,14 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
         this._requiresUpdate = true;
         this._invalidatingSource = source;
 
-        log('🔗🚩 (derivation invalidated)', this.displayName, [], () => ({
-            Previous: this._value,
+        log(this.invalidatedEvent, this.displayName, [], () => ({
+            Previous: this.loggedValue(this._value),
             Container: this.container,
             Sources: sourceTree(oldSources)
         }), () => this.notifyObservers());
     }
+
+    protected loggedValue(value: T): unknown { return value; }
 
     override unsubscribeFromSources() {
         this._sources.forEach(unsub => unsub());
