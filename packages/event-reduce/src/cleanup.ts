@@ -1,7 +1,7 @@
 import { log } from "./logging";
 import { getObservableValues, getStateProperties, isModel } from "./models";
 import { ObservableValue } from "./observableValue";
-import { isPlainObject, nameOfFunction } from "./utils";
+import { dispose, isPlainObject, nameOfFunction } from "./utils";
 
 /** value -> owners */
 const ownerRegistry = new WeakMap<TrackableValue, Set<TrackableValue>>();
@@ -40,7 +40,7 @@ export function disposeModel(model: Model) {
     log('🗑️ (dispose)', nameOfFunction(model.constructor), [], undefined, () => {
         ownerRegistry.delete(model);
         if (model instanceof ObservableValue) {
-            model.dispose();
+            model[dispose]();
         } else if (isModel(model)) {
             for (let value of Object.values(getObservableValues(model)))
                 removeOwner(model, value);

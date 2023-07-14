@@ -3,6 +3,7 @@ import { changeOwnedValue } from "event-reduce/lib/cleanup";
 import { getObservableValues } from "event-reduce/lib/models";
 import { ObservableValue } from "event-reduce/lib/observableValue";
 import { StringKey } from "event-reduce/lib/types";
+import { dispose } from "event-reduce/lib/utils";
 import { spy } from "sinon";
 import { describe, it, then, when } from "wattle";
 
@@ -225,7 +226,7 @@ describe("subscription cleanup", function () {
         let disposeModel = spyOnDispose(arrayValue.value[0], 'reducedProp');
 
         when("array value is disposed", () => {
-            arrayValue.dispose();
+            arrayValue[dispose]();
 
             it("doesn't dispose items", () => disposeModel.should.not.have.been.called);
         });
@@ -237,7 +238,7 @@ describe("subscription cleanup", function () {
         let disposeModel = spyOnDispose(objectValue.value.model, 'reducedProp');
 
         when("object value is disposed", () => {
-            objectValue.dispose();
+            objectValue[dispose]();
 
             it("doesn't dispose values", () => disposeModel.should.not.have.been.called);
         });
@@ -284,6 +285,6 @@ describe("subscription cleanup", function () {
 
     function spyOnDispose<T>(model: T, property: StringKey<T>) {
         let observableValue = getObservableValues(model)[property];
-        return spy(observableValue, 'dispose');
+        return spy(observableValue, dispose);
     }
 });

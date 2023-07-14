@@ -62,3 +62,12 @@ export function firstIntersection<T>(a: Set<T>, b: Set<T>) {
         if (b.has(item))
             return item;
 }
+
+// TODO remove after TypeScript 5.2
+declare global {
+    interface SymbolConstructor {
+        readonly dispose: unique symbol;
+    }
+}
+
+export const dispose: typeof Symbol.dispose = Symbol.dispose ?? Symbol('Symbol.dispose');

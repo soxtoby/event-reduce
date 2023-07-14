@@ -1,11 +1,11 @@
 import { Unsubscribe } from "./types";
-import { filteredName, NamedBase, nameOfCallback } from "./utils";
+import { dispose, filteredName, NamedBase, nameOfCallback } from "./utils";
 
 export type Observe<T> = (value: T) => void;
 
 export interface IObservable<T> {
     subscribe(observe: Observe<T>, getObserverName?: () => string): Unsubscribe;
-    dispose(): void;
+    [dispose](): void;
     filter(condition: (value: T) => boolean, getDisplayName?: () => string): IObservable<T>;
     map<U>(select: (value: T) => U, getDisplayName?: () => string): IObservable<U>;
     filterMap<U>(select: (value: T) => U | undefined, getDisplayName?: () => string): IObservable<U>;
@@ -45,7 +45,7 @@ export class Observable<T> extends NamedBase {
         this._observers.delete(observer);
     }
 
-    dispose() {
+    [dispose]() {
         this.unsubscribeFromSources();
         this._observers.clear();
     }

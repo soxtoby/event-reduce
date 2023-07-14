@@ -2,7 +2,7 @@ import { changeOwnedValue } from "./cleanup";
 import { allSources, IObservable, Observable, pathToSource } from "./observable";
 import { Subject } from "./subject";
 import { Action, Unsubscribe } from "./types";
-import { firstIntersection } from "./utils";
+import { dispose, firstIntersection } from "./utils";
 
 interface IValueAccess {
     observable: ObservableValue<any>;
@@ -53,8 +53,8 @@ export class ObservableValue<T> extends Observable<void> implements IObservableV
         }
     }
 
-    override dispose() {
-        super.dispose();
+    override[dispose]() {
+        super[dispose]();
         changeOwnedValue(this, this._value, undefined);
         // Keep the value, in case this is still being held onto (e.g. with useDerredValue)
     }
