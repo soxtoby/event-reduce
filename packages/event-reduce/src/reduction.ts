@@ -1,7 +1,7 @@
 import { log, sourceTree } from "./logging";
-import { allSources, IObservable, isObservable } from "./observable";
-import { getUnderlyingObservable, IObservableValue, ObservableValue, protectAgainstAccessingValueWithCommonSource, ValueIsNotObservableError } from "./observableValue";
-import { setState, State, StateObject } from "./state";
+import { IObservable, allSources, isObservable } from "./observable";
+import { IObservableValue, ObservableValue, ValueIsNotObservableError, getUnderlyingObservable, protectAgainstAccessingValueWithCommonSource } from "./observableValue";
+import { State, setState } from "./state";
 import { Subject } from "./subject";
 import { Unsubscribe } from "./types";
 import { isObject } from "./utils";
@@ -26,7 +26,7 @@ export interface IBoundReduction<T, TEvents> extends IReduction<T> {
     on<TEvent>(observable: ((events: TEvents) => IObservable<TEvent>) | IObservable<TEvent>, reduce: Reducer<T, TEvent>): this;
 }
 
-export class Reduction<T> extends ObservableValue<T> {
+export class Reduction<T> extends ObservableValue<T> implements IReduction<T> {
     private _sources = new Map<IObservable<any>, Unsubscribe>();
     private _restore = new Subject<State<T>>(() => `${this.displayName}.restored`);
 
@@ -35,14 +35,14 @@ export class Reduction<T> extends ObservableValue<T> {
 
         this.onRestore((current, state) => {
             if (isObject(current)) {
-                setState(current, state as StateObject<T>);
+                setState(current, state);
                 return current;
             }
             return state as T;
         });
     }
 
-    get sources() { return Array.from(this._sources.keys()); }
+    override get sources() { return Array.from(this._sources.keys()); }
 
     restore(state: State<T>): void {
         this._restore.next(state);
@@ -74,7 +74,7 @@ export class Reduction<T> extends ObservableValue<T> {
     onValueChanged<TValue>(observableValue: TValue, reduce: Reducer<T, TValue>) {
         let observable = getUnderlyingObservable(observableValue);
         if (observable)
-            return this.on(observable, reduce);
+            return this.on(observable.values, reduce);
         throw new ValueIsNotObservableError(observableValue);
     }
 
@@ -82,20 +82,20 @@ export class Reduction<T> extends ObservableValue<T> {
         return this.on(this._restore, reduce);
     }
 
-    unsubscribeFromSources() {
+    override unsubscribeFromSources() {
         this._sources.forEach(unsub => unsub());
         this._sources.clear();
     }
 }
 
-class BoundReduction<TValue, TEvents> extends Reduction<TValue> {
+class BoundReduction<TValue, TEvents> extends Reduction<TValue> implements IBoundReduction<TValue, TEvents> {
     constructor(
         getDisplayName: () => string,
         initial: TValue,
         private _events: TEvents = {} as TEvents
     ) { super(getDisplayName, initial); }
 
-    on<TEvent>(observable: ((events: TEvents) => IObservable<TEvent>) | IObservable<TEvent>, reduce: Reducer<TValue, TEvent>): this {
+    override on<TEvent>(observable: ((events: TEvents) => IObservable<TEvent>) | IObservable<TEvent>, reduce: Reducer<TValue, TEvent>): this {
         return super.on(isObservable(observable) ? observable : observable(this._events), reduce);
     }
 }

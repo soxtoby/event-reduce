@@ -1,10 +1,10 @@
-import { asyncEvent, derived, event, events, extend, reduce, reduced, derive, model } from "event-reduce";
+import { asyncEvent, derive, derived, event, events, extend, model, reduce, reduced } from "event-reduce";
 import { AccessedValueWithCommonSourceError } from "event-reduce/lib/observableValue";
 import { describe, it, test, then, when } from "wattle";
 
-describe("model decorators", function () {
-    let increment = event();
-    let decrement = event();
+describe("models", function () {
+    let increment = event('increment');
+    let decrement = event('decrement');
 
     @model
     class TestModel {
@@ -35,7 +35,7 @@ describe("model decorators", function () {
 
     @model
     class ExtendedModel extends TestModel {
-        property: number = extend(this.property)
+        override property: number = extend(this.property)
             .on(decrement, c => c - 1)
             .value;
     }
@@ -120,7 +120,7 @@ describe("events decorator", function () {
     it("keeps class name", () => TestEvents.name.should.equal('TestEvents'));
 
     it("sets event name", () => {
-        (sut.promiseEvent as any).displayName.should.equal('promiseEvent');
+        sut.promiseEvent.displayName.should.equal('promiseEvent');
         sut.promiseEvent.started.displayName.should.equal('promiseEvent.started');
         sut.promiseEvent.resolved.displayName.should.equal('promiseEvent.resolved');
         sut.promiseEvent.rejected.displayName.should.equal('promiseEvent.rejected');

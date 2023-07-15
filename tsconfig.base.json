@@ -5,6 +5,7 @@
     "lib": ["es2017", "dom"],
     "jsx": "react",
     "strict": true,
+    "noImplicitOverride": true,
     "inlineSourceMap": true,
     "inlineSources": true,
     "experimentalDecorators": true,

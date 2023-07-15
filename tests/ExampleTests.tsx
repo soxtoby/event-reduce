@@ -6,7 +6,6 @@ import { eventProxy, mutable } from "event-reduce/lib/testing";
 import * as React from "react";
 import { SynchronousPromise } from "synchronous-promise";
 import { describe, it, test, then, when } from "wattle";
-import { runReactions } from "./setup";
 
 describe(CounterListModel.name, function () {
     let events = new CounterListEvents();
@@ -37,19 +36,17 @@ describe(CounterListModel.name, function () {
     });
 });
 
-describe(CounterList.displayName!, function () {
+describe(CounterList.name, function () {
     let model = new CounterListModel(new CounterListEvents());
     let sut = render(<CounterList model={model} />);
 
     when("'Add Counter' button clicked", () => {
         fireEvent.click(sut.getByText('Add Counter'));
-        runReactions();
 
         then("counter added", () => sut.getByTestId('counter').should.exist);
 
         when("'Remove' button clicked", () => {
             fireEvent.click(sut.getByText('Remove'));
-            runReactions();
 
             then("counter removed", () => expect(sut.queryByTestId('counter')).to.not.exist);
         });
@@ -111,7 +108,7 @@ describe(CounterModel.name, function () {
     });
 });
 
-describe(Counter.displayName!, function () {
+describe(Counter.name, function () {
     let id = 1;
     let model = new CounterModel(new CounterEvents(eventProxy(), id), { id, count: 3 });
     let sut = render(<Counter model={model} />);
@@ -122,28 +119,24 @@ describe(Counter.displayName!, function () {
 
     when("'+' button clicked'", () => {
         fireEvent.click(sut.getByText('+'));
-        runReactions();
 
         then("count incremented", () => sut.getByTestId('count').should.have.text('4'));
     });
 
     when("'-' button clicked", () => {
         fireEvent.click(sut.getByText('-'));
-        runReactions();
 
         then("count decremented", () => sut.getByTestId('count').should.have.text('2'));
     });
 
     when("'0' button clicked'", () => {
         fireEvent.click(sut.getByText('0'));
-        runReactions();
 
         then("count reset to 0", () => sut.getByTestId('count').should.have.text('0'));
     });
 
     when("'Fetch' button clicked", () => {
         fireEvent.click(sut.getByText('Fetch'));
-        runReactions();
 
         then("count set to 100", () => sut.getByTestId('count').should.have.text('100'));
     });

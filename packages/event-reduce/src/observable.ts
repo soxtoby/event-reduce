@@ -1,13 +1,14 @@
 import { Unsubscribe } from "./types";
-import { filteredName, NamedBase, nameOfFunction } from "./utils";
+import { dispose, filteredName, NamedBase, nameOfCallback } from "./utils";
 
 export type Observe<T> = (value: T) => void;
 
 export interface IObservable<T> {
     subscribe(observe: Observe<T>, getObserverName?: () => string): Unsubscribe;
-    unsubscribeFromSources(): void;
+    [dispose](): void;
     filter(condition: (value: T) => boolean, getDisplayName?: () => string): IObservable<T>;
     map<U>(select: (value: T) => U, getDisplayName?: () => string): IObservable<U>;
+    filterMap<U>(select: (value: T) => U | undefined, getDisplayName?: () => string): IObservable<U>;
 
     displayName: string;
     readonly sources: readonly IObservable<any>[];
@@ -32,6 +33,8 @@ export class Observable<T> extends NamedBase {
 
     get sources() { return [] as readonly IObservable<any>[]; }
 
+    get isObserved() { return this._observers.size > 0; }
+
     subscribe(observe: Observe<T>, getObserverName = () => '(anonymous observer)'): Unsubscribe {
         let observer = { getDisplayName: getObserverName, next: observe };
         this._observers.add(observer);
@@ -40,6 +43,11 @@ export class Observable<T> extends NamedBase {
 
     protected unsubscribe(observer: IObserver<T>) {
         this._observers.delete(observer);
+    }
+
+    [dispose]() {
+        this.unsubscribeFromSources();
+        this._observers.clear();
     }
 
     protected notifyObservers(value: T) {
@@ -53,9 +61,19 @@ export class Observable<T> extends NamedBase {
             observer => this.subscribe(value => condition(value) && observer.next(value), getDisplayName));
     }
 
-    map<U>(select: (value: T) => U, getDisplayName: () => string = () => `${this.displayName}.map(${nameOfFunction(select)})`): IObservable<U> {
+    map<U>(select: (value: T) => U, getDisplayName: () => string = () => `${this.displayName}.map(${nameOfCallback(select)})`): IObservable<U> {
         return new ObservableOperation<U>(getDisplayName, [this],
             observer => this.subscribe(value => observer.next(select(value)), getDisplayName));
+    }
+
+    /** Maps values to a new type, filtering out undefined results. */
+    filterMap<U>(select: (value: T) => U | undefined, getDisplayName: () => string = () => `${this.displayName}.filterMap(${nameOfCallback(select)})`): IObservable<U> {
+        return new ObservableOperation<U>(getDisplayName, [this],
+            observer => this.subscribe(value => {
+                let mapped = select(value);
+                if (mapped !== undefined)
+                    observer.next(mapped);
+            }, getDisplayName));
     }
 }
 
@@ -70,24 +88,23 @@ export class ObservableOperation<T> extends Observable<T> {
         super(getDisplayName);
     }
 
-    get sources() { return this._sources; }
+    override get sources() { return this._sources; }
 
-    subscribe(observer: Observe<T>, getObserverName = () => '(anonymous observer)'): Unsubscribe {
+    override subscribe(observer: Observe<T>, getObserverName = () => '(anonymous observer)'): Unsubscribe {
         let unsubscribe = super.subscribe(observer, getObserverName);
         if (this._observers.size == 1)
             this._unsubscribeFromSources = this._subscribeToSources({ getDisplayName: () => this.displayName, next: this.notifyObservers.bind(this) });
         return unsubscribe;
     }
 
-    protected unsubscribe(observer: IObserver<T>) {
+    protected override unsubscribe(observer: IObserver<T>) {
         super.unsubscribe(observer);
         if (!this._observers.size)
             this.unsubscribeFromSources();
     }
 
-    unsubscribeFromSources() {
-        if (this._unsubscribeFromSources)
-            this._unsubscribeFromSources();
+    override unsubscribeFromSources() {
+        this._unsubscribeFromSources?.();
     }
 }
 

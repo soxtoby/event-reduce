@@ -1,15 +1,21 @@
 import { log, sourceTree } from "./logging";
-import { IObservable, Observe } from "./observable";
-import { collectAccessedValues, ObservableValue, withInnerTrackingScope } from "./observableValue";
+import { IObservable } from "./observable";
+import { IObservableValue, ObservableValue, collectAccessedValues, withInnerTrackingScope } from "./observableValue";
 import { Unsubscribe } from "./types";
+
+let currentlyRunningDerivation = null as IObservableValue<unknown> | null;
 
 export function derive<T>(getDerivedValue: () => T, name?: string) {
     return new Derivation(() => name || '(anonymous derivation)', getDerivedValue);
 }
 
-export class Derivation<T> extends ObservableValue<T> {
+export class Derivation<T> extends ObservableValue<T> implements IObservableValue<T> {
     private _requiresUpdate = true;
     private _sources = new Map<IObservable<any>, Unsubscribe>();
+    private _invalidatingSource?: IObservable<unknown>;
+
+    protected updatedEvent = '🔗 (derivation)';
+    protected invalidatedEvent = '🔗🚩 (derivation invalidated)';
 
     constructor(
         getDisplayName: () => string,
@@ -18,50 +24,80 @@ export class Derivation<T> extends ObservableValue<T> {
         super(getDisplayName, undefined!);
     }
 
-    get sources() { return Array.from(this._sources.keys()); }
+    override get sources() { return Array.from(this._sources.keys()); }
 
-    get value() {
+    override get value() {
         if (this._requiresUpdate)
-            withInnerTrackingScope(() => this.update());
+            this.update();
         return super.value;
     }
 
-    private update() {
-        let value!: T;
+    get invalidatedBy() { return this._invalidatingSource?.displayName; }
 
-        collectAccessedValues(() => value = this._deriveValue())
-            .forEach(o => this._sources.set(o, o.subscribe(() => this.invalidate(), () => this.displayName)));
+    /** 
+     * Forces the value to be re-calculated. 
+     * @param deriveValue Optional function to use to derive the value. If not provided, the original derivation function will be used.
+     * @param reason Optional reason for the update. If not invalidated by a source change, this will be used as the reason for the update.
+     **/
+    update(deriveValue = this._deriveValue, reason?: string) {
+        withInnerTrackingScope(() => {
+            this._requiresUpdate = false;
+            let trigger = this._invalidatingSource;
+            delete this._invalidatingSource;
+            let value!: T;
 
-        log('🔗 (derivation)', this.displayName, [], () => ({
-            Previous: this._value,
-            Current: value,
-            Container: this.container,
-            Sources: sourceTree(this.sources)
-        }), () => this.setValue(value));
+            this.unsubscribeFromSources();
+            let newSources = collectAccessedValues(() => {
+                let previouslyRunningDerivation = currentlyRunningDerivation;
+                currentlyRunningDerivation = this;
+                try {
+                    value = (deriveValue ?? this._deriveValue)();
+                } finally {
+                    currentlyRunningDerivation = previouslyRunningDerivation;
+                }
+            });
+            for (let source of newSources)
+                this._sources.set(source, source.subscribe(() => this.invalidate(source), () => this.displayName));
+
+            log(this.updatedEvent, this.displayName, [], () => ({
+                Previous: this.loggedValue(this._value),
+                Current: this.loggedValue(value),
+                Container: this.container,
+                Sources: sourceTree(this.sources),
+                TriggeredBy: trigger ?? reason
+            }), () => this.setValue(value, false));
+        });
     }
 
-    setValue(value: T) {
-        this._requiresUpdate = false;
-        super.setValue(value);
-    }
-
-    private invalidate() {
+    private invalidate(source: IObservable<unknown>) {
+        let oldSources = this.sources;
         this.unsubscribeFromSources();
         this._requiresUpdate = true;
+        this._invalidatingSource = source;
 
-        if (this._observers.size)
-            this.update();
+        log(this.invalidatedEvent, this.displayName, [], () => ({
+            Previous: this.loggedValue(this._value),
+            Container: this.container,
+            Sources: sourceTree(oldSources)
+        }), () => this.notifyObservers());
     }
 
-    subscribe(observe: Observe<T>, getObserverName?: () => string) {
-        if (this._requiresUpdate)
-            withInnerTrackingScope(() => this.update());
+    protected loggedValue(value: T): unknown { return value; }
 
-        return super.subscribe(observe, getObserverName);
-    }
-
-    unsubscribeFromSources() {
+    override unsubscribeFromSources() {
         this._sources.forEach(unsub => unsub());
         this._sources.clear();
     }
+}
+
+export function ensureNotInsideDerivation(sideEffect: string) {
+    if (currentlyRunningDerivation)
+        throw new SideEffectInDerivationError(currentlyRunningDerivation, sideEffect);
+}
+
+export class SideEffectInDerivationError extends Error {
+    constructor(
+        public derivation: IObservableValue<unknown>,
+        public sideEffect: string
+    ) { super(`Derivation ${derivation.displayName} triggered side effect ${sideEffect}. Derivations cannot have side effects.`); }
 }

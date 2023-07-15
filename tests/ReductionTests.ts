@@ -59,7 +59,7 @@ describe(reduce.name, function () {
         });
 
         when("subscribing to an observable based on itself", () => {
-            let observable = sut.filter(n => n > 3);
+            let observable = sut.values.filter(n => n > 3);
             let action = () => sut.on(observable, (_, n) => n);
 
             it("throws", () => {

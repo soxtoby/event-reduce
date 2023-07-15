@@ -19,7 +19,7 @@
         "@types/react": ">=16.8",
         "@types/react-dom": ">=16.8",
         "parcel-bundler": "*",
-        "typescript": "~4"
+        "typescript": "~5"
     },
     "browserslist": ["last 2 Chrome versions"]
 }

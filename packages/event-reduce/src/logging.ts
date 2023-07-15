@@ -1,8 +1,15 @@
 import { sendEvent } from "./devtools";
 import { IObservable } from "./observable";
+import { StringKey } from "./types";
 
 let loggingEnabled = false;
 let loggingDepth = 0;
+
+/**
+ * For logged values that have their own specific log formatting.
+ * `args` will be passed as separate arguments to `console.log`
+ **/
+export class LogValue { constructor(public args: unknown[]) { } }
 
 export function enableLogging(enable = true) {
     loggingEnabled = enable;
@@ -13,7 +20,7 @@ export function logEvent(type: string, displayName: string, arg: any, getInfo: (
     sendEvent(displayName, arg);
 }
 
-export function log(type: string, displayName: string, args: any[], getInfo?: () => object, work?: () => void) {
+export function log<Info extends object>(type: string, displayName: string, args: any[], getInfo?: () => Info, work?: () => void) {
     if (process.env.NODE_ENV !== 'production') {
         if (!loggingEnabled)
             return void (work && work());
@@ -35,16 +42,21 @@ export function log(type: string, displayName: string, args: any[], getInfo?: ()
         function logMessage(group: boolean) {
             let message = [`${displayName} %c${type}`, 'color: grey; font-weight: normal;', ...args];
 
-            let info = getInfo && getInfo() || {};
-            let infoKeys = Object.keys(info);
+            let info = getInfo?.() ?? {} as Info;
+            let infoKeys = Object.keys(info) as StringKey<Info>[];
             if (infoKeys.length || group) {
                 if (loggingDepth)
                     console.group(...message);
                 else
                     console.groupCollapsed(...message);
 
-                for (let key of infoKeys)
-                    console.log(`${key}:`, (info as any)[key]);
+                for (let key of infoKeys) {
+                    let infoValue = info[key];
+                    if (infoValue instanceof LogValue)
+                        console.log(`${key}:`, ...infoValue.args);
+                    else
+                        console.log(`${key}:`, infoValue);
+                }
 
                 if (!group)
                     console.groupEnd();

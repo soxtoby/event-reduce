@@ -1,34 +1,15 @@
-import { getObservableProperties } from "./decorators";
+import { getObservableProperties, getStateProperties, isModel } from "./models";
 import { Reduction } from "./reduction";
-import { StringKey } from "./types";
-import { getOrAdd, isModel, isObject, isPlainObject, jsonPath } from "./utils";
+import { OmitValues, StringKey } from "./types";
+import { isObject, jsonPath } from "./utils";
 
 export type State<T> =
     T extends Function ? never
-    : T extends Array<infer U> ? StateArray<U>
-    : T extends object ? StateObject<T>
+    : T extends Array<infer U> ? State<U>[]
+    : T extends object ? { [K in StringKey<OmitValues<T, Function>>]: State<T[K]> }
     : T;
 
-export interface StateArray<T> extends Array<State<T>> { }
-export type StateObject<T> = { [P in keyof T]: State<T[P]> };
-
-const statePropsKey = Symbol('stateProps');
-
-/** Mark a constructor parameter as a state property by specifying its name. */
-export function state(parameterName: string): ParameterDecorator;
-/** Mark a property as a state property. */
-export function state(target: any, key: string): void;
-export function state(paramNameOrTarget: any, key?: string) {
-    if (typeof paramNameOrTarget == 'string')
-        return (constructor: Function, key: any, index: number) => addStateProp(constructor.prototype, paramNameOrTarget);
-
-    addStateProp(paramNameOrTarget.constructor.prototype, key!);
-}
-
-function addStateProp(prototype: any, key: string) {
-    getOrAdd(prototype, statePropsKey, () => [] as string[])
-        .push(key);
-}
+export type StateKey<T> = Extract<keyof T, keyof State<T>>;
 
 export interface IStateOptions {
     /** 
@@ -45,20 +26,15 @@ export interface IStateOptions {
 export type CircularReferenceHandling = 'error' | 'warn' | 'expect';
 
 export function getState<T>(model: T, options: IStateOptions = {}): State<T> {
-    let { circularReferences, name = '$', ...otherOptions } = options;
-    try {
-        return getStateRecursive(circularReferences == 'expect' ? options : otherOptions, new Map(), name, model);
-    } catch {
-        circularReferences ??= (process.env.NODE_ENV === 'production' ? 'expect' : 'error'); // Silently handle circular references in production
-        return getStateRecursive({ circularReferences, ...otherOptions }, new Map(), name, model);
-    }
+    return getStateRecursive(options, new Map(), options.name ?? '$', model);
 }
+
 function getStateRecursive<T>(options: IStateOptions, parentPath: Map<unknown, PropertyKey>, key: PropertyKey, model: T): State<T> {
     if (!isObject(model))
         return model as State<T>;
 
-    if (options.circularReferences && parentPath.has(model))
-        return getCircularReference(options.circularReferences, parentPath, key, model);
+    if (parentPath.has(model))
+        return getCircularReference(options.circularReferences ?? (process.env.NODE_ENV === 'production' ? 'expect' : 'error'), parentPath, key, model);
 
     parentPath.set(model, key);
     let state = Array.isArray(model)
@@ -73,13 +49,13 @@ function getArrayState<T>(options: IStateOptions, parentPath: Map<unknown, Prope
 }
 
 function getObjectState<T>(options: IStateOptions, parentPath: Map<unknown, PropertyKey>, model: T) {
-    let state = {} as StateObject<T>;
+    let state = {} as State<T>;
     for (let key of getAllStatefulProperties(model, options.includeDerivedProperties)) {
-        let value = model[key as keyof T];
+        let value = model[key];
         if (typeof value != 'function')
-            state[key as keyof T] = getStateRecursive(options, parentPath, key, value);
+            state[key] = getStateRecursive(options, parentPath, key, value) as State<T>[StateKey<T>];
     }
-    return state as State<T>;
+    return state;
 }
 
 function getCircularReference<T>(handling: CircularReferenceHandling, parentPath: Map<unknown, PropertyKey>, key: PropertyKey, model: T) {
@@ -90,65 +66,52 @@ function getCircularReference<T>(handling: CircularReferenceHandling, parentPath
     let circularPathKeys = circularPath.map(([key]) => key);
     let referencedPathKeys = circularPathKeys.slice(0, circularPath.findIndex(([, v]) => v == model) + 1);
 
-    if (handling == 'expect')
-        return `<ref: ${jsonPath(referencedPathKeys)}>` as any;
+    if (handling == 'warn')
+        console.warn(CircularReferenceInStateError.message(circularPathKeys, referencedPathKeys), new Details(circularPath));
 
-    let error = new CircularReferenceInStateError(circularPath, circularPathKeys, referencedPathKeys);
+    if (handling == 'error')
+        throw new CircularReferenceInStateError(circularPath, circularPathKeys, referencedPathKeys);
 
-    if (handling == 'warn') {
-        console.warn(error.message, new Details(circularPath));
-        return;
-    }
-
-    throw error;
+    return `<ref: ${jsonPath(referencedPathKeys)}>` as State<T>;
 }
 
 // Just for naming in the console
 class Details { constructor(public circularPath: (readonly [PropertyKey, unknown])[]) { } }
 
-export function setState<T>(model: T, state: StateObject<T>) {
+export function setState<T>(model: T, state: State<T>) {
     let observableProps = getReducedProperties(model);
     let stateProps = getAllStatefulProperties(model)
-        .filter(key => key in state);
+        .filter(key => key in (state as object));
 
     stateProps.forEach(key => {
         if (key in observableProps)
             observableProps[key].restore(state[key]);
         else if (isObject(model[key]))
-            setState(model[key], state[key] as StateObject<T[StringKey<T>]>);
+            setState(model[key], state[key] as State<T[StateKey<T>]>);
         else
-            model[key] = state[key] as T[StringKey<T>];
+            model[key] = state[key] as T[StateKey<T>];
     });
 
     return model;
 }
 
-function getAllStatefulProperties<T>(model: T, includeDerived = false) {
+function getAllStatefulProperties<T>(model: T, includeDerived = false): StateKey<T>[] {
     if (!isModel(model))
-        return Object.keys(model) as StringKey<T>[];
+        return Object.keys(model as object) as StateKey<T>[];
     let observableProps = includeDerived
         ? Object.keys(getObservableProperties(model) || {})
         : Object.keys(getReducedProperties(model));
     let explicitProps = getStateProperties(model);
-    return observableProps.concat(explicitProps) as StringKey<T>[];
-}
-
-export function getStateProperties<T>(model: T): string[] {
-    if (isPlainObject(model))
-        return [];
-
-    let prototype = Object.getPrototypeOf(model);
-    return getStateProperties(prototype)
-        .concat(prototype[statePropsKey] as StringKey<T>[] | undefined || []);
+    return observableProps.concat(explicitProps) as StateKey<T>[];
 }
 
 function getReducedProperties<T>(model: T) {
-    let reducedProps = {} as Record<string, Reduction<any>>;
+    let reducedProps = {} as Record<StateKey<T>, Reduction<unknown>>;
     let observableProps = getObservableProperties(Object.getPrototypeOf(model)) || {};
     for (let key in observableProps) {
         let observableValue = observableProps[key](model);
         if (observableValue instanceof Reduction)
-            reducedProps[key] = observableValue;
+            reducedProps[key as StateKey<T>] = observableValue;
     }
     return reducedProps;
 }
@@ -159,6 +122,10 @@ export class CircularReferenceInStateError extends Error {
         public circularPathKeys: PropertyKey[],
         public referencedPathKeys: PropertyKey[]
     ) {
-        super(`Detected circular reference in model: ${jsonPath(circularPathKeys)} -> ${jsonPath(referencedPathKeys)}`);
+        super(CircularReferenceInStateError.message(circularPathKeys, referencedPathKeys));
+    }
+
+    static message(circularPathKeys: PropertyKey[], referencedPathKeys: PropertyKey[]) {
+        return `Detected circular reference in model: ${jsonPath(circularPathKeys)} -> ${jsonPath(referencedPathKeys)}`;
     }
 }

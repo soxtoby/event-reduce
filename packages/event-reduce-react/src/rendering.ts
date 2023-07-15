@@ -1,44 +1,24 @@
-import { Unsubscribe, watch } from "event-reduce";
-import { log, sourceTree } from "event-reduce/lib/logging";
-import { collectAccessedValues, ObservableValue } from "event-reduce/lib/observableValue";
+import { nameOfFunction } from "event-reduce";
+import { Derivation } from "event-reduce/lib/derivation";
+import { LogValue } from "event-reduce/lib/logging";
+import { ObservableValue } from "event-reduce/lib/observableValue";
 import { reactionQueue } from "event-reduce/lib/reactions";
-import { createElement, forwardRef, ForwardRefExoticComponent, ForwardRefRenderFunction, Fragment, FunctionComponent, memo, MemoExoticComponent, PropsWithChildren, PropsWithoutRef, ReactElement, ReactNode, RefAttributes, useRef, useState, ValidationMap, WeakValidationMap } from "react";
-import { useAsObservableValues } from "./hooks";
-import { useDispose } from "./utils";
-
-interface ContextlessFunctionComponent<P = {}> {
-    (props: PropsWithChildren<P>): ReactElement | null;
-    propTypes?: WeakValidationMap<P>;
-    contextTypes?: ValidationMap<any>;
-    defaultProps?: Partial<P>;
-    displayName?: string;
-}
-
-export type ReactiveComponent<Component extends ContextlessFunctionComponent<any> | ForwardRefRenderFunction<any, any>> =
-    Component extends ContextlessFunctionComponent<any> ? MemoExoticComponent<Component>
-    : Component extends ForwardRefRenderFunction<infer Ref, infer Props> ? MemoExoticComponent<ForwardRefExoticComponent<PropsWithoutRef<Props> & RefAttributes<Ref>>>
-    : never;
+import { dispose } from "event-reduce/lib/utils";
+import { Children, Fragment, ReactElement, ReactNode, createElement, isValidElement, useCallback, useEffect } from "react";
+import { useSyncExternalStore } from "use-sync-external-store/shim";
+import { useDispose, useOnce } from "./utils";
 
 export function Reactive(props: { name?: string; children: () => ReactNode; }): ReactElement {
     return useReactive(props.name || 'Derived', () => createElement(Fragment, { children: props.children() }));
 }
 
-export function reactive<Component extends (ContextlessFunctionComponent<any> | ForwardRefRenderFunction<any, any>)>(component: Component): ReactiveComponent<Component> {
-    let componentName = component.displayName || component.name || 'ReactiveComponent';
-    let reactiveComponent = ((...args: Parameters<Component>) => { // Important to use rest operator here so react ignores function arity
-        return useReactive(componentName, () => {
-            let [props, ...otherArgs] = args;
-            let observableProps = useAsObservableValues(props, `${componentName}.props`);
-            return component(observableProps, ...otherArgs as [any])
-        });
-    }) as ReactiveComponent<Component>;
-    reactiveComponent.displayName = componentName;
+export function reactive<Args extends any[]>(component: (...args: Args) => ReactElement | null) {
+    let componentName = nameOfFunction(component) || 'ReactiveComponent';
 
-    if (component.length == 2)
-        reactiveComponent = forwardRef(reactiveComponent) as ReactiveComponent<Component>;
-    reactiveComponent = memo<Component>(reactiveComponent as FunctionComponent<any>) as ReactiveComponent<Component>;
-    reactiveComponent.displayName = componentName;
-    return reactiveComponent;
+    const reactiveComponentName = `reactive(${componentName})`;
+    return {
+        [reactiveComponentName]: (...args: Args) => useReactive(componentName, () => component(...args))
+    }[reactiveComponentName];
 }
 
 export function useReactive<T>(deriveValue: () => T): T;
@@ -48,39 +28,61 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
         ? [nameOrDeriveValue, maybeDeriveValue!]
         : ['ReactiveValue', nameOrDeriveValue];
 
-    let [reactionCount, setRerenderCount] = useState(0);
+    let derivation = useSyncDerivation<T>(name);
+    return useRenderValue<T>(derivation, deriveValue);
+}
 
-    // Unsubscribe from previous render before rendering again
-    let unsubscribeFromLatestRender = useRef((() => { }) as Unsubscribe);
-    unsubscribeFromLatestRender.current();
-    unsubscribeFromLatestRender.current = unsubscribeFromThisRender;
-    useDispose(() => unsubscribeFromLatestRender.current());
+function useSyncDerivation<T>(name: string) {
+    // Using a bogus derive function because we'll provide a new one every render
+    let derivedValue = useOnce(() => new RenderedValue<T>(() => name, () => undefined!));
+    useDispose(() => derivedValue[dispose]());
 
-    let value!: T;
+    let render = useOnce(() => new ObservableValue(() => `${name}.render`, { invalidatedBy: "(nothing)" }));
 
-    let watcher = watch(
-        () => {
-            let newSources: Set<ObservableValue<any>>;
-            log('⚛ (render)', name, [], () => ({
-                'Reaction count': reactionCount,
-                Sources: { get list() { return sourceTree(Array.from(newSources)); } }
-            }), () => newSources = collectAccessedValues(() => value = deriveValue()));
-        },
-        name);
+    useEffect(() => derivedValue.subscribe(() => {
+        let invalidatedBy = derivedValue.invalidatedBy ?? "(unknown)";
+        reactionQueue.current.add(() => {
+            if (derivedValue.invalidatedBy == invalidatedBy) // Avoid unnecessary renders
+                render.setValue({ invalidatedBy })
+        });
+    }), []);
 
-    let cancelReaction = undefined as Unsubscribe | undefined;
-    let stopWatching = watcher.subscribe(changed => {
-        unsubscribeFromThisRender(); // Avoid queueing up extra renders if more sources change
-        cancelReaction = reactionQueue.current.add(() => 
-            setRerenderCount(c => c + 1)
-        );
-    });
+    useSyncExternalStore(useCallback(o => render.subscribe(o), []), () => render.value);
 
-    return value;
+    return derivedValue;
+}
 
-    function unsubscribeFromThisRender() {
-        cancelReaction?.();
-        stopWatching();
-        watcher.unsubscribeFromSources();
+function useRenderValue<T>(derivation: RenderedValue<T>, deriveValue: () => T) {
+    useCallback(function update() { derivation.update(deriveValue, 'render'); }, [deriveValue])(); // need to use a hook to be considered a hook in devtools
+    return derivation.value;
+}
+
+class RenderedValue<T> extends Derivation<T> {
+    protected override updatedEvent = '⚛️ (render)';
+    protected override invalidatedEvent = '⚛️🚩 (render invalidated)';
+    protected override loggedValue(value: T) {
+        if (process.env.NODE_ENV !== 'production' && isValidElement(value)) {
+            let xmlDoc = document.implementation.createDocument(null, null);
+            return new LogValue([
+                xmlTree(value),
+                { ['React element']: value }
+            ]);
+
+            function xmlTree<T>(node: T): Node {
+                if (isValidElement(node)) {
+                    let type = (typeof node.type == 'string' ? node.type
+                        : typeof node.type == 'function' ? nameOfFunction(node.type)
+                            : typeof node.type == 'symbol' ? String(node.type)
+                                : '???')
+                        .split('(').at(-1)!.split(')')[0]; // Unwrap HOC names
+                    let el = xmlDoc.createElement(type);
+                    for (let child of Children.toArray((node.props as any).children))
+                        el.appendChild(xmlTree(child));
+                    return el;
+                }
+                return document.createTextNode(String(node));
+            }
+        }
+        return value;
     }
 }

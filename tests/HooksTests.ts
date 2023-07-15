@@ -1,10 +1,11 @@
-import { describe, when, it } from "wattle";
-import { useEvent, useDerived, useReduced, useAsyncEvent } from "event-reduce-react";
 import { renderHook } from "@testing-library/react-hooks";
-import { spy, match } from "sinon";
-import { reduce, event, IReduction, reduced } from "event-reduce";
-import { SynchronousPromise } from "synchronous-promise";
+import { event, reduce, reduced } from "event-reduce";
+import { useAsyncEvent, useDerived, useEvent, useReduced } from "event-reduce-react";
 import { mutable } from "event-reduce/lib/testing";
+import { dispose } from "event-reduce/lib/utils";
+import { match, spy } from "sinon";
+import { SynchronousPromise } from "synchronous-promise";
+import { describe, it, when } from "wattle";
 
 describe(useEvent.name, function () {
     let sut = renderHook(() => useEvent<number>());
@@ -70,7 +71,7 @@ describe(useDerived.name, function () {
     });
 
     when("disposed", () => {
-        let unsubscribe = spy(initialResult, 'unsubscribeFromSources');
+        let unsubscribe = spy(initialResult, dispose);
         sut.unmount();
 
         it("unsubscribes derivation from its sources", () => unsubscribe.should.have.been.called);
@@ -99,7 +100,7 @@ describe(useReduced.name, function () {
     });
 
     when("disposed", () => {
-        let unsubscribe = spy(initialResult, 'unsubscribeFromSources');
+        let unsubscribe = spy(initialResult, dispose);
         sut.unmount();
 
         it("unsubscribes reduction from its sources", () => unsubscribe.should.have.been.called);

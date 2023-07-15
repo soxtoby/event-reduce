@@ -1,8 +1,8 @@
-import { ensureValueOwner, unsubscribeOldModelsFromSources, valueOwner } from "./cleanup";
+import { changeOwnedValue } from "./cleanup";
 import { allSources, IObservable, Observable, pathToSource } from "./observable";
 import { Subject } from "./subject";
 import { Action, Unsubscribe } from "./types";
-import { firstIntersection } from "./utils";
+import { dispose, firstIntersection } from "./utils";
 
 interface IValueAccess {
     observable: ObservableValue<any>;
@@ -17,17 +17,18 @@ let triggeringObservable: IObservable<any> | undefined;
 
 startTrackingScope();
 
-export interface IObservableValue<T> extends IObservable<T> {
+export interface IObservableValue<T> extends IObservable<void> {
     readonly value: T;
+    readonly values: IObservable<T>;
 }
 
-export class ObservableValue<T> extends Observable<T> {
+export class ObservableValue<T> extends Observable<void> implements IObservableValue<T> {
     constructor(
         getDisplayName: () => string,
         protected _value: T
     ) {
         super(getDisplayName);
-        ensureValueOwner(_value, this);
+        changeOwnedValue(this, undefined, _value);
     }
 
     container?: any;
@@ -41,14 +42,21 @@ export class ObservableValue<T> extends Observable<T> {
         return this._value;
     }
 
-    setValue(value: T) {
+    get values() { return this.map(() => this.value); }
+
+    setValue(value: T, notifyObservers = true) {
         if (value !== this._value) {
-            if (valueOwner(this._value) == this)
-                unsubscribeOldModelsFromSources(this._value, value);
+            changeOwnedValue(this, this._value, value);
             this._value = value;
-            ensureValueOwner(value, this);
-            this.notifyObservers(value);
+            if (notifyObservers)
+                this.notifyObservers();
         }
+    }
+
+    override[dispose]() {
+        super[dispose]();
+        changeOwnedValue(this, this._value, undefined);
+        // Keep the value, in case this is still being held onto (e.g. with useDerredValue)
     }
 }
 
