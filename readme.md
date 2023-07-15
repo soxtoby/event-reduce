@@ -54,6 +54,7 @@ and make a model class like this:
 ```ts
 import { derived, reduce, reduced } from 'event-reduce';
 
+@model  // Marks class as a model, enabling all the other decorated properties
 class CounterModel {
     constructor (public events: CounterEvents) { }
 
@@ -70,6 +71,7 @@ class CounterModel {
     }
 }
 ```
+> **Note:** event-reduce currently relies on `"experimentalDecorators": true` and `"useDefineForClassFields": false` being set in your `tsconfig.json` file. Standard ECMAScript field behaviour and decorator support is coming soon.
 
 Then the model can be used like so:
 ```ts
@@ -120,6 +122,7 @@ Yes! If you've got the appropriate decorators on your model properties, they can
 ```ts
 import { state, reduced, reduce, derived, getState, setState } from "event-reduce";
 
+@model
 class MyModel {
     constructor(public events: CounterEvents, id: string) {
         this.id = id;
