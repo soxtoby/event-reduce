@@ -70,11 +70,13 @@ class RenderedValue<T> extends Derivation<T> {
 
             function xmlTree<T>(node: T): Node {
                 if (isValidElement(node)) {
-                    let type = (typeof node.type == 'string' ? node.type
+                    let type = ((typeof node.type == 'string' ? node.type
                         : typeof node.type == 'function' ? nameOfFunction(node.type)
                             : typeof node.type == 'symbol' ? String(node.type)
-                                : '???')
-                        .split('(').at(-1)!.split(')')[0]; // Unwrap HOC names
+                                : ':unknown:')
+                        .split('(').at(-1)!.split(')')[0])  // Unwrap HOC names
+                        .replace(/^[0-9-]/, '_$&')  // Escape leading number or dash
+                        .replace(/[^a-zA-Z0-9:_-]/g, '_');  // Escape rest of element name
                     let el = xmlDoc.createElement(type);
                     for (let child of Children.toArray((node.props as any).children))
                         el.appendChild(xmlTree(child));
