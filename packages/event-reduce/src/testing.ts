@@ -22,7 +22,9 @@ export function mutable<T>(model: T): Mutable<T> {
             }
         }
 
-        Object.defineProperty(model, 'readonly', { get: () => model, configurable: true });
+        Object.defineProperty(model, 'readonly', { get: () => model, configurable: true }); // TODO remove
+        if (!('target' in model))
+            Object.defineProperty(model, 'target', { get: () => model, configurable: true });
     }
     return model as Mutable<T>;
 }
@@ -55,8 +57,11 @@ export function modelProxy<T extends object>(model: T = {} as T) {
 
     let proxy: T = new Proxy(model, {
         get(target: T, key: PropertyKey, receiver: T) {
-            if (key == 'target' || key == 'readonly')
+            if (key == 'target' && !('target' in target)
+                || key == 'readonly' // TODO remove
+            ) {
                 return proxy;
+            }
 
             if (observableValues.hasOwnProperty(key))
                 return observableValues[key as string].value;
@@ -80,7 +85,8 @@ export function modelProxy<T extends object>(model: T = {} as T) {
         },
 
         has(target: T, key: PropertyKey) {
-            return key in target || key in observableValues;
+            return key in target
+                || key in observableValues;
         }
     });
 
@@ -91,14 +97,18 @@ export function modelProxy<T extends object>(model: T = {} as T) {
     }
 }
 
-export type Mutable<T> = {
-    -readonly [P in keyof T]: T[P]
-} & {
-    /** The model proxy as the original type */
-    readonly target: T;
-    /** @deprecated Use `target` instead */
-    readonly readonly: T;
-}
+export type Mutable<T> =
+    & { -readonly [P in keyof T]: T[P] }
+    & (T extends { target: any }
+        ? {}
+        : {
+            /** The model proxy as the original type */
+            readonly target: T;
+        })
+    & {
+        /** @deprecated Use `target` instead */
+        readonly readonly: T;
+    }
 
 export function eventProxy<T = any>(): T;
 export function eventProxy<TEvent extends (...args: any[]) => void>(createEvent: () => TEvent): { [key: string]: TEvent };

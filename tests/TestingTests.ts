@@ -26,7 +26,7 @@ describe("mutable", () => {
     let model = new Model();
     model.valuePlusOne;
     let sut = mutable(model);
-    let typedModel: Model = sut.readonly;
+    let typedModel: Model = sut.target;
 
     when("without overrides", () => {
         then("properties behave normally", () => {
