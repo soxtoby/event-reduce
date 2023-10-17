@@ -32,6 +32,11 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
         return super.value;
     }
 
+    override setValue(value: T) {
+        this._requiresUpdate = false;
+        super.setValue(value);
+    }
+
     get invalidatedBy() { return this._invalidatingSource?.displayName; }
 
     /** 
