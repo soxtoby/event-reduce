@@ -123,6 +123,14 @@ export function startTrackingScope(): Unsubscribe {
     }
 }
 
+/** Allows subscribing to the changes of the specified observable value. */
+export function valueChanged<T>(observableValue: T) {
+    let observable = getUnderlyingObservable(observableValue);
+    if (observable)
+        return observable.values;
+    throw new ValueIsNotObservableError(observableValue);
+}
+
 export function getUnderlyingObservable<T>(value: T): ObservableValue<T> | undefined {
     let lastAccessed = consumeLastAccessed();
     if (lastAccessed && withInnerTrackingScope(() => lastAccessed!.value) == value)

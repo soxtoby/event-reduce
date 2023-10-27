@@ -1,6 +1,6 @@
 import { log, sourceTree } from "./logging";
 import { IObservable, allSources, isObservable } from "./observable";
-import { IObservableValue, ObservableValue, ValueIsNotObservableError, getUnderlyingObservable, protectAgainstAccessingValueWithCommonSource } from "./observableValue";
+import { IObservableValue, ObservableValue, ValueIsNotObservableError, getUnderlyingObservable, protectAgainstAccessingValueWithCommonSource, valueChanged } from "./observableValue";
 import { State, setState } from "./state";
 import { Subject } from "./subject";
 import { Unsubscribe } from "./types";
@@ -18,6 +18,7 @@ type Reducer<TValue, TEvent> = (previous: TValue, eventValue: TEvent) => TValue;
 
 export interface IReduction<T> extends IObservableValue<T> {
     on<TEvent>(observable: IObservable<TEvent>, reduce: Reducer<T, TEvent>): this;
+    /** @deprecated use valueChanged function instead */
     onValueChanged<TValue>(observableVaue: TValue, reduce: Reducer<T, TValue>): this;
     onRestore(reduce: Reducer<T, State<T>>): this;
 }
@@ -72,10 +73,7 @@ export class Reduction<T> extends ObservableValue<T> implements IReduction<T> {
     }
 
     onValueChanged<TValue>(observableValue: TValue, reduce: Reducer<T, TValue>) {
-        let observable = getUnderlyingObservable(observableValue);
-        if (observable)
-            return this.on(observable.values, reduce);
-        throw new ValueIsNotObservableError(observableValue);
+        return this.on(valueChanged(observableValue), reduce);
     }
 
     onRestore(reduce: Reducer<T, State<T>>): this {

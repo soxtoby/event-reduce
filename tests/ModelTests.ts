@@ -1,5 +1,5 @@
 import { asyncEvent, derive, derived, event, events, extend, model, reduce, reduced } from "event-reduce";
-import { AccessedValueWithCommonSourceError } from "event-reduce/lib/observableValue";
+import { AccessedValueWithCommonSourceError, valueChanged } from "event-reduce/lib/observableValue";
 import { describe, it, test, then, when } from "wattle";
 
 describe("models", function () {
@@ -15,7 +15,7 @@ describe("models", function () {
 
         @reduced
         dependentProperty = reduce(1)
-            .onValueChanged(this.property, (_, p) => p)
+            .on(valueChanged(this.property), (_, p) => p)
             .value;
 
         @derived
@@ -28,7 +28,7 @@ describe("models", function () {
 
         @reduced
         basedOnDerivedProperty = reduce(0)
-            .onValueChanged(this.derivedProperty, (_, d) => d)
+            .on(valueChanged(this.derivedProperty), (_, d) => d)
             .value;
     }
     let testModel = new TestModel();
