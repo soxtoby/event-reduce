@@ -9,4 +9,4 @@ export { IBoundReduction, IReduction, reduce } from "./reduction";
 export { State, getState, setState } from "./state";
 export { ISubject, Subject } from "./subject";
 export { Unsubscribe } from "./types";
-export { NamedBase, filteredName, matchesScope, nameOfCallback, nameOfFunction, scopedName } from "./utils";
+export { NamedBase, filteredName, matchesScope, scopedName } from "./utils";

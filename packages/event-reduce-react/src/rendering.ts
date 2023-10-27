@@ -1,9 +1,8 @@
-import { nameOfFunction } from "event-reduce";
 import { Derivation } from "event-reduce/lib/derivation";
 import { LogValue } from "event-reduce/lib/logging";
 import { ObservableValue } from "event-reduce/lib/observableValue";
 import { reactionQueue } from "event-reduce/lib/reactions";
-import { dispose } from "event-reduce/lib/utils";
+import { dispose, nameOfFunction } from "event-reduce/lib/utils";
 import { Children, Fragment, ReactElement, ReactNode, createElement, isValidElement, useCallback, useEffect } from "react";
 import { useSyncExternalStore } from "use-sync-external-store/shim";
 import { useDispose, useOnce } from "./utils";
@@ -72,8 +71,9 @@ class RenderedValue<T> extends Derivation<T> {
                 if (isValidElement(node)) {
                     let type = ((typeof node.type == 'string' ? node.type
                         : typeof node.type == 'function' ? nameOfFunction(node.type)
-                            : typeof node.type == 'symbol' ? String(node.type)
-                                : ':unknown:')
+                            : typeof node.type == 'object' ? (node.type as any).displayName ?? ':unknown:'
+                                : typeof node.type == 'symbol' ? String(node.type)
+                                    : ':unknown:')
                         .split('(').at(-1)!.split(')')[0])  // Unwrap HOC names
                         .replace(/^[0-9-]/, '_$&')  // Escape leading number or dash
                         .replace(/[^a-zA-Z0-9:_-]/g, '_');  // Escape rest of element name
