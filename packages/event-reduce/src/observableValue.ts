@@ -42,7 +42,7 @@ export class ObservableValue<T> extends Observable<void> implements IObservableV
         return this._value;
     }
 
-    get values() { return this.map(() => this.value); }
+    get values() { return this.map(() => this.value, () => `${this.displayName}.values`); }
 
     setValue(value: T, notifyObservers = true) {
         if (value !== this._value) {
