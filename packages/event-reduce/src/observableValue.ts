@@ -34,7 +34,9 @@ export class ObservableValue<T> extends Observable<void> implements IObservableV
     container?: any;
 
     get value() {
-        let commonSource = firstIntersection(triggeringSources, allSources([this]));
+        let commonSource = triggeringSources.size
+            ? firstIntersection(triggeringSources, allSources([this]))
+            : undefined;
         let error = commonSource
             ? new AccessedValueWithCommonSourceError(commonSource, triggeringObservable!, this)
             : undefined;
