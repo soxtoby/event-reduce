@@ -1,6 +1,6 @@
 import { log, sourceTree } from "./logging";
 import { IObservable, allSources, isObservable } from "./observable";
-import { IObservableValue, ObservableValue, ValueIsNotObservableError, getUnderlyingObservable, protectAgainstAccessingValueWithCommonSource, valueChanged } from "./observableValue";
+import { IObservableValue, ObservableValue, protectAgainstAccessingValueWithCommonSource, valueChanged } from "./observableValue";
 import { State, setState } from "./state";
 import { Subject } from "./subject";
 import { Unsubscribe } from "./types";
