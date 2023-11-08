@@ -115,8 +115,10 @@ export function allSources(sources: Iterable<IObservable<any>>) {
 
     function addSourcesRecursive(sources: Iterable<IObservable<any>>) {
         for (let s of sources) {
-            allSources.add(s);
-            addSourcesRecursive(s.sources);
+            if (!allSources.has(s)) {
+                allSources.add(s);
+                addSourcesRecursive(s.sources);
+            }
         }
     }
 }
