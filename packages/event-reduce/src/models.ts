@@ -138,7 +138,10 @@ export function getObservableValues(instance: any): { [property: string]: Observ
 }
 
 export function getObservableProperty(prototype: any, key: string) {
-    return (getObservableProperties(prototype) || {})[key];
+    let observableProperties = getObservableProperties(prototype) || {};
+    return Object.hasOwn(observableProperties, key)
+        ? observableProperties[key]
+        : undefined;
 }
 
 function getOrAddObservableProperties(prototype: any) {
