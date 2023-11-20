@@ -14,9 +14,6 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
     private _sources = new Map<IObservable<any>, Unsubscribe>();
     private _invalidatingSource?: IObservable<unknown>;
 
-    protected updatedEvent = '🔗 (derivation)';
-    protected invalidatedEvent = '🔗🚩 (derivation invalidated)';
-
     constructor(
         getDisplayName: () => string,
         private _deriveValue: () => T
@@ -44,7 +41,7 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
      * @param deriveValue Optional function to use to derive the value. If not provided, the original derivation function will be used.
      * @param reason Optional reason for the update. If not invalidated by a source change, this will be used as the reason for the update.
      **/
-    update(deriveValue = this._deriveValue, reason?: string) {
+    update(deriveValue?: () => T, reason?: string, notifyObservers = true) {
         withInnerTrackingScope(() => {
             this._requiresUpdate = false;
             let trigger = this._invalidatingSource;
@@ -64,15 +61,17 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
             for (let source of newSources)
                 this._sources.set(source, source.subscribe(() => this.invalidate(source), () => this.displayName));
 
-            log(this.updatedEvent, this.displayName, [], () => ({
+            log(this.getUpdateMessage(), this.displayName, [], () => ({
                 Previous: this.loggedValue(this._value),
                 Current: this.loggedValue(value),
                 Container: this.container,
                 Sources: sourceTree(this.sources),
                 TriggeredBy: trigger ?? reason
-            }), () => this.setValue(value, false));
+            }), () => this.setValue(value, notifyObservers));
         });
     }
+
+    protected getUpdateMessage() { return '🔗 (derivation)'; }
 
     private invalidate(source: IObservable<unknown>) {
         let oldSources = this.sources;
@@ -80,11 +79,19 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
         this._requiresUpdate = true;
         this._invalidatingSource = source;
 
-        log(this.invalidatedEvent, this.displayName, [], () => ({
-            Previous: this.loggedValue(this._value),
-            Container: this.container,
-            Sources: sourceTree(oldSources)
-        }), () => this.notifyObservers());
+        this.onInvalidated(oldSources);
+    }
+
+    protected onInvalidated(oldSources: readonly IObservable<any>[]) {
+        if (this.isObserved) {
+            this.update();
+        } else {
+            log('🔗🚩 (derivation invalidated)', this.displayName, [], () => ({
+                Previous: this.loggedValue(this._value),
+                Container: this.container,
+                Sources: sourceTree(oldSources)
+            }));
+        }
     }
 
     protected loggedValue(value: T): unknown { return value; }

@@ -1,5 +1,6 @@
+import { IObservable } from "event-reduce";
 import { Derivation } from "event-reduce/lib/derivation";
-import { LogValue } from "event-reduce/lib/logging";
+import { LogValue, log, sourceTree } from "event-reduce/lib/logging";
 import { ObservableValue } from "event-reduce/lib/observableValue";
 import { reactionQueue } from "event-reduce/lib/reactions";
 import { dispose, nameOfFunction } from "event-reduce/lib/utils";
@@ -52,13 +53,21 @@ function useSyncDerivation<T>(name: string) {
 }
 
 function useRenderValue<T>(derivation: RenderedValue<T>, deriveValue: () => T) {
-    useCallback(function update() { derivation.update(deriveValue, 'render'); }, [deriveValue])(); // need to use a hook to be considered a hook in devtools
+    useCallback(function update() { derivation.update(deriveValue, 'render', false); }, [deriveValue])(); // need to use a hook to be considered a hook in devtools
     return derivation.value;
 }
 
 class RenderedValue<T> extends Derivation<T> {
-    protected override updatedEvent = '⚛️ (render)';
-    protected override invalidatedEvent = '⚛️🚩 (render invalidated)';
+    protected override getUpdateMessage() { return '⚛️ (render)'; }
+
+    protected override onInvalidated(oldSources: readonly IObservable<any>[]) {
+        log('⚛️🚩 (render invalidated)', this.displayName, [], () => ({
+            Previous: this.loggedValue(this._value),
+            Container: this.container,
+            Sources: sourceTree(oldSources)
+        }), () => this.notifyObservers());
+    }
+
     protected override loggedValue(value: T) {
         if (process.env.NODE_ENV !== 'production' && isValidElement(value)) {
             let xmlDoc = document.implementation.createDocument(null, null);
