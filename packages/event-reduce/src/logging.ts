@@ -75,7 +75,10 @@ export interface ISourceInfo {
 
 export function sourceTree(sources: readonly IObservable<any>[]): ISourceInfo[] {
     if (process.env.NODE_ENV !== 'production')
-        return sources.map(s => ({ name: s.displayName, sources: sourceTree(s.sources), get observable() { return s; } }));
+        return sources.map(s => {
+            let source = new WeakRef(s);
+            return { name: s.displayName, sources: sourceTree(s.sources), get observable() { return source.deref() ?? "No longer in memory"; } }
+        });
     else
         return [];
 }
