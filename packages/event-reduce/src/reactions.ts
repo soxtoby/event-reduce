@@ -4,13 +4,11 @@ export interface IReactionQueue {
     add(reaction: Action): Unsubscribe;
 }
 
-export class PromiseQueue implements IReactionQueue {
-    constructor(private _resolvedPromise: PromiseLike<void>) { }
-
+export class MicrotaskQueue implements IReactionQueue {
     add(reaction: Action) {
         let cancelled = false;
 
-        this._resolvedPromise.then(function runReaction() {
+        queueMicrotask(function runReaction() {
             if (!cancelled)
                 reaction();
         });
@@ -21,5 +19,5 @@ export class PromiseQueue implements IReactionQueue {
 
 export const reactionQueue = {
     /** Can be replaced for testing purposes */
-    current: new PromiseQueue(Promise.resolve()) as IReactionQueue
+    current: new MicrotaskQueue() as IReactionQueue
 };
