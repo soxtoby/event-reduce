@@ -1,3 +1,4 @@
+import { ISourceInfo, sourceTree } from "./logging";
 import { Unsubscribe } from "./types";
 import { dispose, filteredName, NamedBase, nameOfCallback } from "./utils";
 
@@ -30,8 +31,18 @@ export function merge<T>(observables: IObservable<T>[]): IObservable<T> {
 
 export class Observable<T> extends NamedBase {
     protected _observers = new Set<IObserver<T>>();
+    private _sourceInfo?: ISourceInfo[];
 
     get sources() { return [] as readonly IObservable<any>[]; }
+
+    get sourceInfo() { return this._sourceInfo ??= sourceTree(this.sources); }
+
+    protected clearSourceInfo() {
+        delete this._sourceInfo;
+        for (let observer of this._observers)
+            if (observer instanceof Observable)
+                observer.clearSourceInfo();
+    }
 
     get isObserved() { return this._observers.size > 0; }
 

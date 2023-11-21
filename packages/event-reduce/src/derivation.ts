@@ -71,6 +71,7 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
                 });
                 for (let source of newSources)
                     this._sources.set(source, source.subscribe(() => this.invalidate(source), () => this.displayName));
+                this.clearSourceInfo();
 
                 this.setValue(value, notifyObservers);
             });

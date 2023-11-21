@@ -1,5 +1,5 @@
 import { sendEvent } from "./devtools";
-import { IObservable } from "./observable";
+import { IObservable, Observable } from "./observable";
 
 let loggingEnabled = false;
 
@@ -85,14 +85,20 @@ type LogGroup = {
 }
 
 export interface ISourceInfo {
-    sources: ISourceInfo[];
+    readonly name: string;
+    readonly sources: readonly ISourceInfo[];
+    readonly observable: IObservable<any> | string;
 }
 
 export function sourceTree(sources: readonly IObservable<any>[]): ISourceInfo[] {
     if (process.env.NODE_ENV !== 'production')
         return sources.map(s => {
             let source = new WeakRef(s);
-            return { name: s.displayName, sources: sourceTree(s.sources), get observable() { return source.deref() ?? "No longer in memory"; } }
+            return {
+                name: s.displayName,
+                sources: (s as Observable<any>).sourceInfo,
+                get observable() { return source.deref() ?? "No longer in memory"; }
+            }
         });
     else
         return [];

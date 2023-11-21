@@ -71,6 +71,8 @@ export class Reduction<T> extends ObservableValue<T> implements IReduction<T> {
             });
         }, () => this.displayName));
 
+        this.clearSourceInfo();
+
         return this;
     }
 
