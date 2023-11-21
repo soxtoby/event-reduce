@@ -59,14 +59,16 @@ export class Reduction<T> extends ObservableValue<T> implements IReduction<T> {
 
         this._sources.set(observable, observable.subscribe(eventValue => {
             let value!: T;
-            protectAgainstAccessingValueWithCommonSource(observable, () => value = reduce(this._value, eventValue));
 
             log('🧪 (reduction)', this.displayName, [], () => ({
                 Previous: this._value,
                 Current: value,
                 Container: this.container,
                 Sources: sourceTree(this.sources)
-            }), () => this.setValue(value));
+            }), () => {
+                protectAgainstAccessingValueWithCommonSource(observable, () => value = reduce(this._value, eventValue));
+                this.setValue(value)
+            });
         }, () => this.displayName));
 
         return this;

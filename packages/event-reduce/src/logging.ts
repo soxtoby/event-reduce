@@ -1,9 +1,9 @@
 import { sendEvent } from "./devtools";
 import { IObservable } from "./observable";
-import { StringKey } from "./types";
 
 let loggingEnabled = false;
-let loggingDepth = 0;
+
+let logStack = [[]] as LogItem[][];
 
 /**
  * For logged values that have their own specific log formatting.
@@ -23,50 +23,65 @@ export function logEvent(type: string, displayName: string, arg: any, getInfo: (
 export function log<Info extends object>(type: string, displayName: string, args: any[], getInfo?: () => Info, work?: () => void) {
     if (process.env.NODE_ENV !== 'production') {
         if (!loggingEnabled)
-            return void (work && work());
+            return void work?.();
 
         if (work) {
-            logMessage(true);
-            loggingDepth++;
+            logStack.push([]);
 
             try {
                 work();
             } finally {
-                console.groupEnd();
-                loggingDepth--;
+                logMessage(logStack.pop()!);
             }
         } else {
-            logMessage(false);
+            logMessage();
         }
 
-        function logMessage(group: boolean) {
-            let message = [`${displayName} %c${type}`, 'color: grey; font-weight: normal;', ...args];
+        if (logStack.length == 1) {
+            flushLogs(logStack[0], 0);
+            logStack = [[]];
+        }
 
-            let info = getInfo?.() ?? {} as Info;
-            let infoKeys = Object.keys(info) as StringKey<Info>[];
-            if (infoKeys.length || group) {
-                if (loggingDepth)
-                    console.group(...message);
-                else
-                    console.groupCollapsed(...message);
+        function logMessage(childLogs: LogItem[] = []) {
+            let group = {
+                message: [`${displayName} %c${type}`, 'color: grey; font-weight: normal;', ...args],
+                children: Object.entries(getInfo?.() ?? {} as Info)
+                    .map(([key, value]) => value instanceof LogValue
+                        ? [`${key}:`, ...value.args]
+                        : [`${key}:`, value])
+                    .concat(childLogs)
+            };
+            logStack.at(-1)!.push(group);
+        }
 
-                for (let key of infoKeys) {
-                    let infoValue = info[key];
-                    if (infoValue instanceof LogValue)
-                        console.log(`${key}:`, ...infoValue.args);
+        function flushLogs(logs: LogItem[], depth: number) {
+            for (let log of logs) {
+                if (Array.isArray(log)) {
+                    console.log(...log);
+                } else if (!log.children.length) {
+                    console.log(...log.message);
+                } else {
+                    if (depth)
+                        console.group(...log.message);
                     else
-                        console.log(`${key}:`, infoValue);
-                }
-
-                if (!group)
+                        console.groupCollapsed(...log.message);
+                    flushLogs(log.children, depth + 1);
                     console.groupEnd();
-            } else {
-                console.log(...message);
+                }
             }
         }
     } else {
-        return void (work && work());
+        return void work?.();
     }
+}
+
+type LogItem = LogMessage | LogGroup;
+
+type LogMessage = any[];
+
+type LogGroup = {
+    message: LogMessage;
+    children: LogItem[];
 }
 
 export interface ISourceInfo {

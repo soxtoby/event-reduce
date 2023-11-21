@@ -49,17 +49,6 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
             let value!: T;
 
             this.unsubscribeFromSources();
-            let newSources = collectAccessedValues(() => {
-                let previouslyRunningDerivation = currentlyRunningDerivation;
-                currentlyRunningDerivation = this;
-                try {
-                    value = (deriveValue ?? this._deriveValue)();
-                } finally {
-                    currentlyRunningDerivation = previouslyRunningDerivation;
-                }
-            });
-            for (let source of newSources)
-                this._sources.set(source, source.subscribe(() => this.invalidate(source), () => this.displayName));
 
             log(this.getUpdateMessage(), this.displayName, [], () => ({
                 Previous: this.loggedValue(this._value),
@@ -67,7 +56,21 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
                 Container: this.container,
                 Sources: sourceTree(this.sources),
                 TriggeredBy: trigger ?? reason
-            }), () => this.setValue(value, notifyObservers));
+            }), () => {
+                let newSources = collectAccessedValues(() => {
+                    let previouslyRunningDerivation = currentlyRunningDerivation;
+                    currentlyRunningDerivation = this;
+                    try {
+                        value = (deriveValue ?? this._deriveValue)();
+                    } finally {
+                        currentlyRunningDerivation = previouslyRunningDerivation;
+                    }
+                });
+                for (let source of newSources)
+                    this._sources.set(source, source.subscribe(() => this.invalidate(source), () => this.displayName));
+
+                this.setValue(value, notifyObservers);
+            });
         });
     }
 
