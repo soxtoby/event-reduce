@@ -45,6 +45,7 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
         withInnerTrackingScope(() => {
             this._requiresUpdate = false;
             let trigger = this._invalidatingSource;
+            let triggerRef = trigger && new WeakRef(trigger);
             delete this._invalidatingSource;
             let value!: T;
 
@@ -55,7 +56,9 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
                 Current: this.loggedValue(value),
                 Container: this.container,
                 Sources: sourceTree(this.sources),
-                TriggeredBy: trigger ?? reason
+                TriggeredBy: trigger
+                    ? { name: trigger.displayName, get observable() { return triggerRef!.deref() ?? "No longer in memory"; } }
+                    : reason
             }), () => {
                 let newSources = collectAccessedValues(() => {
                     let previouslyRunningDerivation = currentlyRunningDerivation;
