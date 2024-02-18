@@ -58,10 +58,11 @@ export class Reduction<T> extends ObservableValue<T> implements IReduction<T> {
             unsubscribeExisting();
 
         this._sources.set(observable, observable.subscribe(eventValue => {
+            let previousValue = this._value;
             let value!: T;
 
             log('🧪 (reduction)', this.displayName, [], () => ({
-                Previous: this._value,
+                Previous: previousValue,
                 Current: value,
                 Container: this.container,
                 Sources: sourceTree(this.sources)
