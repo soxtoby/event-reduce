@@ -25,7 +25,8 @@ export interface IObservableValue<T> extends IObservable<void> {
 export class ObservableValue<T> extends Observable<void> implements IObservableValue<T> {
     constructor(
         getDisplayName: () => string,
-        protected _value: T
+        protected _value: T,
+        private _valuesEqual: (previous: T, next: T) => boolean = (a, b) => a === b
     ) {
         super(getDisplayName);
         changeOwnedValue(this, undefined, _value);
@@ -47,7 +48,7 @@ export class ObservableValue<T> extends Observable<void> implements IObservableV
     get values() { return this.map(() => this.value, () => `${this.displayName}.values`); }
 
     setValue(value: T, notifyObservers = true) {
-        if (value !== this._value) {
+        if (!this._valuesEqual(this._value, value)) {
             changeOwnedValue(this, this._value, value);
             this._value = value;
             if (notifyObservers)

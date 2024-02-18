@@ -5,8 +5,8 @@ import { Unsubscribe } from "./types";
 
 let currentlyRunningDerivation = null as IObservableValue<unknown> | null;
 
-export function derive<T>(getDerivedValue: () => T, name?: string) {
-    return new Derivation(() => name || '(anonymous derivation)', getDerivedValue);
+export function derive<T>(getDerivedValue: () => T, name?: string, valuesEqual?: (previous: T, next: T) => boolean) {
+    return new Derivation(() => name || '(anonymous derivation)', getDerivedValue, valuesEqual);
 }
 
 export class Derivation<T> extends ObservableValue<T> implements IObservableValue<T> {
@@ -16,9 +16,10 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
 
     constructor(
         getDisplayName: () => string,
-        private _deriveValue: () => T
+        private _deriveValue: () => T,
+        valuesEqual?: (previous: T, next: T) => boolean
     ) {
-        super(getDisplayName, undefined!);
+        super(getDisplayName, undefined!, valuesEqual);
     }
 
     override get sources() { return Array.from(this._sources.keys()); }
@@ -47,12 +48,13 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
             let trigger = this._invalidatingSource;
             let triggerRef = trigger && new WeakRef(trigger);
             delete this._invalidatingSource;
+            let previousValue = this._value;
             let value!: T;
 
             this.unsubscribeFromSources();
 
             log(this.getUpdateMessage(), this.displayName, [], () => ({
-                Previous: this.loggedValue(this._value),
+                Previous: this.loggedValue(previousValue),
                 Current: this.loggedValue(value),
                 Container: this.container,
                 Sources: sourceTree(this.sources),

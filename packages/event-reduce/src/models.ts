@@ -42,20 +42,32 @@ export let reduced: PropertyDecorator = (target: Object, key: string | symbol): 
     return observableValueProperty(target, key, Reduction, () => new InvalidReducedPropertyError(key));
 }
 
-export let derived: PropertyDecorator = (target: Object, key: string | symbol): PropertyDescriptor => {
-    let property = Object.getOwnPropertyDescriptor(target, key)!;
+export function derived(valuesEqual: (previous: any, next: any) => boolean): PropertyDecorator;
+export function derived(target: Object, key: string | symbol): void;
+export function derived(targetOrValuesEqual: Object | ((previous: any, next: any) => boolean), key?: string | symbol): PropertyDecorator | void {
+    let valuesEqual = typeof targetOrValuesEqual == 'function'
+        ? targetOrValuesEqual as (previous: any, next: any) => boolean
+        : undefined;
 
-    if (property && property.get) {
-        let getObservableValue = (instance: any) => getOrSetObservableValue(instance, key, () => derive(property.get!.bind(instance), String(key)));
-        setObservableProperty(target, key, getObservableValue);
-        return {
-            get() { return getObservableValue(this).value; },
-            enumerable: true,
-            configurable: true
+    return valuesEqual
+        ? decorate as PropertyDecorator
+        : decorate(targetOrValuesEqual, key!) as any 
+
+    function decorate(target: Object, key: string | symbol) {
+        let property = Object.getOwnPropertyDescriptor(target, key)!;
+
+        if (property && property.get) {
+            let getObservableValue = (instance: any) => getOrSetObservableValue(instance, key, () => derive(property.get!.bind(instance), String(key), valuesEqual));
+            setObservableProperty(target, key, getObservableValue);
+            return {
+                get() { return getObservableValue(this).value; },
+                enumerable: true,
+                configurable: true
+            }
         }
-    }
 
-    return observableValueProperty(target, key, Derivation, () => new InvalidDerivedPropertyError(key));
+        return observableValueProperty(target, key, Derivation, () => new InvalidDerivedPropertyError(key));
+    }
 }
 
 function observableValueProperty<Type extends ObservableValue<any>>(
