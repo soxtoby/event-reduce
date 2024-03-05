@@ -10,9 +10,10 @@ export function derive<T>(getDerivedValue: () => T, name?: string, valuesEqual?:
 }
 
 export class Derivation<T> extends ObservableValue<T> implements IObservableValue<T> {
-    private _requiresUpdate = true;
-    private _sources = new Map<IObservable<any>, Unsubscribe>();
-    private _invalidatingSource?: IObservable<unknown>;
+    protected _state: DerivationState = 'invalid';
+    private _sources = new Map<ObservableValue<any>, Unsubscribe>();
+    protected _invalidatingSource?: IObservable<unknown>;
+    private _sourceVersion = 0;
 
     constructor(
         getDisplayName: () => string,
@@ -24,15 +25,32 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
 
     override get sources() { return Array.from(this._sources.keys()); }
 
+    override get version() {
+        this.reconcile();
+        return super.version;
+    }
+
     override get value() {
-        if (this._requiresUpdate)
-            this.update();
+        this.reconcile();
         return super.value;
     }
 
+    private reconcile() {
+        if (this._state != 'settled') {
+            if (this._state == 'invalid' || this.sources.some(s => s.version > this._sourceVersion))
+                this.update();
+            this.onSettled();
+        }
+    }
+
     override setValue(value: T, notifyObservers?: boolean) {
-        this._requiresUpdate = false;
+        this.onSettled();
         super.setValue(value, notifyObservers);
+    }
+
+    private onSettled() {
+        this._state = 'settled';
+        delete this._invalidatingSource;
     }
 
     get invalidatedBy() { return this._invalidatingSource?.displayName; }
@@ -44,10 +62,8 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
      **/
     update(deriveValue?: () => T, reason?: string, notifyObservers = true) {
         withInnerTrackingScope(() => {
-            this._requiresUpdate = false;
             let trigger = this._invalidatingSource;
             let triggerRef = trigger && new WeakRef(trigger);
-            delete this._invalidatingSource;
             let previousValue = this._value;
             let value!: T;
 
@@ -72,7 +88,8 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
                     }
                 });
                 for (let source of newSources)
-                    this._sources.set(source, source.subscribe(() => this.invalidate(source), () => this.displayName));
+                    this._sources.set(source, this.subscribeTo(source));
+                this._sourceVersion = Math.max(0, ...this.sources.map(s => s.version));
                 this.clearSourceInfo();
 
                 this.setValue(value, notifyObservers);
@@ -80,28 +97,40 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
         });
     }
 
-    protected getUpdateMessage() { return '🔗 (derivation)'; }
-
-    private invalidate(source: IObservable<unknown>) {
-        let oldSources = this.sources;
-        this.unsubscribeFromSources();
-        this._requiresUpdate = true;
-        this._invalidatingSource = source;
-
-        this.onInvalidated(oldSources);
+    private subscribeTo(source: ObservableValue<any>): Unsubscribe {
+        let valueUnsub = source.subscribe(() => this.onSourceValueChanged(source), () => this.displayName);
+        let unsettledUnsub = source.unsettled.subscribe(() => this.onSourceUnsettled(source), () => this.displayName);
+        return () => {
+            valueUnsub();
+            unsettledUnsub();
+        };
     }
 
-    protected onInvalidated(oldSources: readonly IObservable<any>[]) {
-        if (this.isObserved) {
-            this.update();
-        } else {
-            log('🔗🚩 (derivation invalidated)', this.displayName, [], () => ({
-                Previous: this.loggedValue(this._value),
-                Container: this.container,
-                Sources: sourceTree(oldSources)
-            }));
+    protected onSourceUnsettled(source: IObservable<unknown>) {
+        if (this._state == 'settled') {
+            this._state = 'indeterminate';
+            // Not logging this because it'd be too noisy,
+            // and it's more of an implementation detail than a change in the model
+            this.notifyObserversUnsettled();
         }
     }
+
+    protected onSourceValueChanged(source: IObservableValue<any>) {
+        this._invalidatingSource = source;
+
+        if (this.isObserved)
+            this.reconcile();
+        else
+            log(this.getInvalidatedMessage(), this.displayName, [], () => ({
+                Previous: this.loggedValue(this._value),
+                Container: this.container,
+                Sources: sourceTree(this.sources)
+            }));
+    }
+
+    protected getInvalidatedMessage() { return '🔗🚩 (derivation invalidated)'; }
+
+    protected getUpdateMessage() { return '🔗 (derivation)'; }
 
     protected loggedValue(value: T): unknown { return value; }
 
@@ -110,6 +139,8 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
         this._sources.clear();
     }
 }
+
+type DerivationState = 'invalid' | 'indeterminate' | 'settled';
 
 export function ensureNotInsideDerivation(sideEffect: string) {
     if (currentlyRunningDerivation)

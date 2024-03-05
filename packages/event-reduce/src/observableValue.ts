@@ -14,15 +14,18 @@ let lastValueConsumed: Subject<void>;
 let lastAccessed: ObservableValue<any> | undefined;
 let triggeringSources = new Set<IObservable<any>>;
 let triggeringObservable: IObservable<any> | undefined;
+let latestVersion = 0; // Shared latest version, so no need to track version per source
 
 startTrackingScope();
 
-export interface IObservableValue<T> extends IObservable<void> {
+export interface IObservableValue<T> extends IObservable<T> {
     readonly value: T;
-    readonly values: IObservable<T>;
 }
 
-export class ObservableValue<T> extends Observable<void> implements IObservableValue<T> {
+export class ObservableValue<T> extends Observable<T> implements IObservableValue<T> {
+    private readonly _unsettled = new Subject<void>(() => `${this.displayName}.unsettled`);
+    private _version = 0;
+
     constructor(
         getDisplayName: () => string,
         protected _value: T,
@@ -33,6 +36,12 @@ export class ObservableValue<T> extends Observable<void> implements IObservableV
     }
 
     container?: any;
+
+    /** Fired when a source value has changed, and this value _may_ not be up-to-date any more. */
+    get unsettled() { return this._unsettled as IObservable<void>; }
+
+    /** Increased whenever the value changes. Latest version is shared, so this won't increase by just 1. */
+    get version() { return this._version; }
 
     get value() {
         let commonSource = triggeringSources.size
@@ -45,16 +54,18 @@ export class ObservableValue<T> extends Observable<void> implements IObservableV
         return this._value;
     }
 
-    get values() { return this.map(() => this.value, () => `${this.displayName}.values`); }
-
     setValue(value: T, notifyObservers = true) {
         if (!this._valuesEqual(this._value, value)) {
             changeOwnedValue(this, this._value, value);
             this._value = value;
+            this._version = ++latestVersion;
+            this.notifyObserversUnsettled(); // Still need to do this even if we're not notifying observers about the value changing
             if (notifyObservers)
-                this.notifyObservers();
+                this.notifyObservers(value);
         }
     }
+
+    protected notifyObserversUnsettled() { this._unsettled.next(); }
 
     override[dispose]() {
         super[dispose]();
@@ -130,7 +141,7 @@ export function startTrackingScope(): Unsubscribe {
 export function valueChanged<T>(observableValue: T) {
     let observable = getUnderlyingObservable(observableValue);
     if (observable)
-        return observable.values;
+        return observable;
     throw new ValueIsNotObservableError(observableValue);
 }
 

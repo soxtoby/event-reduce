@@ -1,6 +1,6 @@
-import { IObservable } from "event-reduce";
+import { IObservable, IObservableValue, Subject } from "event-reduce";
 import { Derivation } from "event-reduce/lib/derivation";
-import { LogValue, log, sourceTree } from "event-reduce/lib/logging";
+import { LogValue } from "event-reduce/lib/logging";
 import { ObservableValue } from "event-reduce/lib/observableValue";
 import { reactionQueue } from "event-reduce/lib/reactions";
 import { dispose, nameOfFunction } from "event-reduce/lib/utils";
@@ -39,13 +39,10 @@ function useSyncDerivation<T>(name: string) {
 
     let render = useOnce(() => new ObservableValue(() => `${name}.render`, { invalidatedBy: "(nothing)" }));
 
-    useEffect(() => derivedValue.subscribe(() => {
-        let invalidatedBy = derivedValue.invalidatedBy ?? "(unknown)";
-        reactionQueue.current.add(() => {
-            if (derivedValue.invalidatedBy == invalidatedBy) // Avoid unnecessary renders
-                render.setValue({ invalidatedBy })
-        });
-    }), []);
+    useEffect(() => derivedValue.requiresRender.subscribe(
+        invalidatedBy => reactionQueue.current.add(
+            () => render.setValue({ invalidatedBy }))),
+        []);
 
     useSyncExternalStore(useCallback(o => render.subscribe(o), []), () => render.value);
 
@@ -58,15 +55,20 @@ function useRenderValue<T>(derivation: RenderedValue<T>, deriveValue: () => T) {
 }
 
 class RenderedValue<T> extends Derivation<T> {
-    protected override getUpdateMessage() { return '⚛️ (render)'; }
+    private _requiresRender = new Subject<string>(() => `${this.displayName}.requiresRender`);
 
-    protected override onInvalidated(oldSources: readonly IObservable<any>[]) {
-        log('⚛️🚩 (render invalidated)', this.displayName, [], () => ({
-            Previous: this.loggedValue(this._value),
-            Container: this.container,
-            Sources: sourceTree(oldSources)
-        }), () => this.notifyObservers());
+    get requiresRender() { return this._requiresRender as IObservable<string>; }
+
+    protected override onSourceValueChanged(source: IObservableValue<unknown>) {
+        if (this._state == 'indeterminate') {
+            this._state = 'invalid';
+            this._requiresRender.next(source.displayName ?? "(unknown)");
+        }
     }
+
+    protected override getInvalidatedMessage() { return '⚛️🚩 (render invalidated)'; }
+
+    protected override getUpdateMessage() { return '⚛️ (render)'; }
 
     protected override loggedValue(value: T) {
         if (process.env.NODE_ENV !== 'production' && isValidElement(value)) {

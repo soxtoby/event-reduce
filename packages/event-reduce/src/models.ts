@@ -127,7 +127,7 @@ export function isModel<T>(model: T): model is T & object {
 export function extend<T>(reducedValue: T) {
     let source = getUnderlyingObservable(reducedValue);
     if (source && source instanceof Reduction)
-        return reduce(reducedValue).on(source.values, (_, val) => val);
+        return reduce(reducedValue).on(source, (_, val) => val);
     throw new ValueIsNotObservableError(reducedValue);
 }
 
