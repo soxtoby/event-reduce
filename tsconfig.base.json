@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "es6",
     "module": "commonjs",
-    "lib": ["ES2022", "dom"],
+    "lib": ["ES2022", "ESNext.Disposable", "dom"],
     "jsx": "react",
     "strict": true,
     "noImplicitOverride": true,
