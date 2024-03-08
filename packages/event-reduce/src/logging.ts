@@ -38,7 +38,7 @@ export function log<Info extends object>(type: string, displayName: string, args
         }
 
         if (logStack.length == 1) {
-            flushLogs(logStack[0], 0);
+            flushLogs(logStack[0]);
             logStack = [[]];
         }
 
@@ -54,18 +54,15 @@ export function log<Info extends object>(type: string, displayName: string, args
             logStack.at(-1)!.push(group);
         }
 
-        function flushLogs(logs: LogItem[], depth: number) {
+        function flushLogs(logs: LogItem[]) {
             for (let log of logs) {
                 if (Array.isArray(log)) {
                     console.log(...log);
                 } else if (!log.children.length) {
                     console.log(...log.message);
                 } else {
-                    if (depth)
-                        console.group(...log.message);
-                    else
-                        console.groupCollapsed(...log.message);
-                    flushLogs(log.children, depth + 1);
+                    console.groupCollapsed(...log.message);
+                    flushLogs(log.children);
                     console.groupEnd();
                 }
             }
