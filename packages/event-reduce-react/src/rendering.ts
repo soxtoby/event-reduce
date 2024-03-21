@@ -37,14 +37,7 @@ function useSyncDerivation<T>(name: string) {
     let derivedValue = useOnce(() => new RenderedValue<T>(() => name, () => undefined!));
     useDispose(() => derivedValue[dispose]());
 
-    let render = useOnce(() => new ObservableValue(() => `${name}.render`, { invalidatedBy: "(nothing)" }));
-
-    useEffect(() => derivedValue.requiresRender.subscribe(
-        invalidatedBy => reactionQueue.current.add(
-            () => render.setValue({ invalidatedBy }))),
-        []);
-
-    useSyncExternalStore(useCallback(o => render.subscribe(o), []), () => render.value);
+    useSyncExternalStore(useCallback(o => derivedValue.render.subscribe(o), []), () => derivedValue.render.value);
 
     return derivedValue;
 }
@@ -55,14 +48,12 @@ function useRenderValue<T>(derivation: RenderedValue<T>, deriveValue: () => T) {
 }
 
 class RenderedValue<T> extends Derivation<T> {
-    private _requiresRender = new Subject<string>(() => `${this.displayName}.requiresRender`);
-
-    get requiresRender() { return this._requiresRender as IObservable<string>; }
+    public readonly render = new ObservableValue(() => `${this.displayName}.render`, { invalidatedBy: "(nothing)" });
 
     protected override onSourceValueChanged(source: IObservableValue<unknown>) {
         if (this._state == 'indeterminate') {
             this._state = 'invalid';
-            this._requiresRender.next(source.displayName ?? "(unknown)");
+            reactionQueue.current.add(() => this.render.setValue({ invalidatedBy: source.displayName ?? "(unknown)" }));
         }
     }
 
