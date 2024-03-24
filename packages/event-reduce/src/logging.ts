@@ -1,5 +1,6 @@
 import { sendEvent } from "./devtools";
 import { IObservable, Observable } from "./observable";
+import { RestoreSubject } from "./reduction";
 
 let loggingEnabled = false;
 
@@ -89,14 +90,16 @@ export interface ISourceInfo {
 
 export function sourceTree(sources: readonly IObservable<any>[]): ISourceInfo[] {
     if (process.env.NODE_ENV !== 'production')
-        return sources.map(s => {
-            let source = new WeakRef(s);
-            return {
-                name: s.displayName,
-                sources: (s as Observable<any>).sourceInfo,
-                get observable() { return source.deref() ?? "No longer in memory"; }
-            }
-        });
+        return sources
+            .filter(s => !(s instanceof RestoreSubject)) // Since every reduction has a restore source, this is just noise
+            .map(s => {
+                let source = new WeakRef(s);
+                return {
+                    name: s.displayName,
+                    sources: (s as Observable<any>).sourceInfo,
+                    get observable() { return source.deref() ?? "No longer in memory"; }
+                }
+            });
     else
         return [];
 }

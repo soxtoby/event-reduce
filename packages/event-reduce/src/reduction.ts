@@ -29,7 +29,7 @@ export interface IBoundReduction<T, TEvents> extends IReduction<T> {
 
 export class Reduction<T> extends ObservableValue<T> implements IReduction<T> {
     private _sources = new Map<IObservable<any>, Unsubscribe>();
-    private _restore = new Subject<State<T>>(() => `${this.displayName}.restored`);
+    private _restore = new RestoreSubject<State<T>>(() => `${this.displayName}.restored`);
 
     constructor(getDisplayName: () => string, initial: T) {
         super(getDisplayName, initial);
@@ -102,6 +102,8 @@ class BoundReduction<TValue, TEvents> extends Reduction<TValue> implements IBoun
         return super.on(isObservable(observable) ? observable : observable(this._events), reduce);
     }
 }
+
+export class RestoreSubject<T> extends Subject<T> { }
 
 export class CircularSubscriptionError extends Error {
     constructor(
