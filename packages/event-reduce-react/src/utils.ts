@@ -1,12 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 
 export function useDispose(dispose: () => void) {
     useEffect(() => () => dispose(), []);
 }
 
 export function useOnce<T>(getValue: () => T) {
-    let ref = useRef<T>(undefined!);
-    if (ref.current === undefined)
-        ref.current = getValue();
-    return ref.current;
+    let [value] = useState(getValue);
+    return value;
 }

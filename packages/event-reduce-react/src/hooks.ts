@@ -6,14 +6,17 @@ import { dispose } from "event-reduce/lib/utils";
 import { DependencyList, useMemo, useRef } from "react";
 import { useDispose, useOnce } from "./utils";
 
-/** Creates a model that persists across renders of the component and cleans up when the component is unmounted. */
-export function useModel<T extends object>(createModel: () => T) {
+/**
+ * Creates a model that persists across renders of the component and cleans up when the component is unmounted.
+ * @param unobservableDependencies - A list of dependencies that are not observable. The model will be re-created when any of these change.
+*/
+export function useModel<T extends object>(createModel: () => T, unobservableDependencies?: DependencyList) {
     let modelOwner = useOnce(() => ({})); // Effectively makes the component the owner of the model for cleanup purposes
-    let model = useOnce(() => {
+    let model = useMemo(() => {
         let model = createModel();
         changeOwnedValue(modelOwner, undefined, model);
         return model;
-    });
+    }, unobservableDependencies ?? []);
     useDispose(() => disposeModel(modelOwner));
     return model;
 }
