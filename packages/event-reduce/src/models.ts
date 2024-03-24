@@ -1,6 +1,6 @@
 import { changeOwnedValue } from "./cleanup";
 import { Derivation, derive } from "./derivation";
-import { IEventBase } from "./events";
+import { isEvent } from "./events";
 import { ObservableValue, ValueIsNotObservableError, getUnderlyingObservable, startTrackingScope } from "./observableValue";
 import { Reduction, reduce } from "./reduction";
 import { StringKey } from "./types";
@@ -29,10 +29,14 @@ export function model<T extends { new(...args: any[]): any }>(target: T): T {
                 }
 
                 for (let value of Object.values(getObservableValues(this)))
-                    changeOwnedValue(this, undefined, value)
+                    changeOwnedValue(this, undefined, value);
 
-                for (let key of getStateProperties(this))
+                for (let key of getStateProperties(this)) {
+                    let value = this[key];
+                    if (isEvent(value) || isEventsClass(value))
+                        throw new EventsMarkedAsStateError(this, key);
                     changeOwnedValue(this, undefined, this[key]);
+                }
             }
         }
     }[className];
@@ -51,7 +55,7 @@ export function derived(targetOrValuesEqual: Object | ((previous: any, next: any
 
     return valuesEqual
         ? decorate as PropertyDecorator
-        : decorate(targetOrValuesEqual, key!) as any 
+        : decorate(targetOrValuesEqual, key!) as any
 
     function decorate(target: Object, key: string | symbol) {
         let property = Object.getOwnPropertyDescriptor(target, key)!;
@@ -186,26 +190,38 @@ export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
                 super(...args);
                 Object.keys(this).forEach(key => {
                     let prop = this[key];
-                    if (hasDisplayName(prop)) {
+                    if (isEvent(prop)) {
                         prop.displayName = key;
                         prop.container = this;
                     }
                 });
+                (this as any)[eventsClassBrand] = true;
             }
         }
     }[className];
 }
 
-function hasDisplayName(e: any): e is IEventBase {
-    return e instanceof Object
-        && 'displayName' in e;
+export function isEventsClass(value: unknown): value is Object {
+    return value instanceof Object
+        && eventsClassBrand in value;
+}
+
+const eventsClassBrand = Symbol('IsEventsClass');
+
+export class EventsMarkedAsStateError extends Error {
+    constructor(
+        public model: object,
+        public property: string | symbol
+    ) {
+        super(`Model property ${String(property)} returns an event or events class, and cannot be marked as @state.`);
+    }
 }
 
 export class InvalidReducedPropertyError extends Error {
     constructor(
         public property: string | symbol
     ) {
-        super(`@reduced property '${String(property)}' can only be set to the value of a reduction`);
+        super(`@reduced property '${String(property)}' can only be set to the value of a reduction.`);
     }
 }
 
@@ -213,6 +229,6 @@ export class InvalidDerivedPropertyError extends Error {
     constructor(
         public property: string | symbol
     ) {
-        super(`@derived property ${String(property)} must have a getter or be set to the value of a derivation`);
+        super(`@derived property ${String(property)} must have a getter or be set to the value of a derivation.`);
     }
 }

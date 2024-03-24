@@ -1,4 +1,5 @@
-import { asyncEvent, derive, derived, event, events, extend, model, reduce, reduced } from "event-reduce";
+import { asyncEvent, derive, derived, event, events, extend, model, reduce, reduced, state } from "event-reduce";
+import { EventsMarkedAsStateError } from "event-reduce/lib/models";
 import { AccessedValueWithCommonSourceError, valueChanged } from "event-reduce/lib/observableValue";
 import { describe, it, test, then, when } from "wattle";
 
@@ -108,6 +109,20 @@ describe("models", function () {
 
         it("throws", () => increment.should.throw(AccessedValueWithCommonSourceError));
     });
+
+    when("event is marked as state", () => {
+        @model
+        class BadModel {
+            @state
+            event = event('bad state');
+        }
+
+        it("throws when constructed", () => {
+            let err = (() => new BadModel()).should.throw(EventsMarkedAsStateError);
+            err.has.property('model');
+            err.has.property('property', 'event');
+        });
+    });
 });
 
 describe("events decorator", function () {
@@ -127,4 +142,18 @@ describe("events decorator", function () {
     });
 
     it("sets event container", () => (sut.promiseEvent as any).container.should.equal(sut));
+
+    when("event class is marked as state", () => {
+        @model
+        class BadModel {
+            @state
+            events = new TestEvents();
+        }
+
+        it("throws when constructed", () => {
+            let err = (() => new BadModel()).should.throw(EventsMarkedAsStateError);
+            err.has.property('model');
+            err.has.property('property', 'events');
+        });
+    })
 });

@@ -164,17 +164,25 @@ class ScopedAsyncEvent<Result, ContextIn extends Scope, ContextOut extends Scope
 /** Converts an event class into a callable function */
 export function makeEventFunction<Event extends IEventClass>(event: Event) {
     Object.setPrototypeOf(eventFn, event);
+    eventFn[eventBrand] = true;
     eventFn.apply = Function.prototype.apply;
     Object.defineProperty(eventFn, 'displayName', { // Delegate to prototype, since already initialised Subjects' displayNames will have captured the prototype as 'this'
         get() { return event.displayName; },
         set(value: string) { event.displayName = value; }
     });
-    return eventFn as Event & Event['next'];
+    return eventFn as EventFn<Event>;
 
     function eventFn(...args: any) {
         return event.next.apply(eventFn, args);
     }
 }
+
+export function isEvent(event: unknown): event is EventFn<IEventClass> {
+    return typeof event == 'function'
+        && eventBrand in event;
+}
+
+export type EventFn<Event extends IEventClass> = Event & Event['next'] & { [eventBrand]: true };
 
 /** Logs event and ensures no other events are run at the same time. */
 export function fireEvent(type: string, displayName: string, arg: any, getInfo: (() => object) | undefined, runEvent: () => void) {
@@ -195,6 +203,7 @@ export function fireEvent(type: string, displayName: string, arg: any, getInfo: 
 
 let currentlyFiringEvent = null as string | null;
 const anonymousEvent = '(anonymous event)';
+const eventBrand = Symbol('IsEvent');
 
 export class ChainedEventsError extends Error {
     constructor(

@@ -1,5 +1,5 @@
-import { derive, event } from "event-reduce";
-import { SideEffectInDerivationError } from "event-reduce/lib/derivation";
+import { derive, event, events } from "event-reduce";
+import { DerivedEventsError, SideEffectInDerivationError } from "event-reduce/lib/derivation";
 import { consumeLastAccessed, ObservableValue } from "event-reduce/lib/observableValue";
 import { spy, stub } from "sinon";
 import { describe, it, then, when } from "wattle";
@@ -73,6 +73,30 @@ describe(derive.name, () => {
             let err = (() => sut.value).should.throw(SideEffectInDerivationError);
             err.has.property('derivation', sut);
             err.has.property('sideEffect', 'some event');
+        });
+    });
+
+    when("derivation returns an event", () => {
+        let eventValue = event('derived event');
+        let sut = derive(() => sourceA.value && eventValue);
+
+        then("accessing value throws", () => {
+            let err = (() => sut.value).should.throw(DerivedEventsError);
+            err.has.property('derivation', sut);
+            err.has.property('value', eventValue);
+        });
+    });
+
+    when("derivation returns an events class", () => {
+        @events
+        class Events { }
+        let eventsValue = new Events();
+        let sut = derive(() => sourceA.value && eventsValue);
+
+        then("accesing value throws", () => {
+            let err = (() => sut.value).should.throw(DerivedEventsError);
+            err.has.property('derivation', sut);
+            err.has.property('value', eventsValue);
         });
     });
 });

@@ -1,4 +1,6 @@
+import { EventFn, IEventClass, isEvent } from "./events";
 import { log, sourceTree } from "./logging";
+import { isEventsClass } from "./models";
 import { IObservable } from "./observable";
 import { IObservableValue, ObservableValue, collectAccessedValues, withInnerTrackingScope } from "./observableValue";
 import { Unsubscribe } from "./types";
@@ -87,6 +89,10 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
                         currentlyRunningDerivation = previouslyRunningDerivation;
                     }
                 });
+
+                if (isEvent(value) || isEventsClass(value))
+                    throw new DerivedEventsError(this, value);
+
                 for (let source of newSources)
                     this._sources.set(source, this.subscribeTo(source));
                 this._sourceVersion = Math.max(0, ...this.sources.map(s => s.version));
@@ -152,4 +158,11 @@ export class SideEffectInDerivationError extends Error {
         public derivation: IObservableValue<unknown>,
         public sideEffect: string
     ) { super(`Derivation ${derivation.displayName} triggered side effect ${sideEffect}. Derivations cannot have side effects.`); }
+}
+
+export class DerivedEventsError extends Error {
+    constructor(
+        public derivation: IObservableValue<unknown>,
+        public value: EventFn<IEventClass> | object
+    ) { super(`Derivation ${derivation.displayName} returned event or events class ${isEvent(value) ? value.displayName : value}. Events cannot be state.`); }
 }
