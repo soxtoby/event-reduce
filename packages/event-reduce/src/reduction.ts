@@ -1,4 +1,6 @@
+import { EventFn, IEventClass, isEvent } from "./events";
 import { log, sourceTree } from "./logging";
+import { isEventsClass } from "./models";
 import { IObservable, allSources, isObservable } from "./observable";
 import { IObservableValue, ObservableValue, protectAgainstAccessingValueWithCommonSource, valueChanged } from "./observableValue";
 import { State, setState } from "./state";
@@ -68,6 +70,10 @@ export class Reduction<T> extends ObservableValue<T> implements IReduction<T> {
                 Sources: sourceTree(this.sources)
             }), () => {
                 protectAgainstAccessingValueWithCommonSource(observable, () => value = reduce(this._value, eventValue));
+
+                if (isEvent(value) || isEventsClass(value))
+                    throw new ReducedEventsError(this, value);
+
                 this.setValue(value)
             });
         }, () => this.displayName));
@@ -111,5 +117,14 @@ export class CircularSubscriptionError extends Error {
         public observable: IObservable<unknown>
     ) {
         super(`Cannot subscribe to '${observable.displayName}', as it depends on this reduction, '${reduction.displayName}'.`);
+    }
+}
+
+export class ReducedEventsError extends Error {
+    constructor(
+        public reduction: IReduction<unknown>,
+        public value: EventFn<IEventClass> | object
+    ) {
+        super(`Reduction ${reduction.displayName} reduced to event or events class ${isEvent(value) ? value.displayName : value}. Events cannot be state.`);
     }
 }

@@ -1,6 +1,6 @@
-import { reduce } from 'event-reduce';
+import { event, events, reduce } from 'event-reduce';
 import { AccessedValueWithCommonSourceError, collectAccessedValues } from 'event-reduce/lib/observableValue';
-import { CircularSubscriptionError } from "event-reduce/lib/reduction";
+import { CircularSubscriptionError, ReducedEventsError } from "event-reduce/lib/reduction";
 import { Subject } from 'event-reduce/lib/subject';
 import * as sinon from 'sinon';
 import { describe, it, test, then, when } from 'wattle';
@@ -69,35 +69,63 @@ describe(reduce.name, function () {
             });
         });
     });
-});
 
-when("bound to events object", () => {
-    let events = {};
-    let sut = reduce(1, events);
+    when("bound to events object", () => {
+        let events = {};
+        let sut = reduce(1, events);
 
-    when("subscribing to an observable", () => {
-        let subject = new Subject<string>(() => 'test');
-        let getEvent = sinon.spy(() => subject);
-        let reducer = sinon.stub();
-        sut.on(getEvent, reducer);
+        when("subscribing to an observable", () => {
+            let subject = new Subject<string>(() => 'test');
+            let getEvent = sinon.spy(() => subject);
+            let reducer = sinon.stub();
+            sut.on(getEvent, reducer);
 
-        then("event getter called with bound events", () => getEvent.should.have.been.calledWith(events));
+            then("event getter called with bound events", () => getEvent.should.have.been.calledWith(events));
 
-        then("reduction subscribed to result of event getter", () => {
-            subject.next('foo');
-            reducer.should.have.been.calledWith(1, 'foo');
+            then("reduction subscribed to result of event getter", () => {
+                subject.next('foo');
+                reducer.should.have.been.calledWith(1, 'foo');
+            });
         });
     });
-});
 
-test("accessed reductions updated when value is accessed", () => {
-    let r1 = reduce(1);
-    let r2 = reduce(2);
+    test("accessed reductions updated when value is accessed", () => {
+        let r1 = reduce(1);
+        let r2 = reduce(2);
 
-    let accessed = collectAccessedValues(() => {
-        r1.value;
-        r2.value;
+        let accessed = collectAccessedValues(() => {
+            r1.value;
+            r2.value;
+        });
+
+        Array.from(accessed).should.have.members([r1, r2]);
     });
 
-    Array.from(accessed).should.have.members([r1, r2]);
+    when("reducer returns an event", () => {
+        let eventValue = event('test event');
+        let subject = new Subject<string>(() => 'test');
+        let sut = reduce(null as any, 'sut')
+            .on(subject, () => eventValue);
+
+        it("throws", () => {
+            let err = (() => subject.next('foo')).should.throw(ReducedEventsError);
+            err.has.property('reduction', sut);
+            err.has.property('value', eventValue);
+        });
+    });
+
+    when("reducer returns an events object", () => {
+        @events
+        class Events { }
+        let eventsValue = new Events();
+        let subject = new Subject<string>(() => 'test');
+        let sut = reduce(null as any, 'sut')
+            .on(subject, () => eventsValue);
+
+        then("it throws", () => {
+            let err = (() => subject.next('foo')).should.throw(ReducedEventsError);
+            err.has.property('reduction', sut);
+            err.has.property('value', eventsValue);
+        });
+    });
 });
