@@ -4,7 +4,7 @@ import { isEvent } from "./events";
 import { ObservableValue, ValueIsNotObservableError, getUnderlyingObservable, startTrackingScope } from "./observableValue";
 import { Reduction, reduce } from "./reduction";
 import { StringKey } from "./types";
-import { getOrAdd, isObject, isPlainObject, nameOfFunction } from "./utils";
+import { getAllPropertyDescriptors, getOrAdd, isObject, isPlainObject, nameOfFunction } from "./utils";
 
 const StateProperties = Symbol('StateProperties');
 const ObservableValueFactories = Symbol('ObservableValueFactories');
@@ -205,6 +205,7 @@ export function getStateProperties<T>(model: T): string[] {
 /**
  * Marks a class as an events class.
  * Automatically populates the names of event properties.
+ * Events returned from getters will be snapshotted, so the getter function is only called once.
  */
 export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
     const className = nameOfFunction(target);
@@ -212,13 +213,19 @@ export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
         [className]: class extends target {
             constructor(...args: any[]) {
                 super(...args);
-                Object.keys(this).forEach(key => {
-                    let prop = this[key];
-                    if (isEvent(prop)) {
-                        prop.displayName = key;
-                        prop.container = this;
+                for (let [key, property] of getAllPropertyDescriptors(this)) {
+                    let value = this[key];
+                    if (isEvent(value)) {
+                        value.displayName = key;
+                        value.container = this;
+                        if (property.get)
+                            Object.defineProperty(this, key, {
+                                value,
+                                configurable: true,
+                                enumerable: true
+                            });
                     }
-                });
+                }
                 (this as any)[eventsClassBrand] = true;
             }
         }

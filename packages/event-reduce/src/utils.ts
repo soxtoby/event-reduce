@@ -63,4 +63,15 @@ export function firstIntersection<T>(a: Set<T>, b: Set<T>) {
             return item;
 }
 
+export function getAllPropertyDescriptors(obj: unknown) {
+    let props = new Map<string, PropertyDescriptor>();
+    while (obj != Object.prototype) {
+        Object.entries(Object.getOwnPropertyDescriptors(obj))
+            .filter(([key]) => !props.has(key))
+            .forEach(([key, property]) => props.set(key, property));
+        obj = Object.getPrototypeOf(obj);
+    }
+    return props;
+}
+
 export const dispose: typeof Symbol.dispose = Symbol.dispose ?? Symbol('Symbol.dispose');

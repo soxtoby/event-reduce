@@ -1,11 +1,11 @@
-import { getObservableValue } from "./models";
 import { event } from "./events";
+import { getObservableValue } from "./models";
 import { ObservableValue } from "./observableValue";
-import { isObject } from "./utils";
+import { getAllPropertyDescriptors, isObject } from "./utils";
 
 export function mutable<T>(model: T): Mutable<T> {
     if (isObject(model) && !Array.isArray(model)) {
-        for (let [key, base] of allProperties(model)) {
+        for (let [key, base] of getAllPropertyDescriptors(model)) {
             let observableValue = getObservableValue(model, key)!;
 
             if (observableValue) {
@@ -25,17 +25,6 @@ export function mutable<T>(model: T): Mutable<T> {
             Object.defineProperty(model, 'target', { get: () => model, configurable: true });
     }
     return model as Mutable<T>;
-}
-
-function allProperties(obj: unknown) {
-    let props = new Map<string, PropertyDescriptor>();
-    while (obj != Object.prototype) {
-        Object.entries(Object.getOwnPropertyDescriptors(obj))
-            .filter(([key]) => !props.has(key))
-            .forEach(([key, property]) => props.set(key, property));
-        obj = Object.getPrototypeOf(obj);
-    }
-    return props;
 }
 
 export function modelProxy<T extends object>(initialState: T): Mutable<T>;

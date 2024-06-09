@@ -25,7 +25,7 @@ export class CounterListModel {
         .value;
 
     private createCounter(initial: { id: number, count?: number }) {
-        return new CounterModel(new CounterEvents(this.events, initial.id), initial);
+        return new CounterModel(new CounterEvents(this.events, { id: initial.id }), initial);
     }
 }
 

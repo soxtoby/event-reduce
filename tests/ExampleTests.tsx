@@ -57,7 +57,7 @@ describe(CounterModel.name, function () {
     let id = 1;
     let initialCount = 3;
     let parentEvents = eventProxy<CounterListEvents>();
-    let events = new CounterEvents(parentEvents, id);
+    let events = new CounterEvents(parentEvents, { id });
     let sut = mutable(new CounterModel(events, { id, count: initialCount }));
 
     describe("count", () => {
@@ -110,7 +110,7 @@ describe(CounterModel.name, function () {
 
 describe(Counter.name, function () {
     let id = 1;
-    let model = new CounterModel(new CounterEvents(eventProxy(), id), { id, count: 3 });
+    let model = new CounterModel(new CounterEvents(eventProxy(), { id }), { id, count: 3 });
     let sut = render(<Counter model={model} />);
 
     it("shows count", () => sut.getByTestId('count').should.have.text('3'));

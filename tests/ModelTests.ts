@@ -1,6 +1,7 @@
 import { asyncEvent, derive, derived, event, events, extend, model, reduce, reduced, state } from "event-reduce";
 import { EventsMarkedAsStateError } from "event-reduce/lib/models";
 import { AccessedValueWithCommonSourceError, valueChanged } from "event-reduce/lib/observableValue";
+import { spy } from "sinon";
 import { describe, it, test, then, when } from "wattle";
 
 describe("models", function () {
@@ -156,22 +157,44 @@ describe("models", function () {
 });
 
 describe("events decorator", function () {
+    let getterSpy = spy();
+
     @events
     class TestEvents {
-        promiseEvent = asyncEvent<string>();
+        eventField = asyncEvent<string>();
+
+        get eventGetter() {
+            getterSpy();
+            return asyncEvent<string>();
+        }
     }
     let sut = new TestEvents();
 
     it("keeps class name", () => TestEvents.name.should.equal('TestEvents'));
 
     it("sets event name", () => {
-        sut.promiseEvent.displayName.should.equal('promiseEvent');
-        sut.promiseEvent.started.displayName.should.equal('promiseEvent.started');
-        sut.promiseEvent.resolved.displayName.should.equal('promiseEvent.resolved');
-        sut.promiseEvent.rejected.displayName.should.equal('promiseEvent.rejected');
+        sut.eventField.displayName.should.equal('eventField');
+        sut.eventField.started.displayName.should.equal('eventField.started');
+        sut.eventField.resolved.displayName.should.equal('eventField.resolved');
+        sut.eventField.rejected.displayName.should.equal('eventField.rejected');
+
+        sut.eventGetter.displayName.should.equal('eventGetter');
+        sut.eventGetter.started.displayName.should.equal('eventGetter.started');
+        sut.eventGetter.resolved.displayName.should.equal('eventGetter.resolved');
+        sut.eventGetter.rejected.displayName.should.equal('eventGetter.rejected');
     });
 
-    it("sets event container", () => (sut.promiseEvent as any).container.should.equal(sut));
+    it("sets event container", () => {
+        (sut.eventField as any).container.should.equal(sut);
+        (sut.eventGetter as any).container.should.equal(sut);
+    });
+
+    it("snapshots getter event", () => {
+        sut.eventGetter;
+        sut.eventGetter;
+
+        getterSpy.should.have.been.calledOnce;
+    });
 
     when("event class is marked as state", () => {
         @model

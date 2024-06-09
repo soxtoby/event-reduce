@@ -5,12 +5,12 @@ import { CounterListEvents } from "./CounterList";
 
 @events
 export class CounterEvents {
-    constructor(private _parent: CounterListEvents, private _id: number) { }
+    constructor(private _parent: CounterListEvents, private _scope: { id: number }) { }
 
-    incremented = this._parent.incremented.scope({ id: this._id });
-    decremented = this._parent.decremented.scope({ id: this._id });
-    reset = this._parent.reset.scope({ id: this._id });
-    removed = this._parent.counterRemoved.scope({ id: this._id });
+    get incremented() { return this._parent.incremented.scope(this._scope); }
+    get decremented() { return this._parent.decremented.scope(this._scope); }
+    get reset() { return this._parent.reset.scope(this._scope); }
+    get removed() { return this._parent.counterRemoved.scope(this._scope); }
     valueFetched = asyncEvent<number>();
 }
 
