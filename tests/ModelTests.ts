@@ -10,14 +10,23 @@ describe("models", function () {
     @model
     class TestModel {
         @reduced
-        property = reduce(1)
+        legacyField = reduce(1)
             .on(increment, c => c + 1)
             .value;
 
         @reduced
-        dependentProperty = reduce(1)
-            .on(valueChanged(this.property), (_, p) => p)
-            .value;
+        get property() {
+            return reduce(1)
+                .on(increment, c => c + 1)
+                .value;
+        }
+
+        @reduced
+        get dependentProperty() {
+            return reduce(1)
+                .on(valueChanged(this.property), (_, p) => p)
+                .value;
+        }
 
         @derived
         get derivedProperty() {
@@ -25,26 +34,39 @@ describe("models", function () {
         }
 
         @derived
-        derivedField = derive(() => this.property * 2).value;
+        derivedField = derive(() => this.legacyField * 2).value;
 
         @reduced
-        basedOnDerivedProperty = reduce(0)
-            .on(valueChanged(this.derivedProperty), (_, d) => d)
-            .value;
+        get basedOnDerivedProperty() {
+            return reduce(0)
+                .on(valueChanged(this.derivedProperty), (_, d) => d)
+                .value;
+        }
     }
     let testModel = new TestModel();
 
     @model
     class ExtendedModel extends TestModel {
-        override property: number = extend(this.property)
+        override legacyField: number = extend(this.property)
             .on(decrement, c => c - 1)
             .value;
+
+        @reduced
+        override get property() {
+            return extend(super.property)
+                .on(decrement, c => c - 1)
+                .value;
+        }
     }
     let extendedModel = new ExtendedModel();
 
     test("property has initial value", () => testModel.property.should.equal(1));
 
     test("extended property has same initial value", () => extendedModel.property.should.equal(1));
+
+    test("legacy field has initial value", () => testModel.legacyField.should.equal(1));
+
+    test("extended legacy field has same initial value", () => extendedModel.legacyField.should.equal(1));
 
     when("reduction updated", () => {
         increment();
@@ -60,6 +82,10 @@ describe("models", function () {
         then("derived field value updated", () => testModel.derivedField.should.equal(4));
 
         then("property based on derived value updated", () => testModel.basedOnDerivedProperty.should.equal(4));
+
+        then("legacy field value updated", () => testModel.legacyField.should.equal(2));
+
+        then("extended legacy field value updated", () => extendedModel.legacyField.should.equal(2));
     });
 
     when("extended reduction updated", () => {
@@ -68,6 +94,10 @@ describe("models", function () {
         then("property value unaffected", () => testModel.property.should.equal(1));
 
         then("extended property value updated", () => extendedModel.property.should.equal(0));
+
+        then("legacy field value unaffected", () => testModel.legacyField.should.equal(1));
+
+        then("extended legacy field value updated", () => extendedModel.legacyField.should.equal(0));
     });
 
     when("derivation creates a new model that accesses an observable value in its constructor", () => {

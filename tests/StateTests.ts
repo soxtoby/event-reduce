@@ -2,7 +2,7 @@ import { derived, getState, reduce, reduced, setState, state, State } from "even
 import { describe, it } from "wattle";
 
 describe("state", function () {
-    class TestModel {
+    class BaseModel {
         constructor(@state('constructorProperty') public constructorProperty: string) { }
 
         @reduced
@@ -29,6 +29,11 @@ describe("state", function () {
         ignoredValue = 'ignored';
     }
 
+    class TestModel extends BaseModel {
+        @state
+        subClassProperty = 'subClass';
+    }
+
     class ChildModel {
         constructor(private _initialValue: string) { }
 
@@ -49,7 +54,8 @@ describe("state", function () {
                 { value: 'two' }
             ],
             mergedModel: { value: 'merged' },
-            constructorProperty: 'ctor'
+            constructorProperty: 'ctor',
+            subClassProperty: 'subClass'
         })));
     });
 
@@ -64,6 +70,7 @@ describe("state", function () {
                 { value: 'three*' }
             ],
             mergedModel: { value: 'merged*' },
+            subClassProperty: 'subClass*',
             ignoredValue: 'ignored*'
         } as State<TestModel>;
         setState(model, state);
@@ -80,6 +87,7 @@ describe("state", function () {
             model.modelArray[2].value.should.equal('three*');
             model.mergedModel.should.equal(originalMergedModel);
             model.mergedModel.value.should.equal('merged*');
+            model.subClassProperty.should.equal('subClass*');
             model.ignoredValue.should.equal('ignored');
         });
     });

@@ -14,13 +14,13 @@ export function changeOwnedValue(owner: TrackableValue, oldValue: unknown, newVa
         let oldTrackableValues = findTrackableValues(oldValue);
         let newTrackableValues = findTrackableValues(newValue);
 
-        for (let oldValue of oldTrackableValues)
-            if (!newTrackableValues.has(oldValue))
-                removeOwner(owner, oldValue);
+        for (let oldTrackableValue of oldTrackableValues)
+            if (!newTrackableValues.has(oldTrackableValue))
+                removeOwner(owner, oldTrackableValue);
 
-        for (let newValue of newTrackableValues)
-            if (!oldTrackableValues.has(newValue))
-                addOwner(owner, newValue);
+        for (let newTrackableValue of newTrackableValues)
+            if (!oldTrackableValues.has(newTrackableValue))
+                addOwner(owner, newTrackableValue);
     }
 }
 

@@ -1,4 +1,4 @@
-import { getObservableProperty } from "./models";
+import { getObservableValue } from "./models";
 import { event } from "./events";
 import { ObservableValue } from "./observableValue";
 import { isObject } from "./utils";
@@ -6,13 +6,12 @@ import { isObject } from "./utils";
 export function mutable<T>(model: T): Mutable<T> {
     if (isObject(model) && !Array.isArray(model)) {
         for (let [key, base] of allProperties(model)) {
-            let getObservableValue = getObservableProperty(Object.getPrototypeOf(model), key)!;
+            let observableValue = getObservableValue(model, key)!;
 
-            if (getObservableValue) {
+            if (observableValue) {
                 Object.defineProperty(model, key, {
-                    get() { return getObservableValue(model).value; },
+                    get() { return observableValue.value; },
                     set(value) {
-                        let observableValue = getObservableValue(model);
                         observableValue.unsubscribeFromSources();
                         observableValue.setValue(value);
                     },

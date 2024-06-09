@@ -1,4 +1,4 @@
-import { getObservableProperties, getStateProperties, isModel } from "./models";
+import { getObservableValues, getStateProperties, isModel } from "./models";
 import { Reduction } from "./reduction";
 import { OmitValues, StringKey } from "./types";
 import { isObject, jsonPath } from "./utils";
@@ -99,7 +99,7 @@ function getAllStatefulProperties<T>(model: T, includeDerived = false): StateKey
     if (!isModel(model))
         return Object.keys(model as object) as StateKey<T>[];
     let observableProps = includeDerived
-        ? Object.keys(getObservableProperties(model) || {})
+        ? Object.keys(getObservableValues(model) || {})
         : Object.keys(getReducedProperties(model));
     let explicitProps = getStateProperties(model);
     return observableProps.concat(explicitProps) as StateKey<T>[];
@@ -107,9 +107,7 @@ function getAllStatefulProperties<T>(model: T, includeDerived = false): StateKey
 
 function getReducedProperties<T>(model: T) {
     let reducedProps = {} as Record<StateKey<T>, Reduction<unknown>>;
-    let observableProps = getObservableProperties(Object.getPrototypeOf(model)) || {};
-    for (let key in observableProps) {
-        let observableValue = observableProps[key](model);
+    for (let [key, observableValue] of Object.entries(getObservableValues(model))) {
         if (observableValue instanceof Reduction)
             reducedProps[key as StateKey<T>] = observableValue;
     }

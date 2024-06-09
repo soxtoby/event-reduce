@@ -9,7 +9,7 @@
             "request": "launch",
             "name": "Run tests",
             "program": "${workspaceFolder}/node_modules/wattle/lib/cmd.js",
-            "args": [ "${relativeFile}" ],
+            "args": [ "${relativeFile}", "--show-stacks" ],
             "autoAttachChildProcesses": true
         }
     ]
