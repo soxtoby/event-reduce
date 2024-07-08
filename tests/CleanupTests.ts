@@ -284,7 +284,7 @@ describe("subscription cleanup", function () {
     });
 
     function spyOnDispose<T>(model: T, property: StringKey<T>) {
-        let observableValue = getObservableValue(model, property);
+        let observableValue = getObservableValue(model, property)!;
         return spy(observableValue, dispose);
     }
 });

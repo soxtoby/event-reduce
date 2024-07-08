@@ -179,7 +179,10 @@ function getOrAddObservableValues(instance: any) {
 }
 
 export function getObservableValue(instance: any, key: string) {
-    return getObservableValues(instance)[key];
+    let observableValues = getObservableValues(instance);
+    return Object.hasOwn(observableValues, key)
+        ? observableValues[key]
+        : undefined;
 }
 
 export function getObservableValues(instance: any): { [property: string]: ObservableValue<unknown> } {

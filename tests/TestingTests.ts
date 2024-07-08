@@ -1,5 +1,7 @@
 import { derived, event, events, reduce, reduced } from "event-reduce";
+import { disposeModel } from "event-reduce/lib/cleanup";
 import { eventProxy, mutable, modelProxy } from "event-reduce/lib/testing";
+import { dispose } from "event-reduce/lib/utils";
 import { match, spy } from "sinon";
 import { describe, test, then, when } from "wattle";
 
@@ -51,15 +53,21 @@ describe("mutable", () => {
 
         then("computed value returns override", () => sut.valuePlusOne.should.equal(3));
     });
+
+    test("can be disposed", () => {
+        disposeModel(sut);
+    });
 });
 
 describe(modelProxy.name, function () {
-    let sut = modelProxy({
-        stringValue: 'foo',
-        objectValue: {
-            prop: 'bar'
-        }
-    });
+    class ModelClass {
+        constructor(
+            public stringValue: string,
+            public objectValue: { prop: string }
+        ) { }
+    }
+
+    let sut = modelProxy(new ModelClass('foo', { prop: 'bar' }));
 
     test("can deeply compare proxy", () => sut.should.deep.equal({
         stringValue: 'foo',
@@ -67,6 +75,10 @@ describe(modelProxy.name, function () {
             prop: 'bar'
         }
     }));
+
+    test("can be disposed", () => {
+        disposeModel(sut);
+    });
 });
 
 describe("eventProxy", () => {
