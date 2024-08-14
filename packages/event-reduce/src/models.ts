@@ -38,8 +38,10 @@ export function model<T extends { new(...args: any[]): any }>(target: T): T {
 
                 for (let key of getStateProperties(this)) {
                     let value = this[key];
-                    if (isEvent(value) || isEventsClass(value))
-                        throw new EventsMarkedAsStateError(this, key);
+                    if (process.env.NODE_ENV !== 'production') {
+                        if (isEvent(value) || isEventsClass(value))
+                            throw new EventsMarkedAsStateError(this, key);
+                    }
                     changeOwnedValue(this, undefined, this[key]);
                 }
             }

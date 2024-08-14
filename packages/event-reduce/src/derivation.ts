@@ -97,8 +97,10 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
                     }
                 });
 
-                if (isEvent(value) || isEventsClass(value))
-                    throw new DerivedEventsError(this, value);
+                if (process.env.NODE_ENV !== 'production') {
+                    if (isEvent(value) || isEventsClass(value))
+                        throw new DerivedEventsError(this, value);
+                }
 
                 for (let source of newSources)
                     this._sources.set(source, this.subscribeTo(source));

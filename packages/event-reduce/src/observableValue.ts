@@ -42,13 +42,17 @@ export class ObservableValue<T> extends Observable<T> implements IObservableValu
     get version() { return this._version; }
 
     get value() {
-        let commonSource = triggeringSources.size
-            ? firstIntersection(triggeringSources, allSources([this]))
-            : undefined;
+        if (process.env.NODE_ENV !== 'production') {
+            let commonSource = triggeringSources.size
+                ? firstIntersection(triggeringSources, allSources([this]))
+                : undefined;
 
-        valueAccessed.next(commonSource
-            ? new AccessedValueWithCommonSourceError(commonSource, triggeringObservable!, this)
-            : this);
+            valueAccessed.next(commonSource
+                ? new AccessedValueWithCommonSourceError(commonSource, triggeringObservable!, this)
+                : this);
+        } else {
+            valueAccessed.next(this);
+        }
 
         return this._value;
     }
@@ -78,21 +82,25 @@ export function collectAccessedValues(action: Action) {
 }
 
 export function protectAgainstAccessingValueWithCommonSource(currentSource: IObservable<any>, action: Action) {
-    let outerTriggeringObservable = triggeringObservable;
-    let outerTriggeringSources = triggeringSources;
-    triggeringObservable = currentSource;
-    triggeringSources = new Set(
-        Array.from(outerTriggeringSources)
-            .concat(Array.from(allSources([currentSource]))));
+    if (process.env.NODE_ENV !== 'production') {
+        let outerTriggeringObservable = triggeringObservable;
+        let outerTriggeringSources = triggeringSources;
+        triggeringObservable = currentSource;
+        triggeringSources = new Set(
+            Array.from(outerTriggeringSources)
+                .concat(Array.from(allSources([currentSource]))));
 
-    try {
-        let accesses = collectValueAccesses(action);
-        let invalidAccessError = accesses.find(isAccessError);
-        if (invalidAccessError)
-            throw invalidAccessError;
-    } finally {
-        triggeringObservable = outerTriggeringObservable;
-        triggeringSources = outerTriggeringSources;
+        try {
+            let accesses = collectValueAccesses(action);
+            let invalidAccessError = accesses.find(isAccessError);
+            if (invalidAccessError)
+                throw invalidAccessError;
+        } finally {
+            triggeringObservable = outerTriggeringObservable;
+            triggeringSources = outerTriggeringSources;
+        }
+    } else {
+        action();
     }
 }
 

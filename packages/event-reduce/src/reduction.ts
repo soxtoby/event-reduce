@@ -52,8 +52,10 @@ export class Reduction<T> extends ObservableValue<T> implements IReduction<T> {
     }
 
     on<TEvent>(observable: IObservable<TEvent>, reduce: Reducer<T, TEvent>) {
-        if (allSources(observable.sources).has(this))
-            throw new CircularSubscriptionError(this, observable);
+        if (process.env.NODE_ENV !== 'production') {
+            if (allSources(observable.sources).has(this))
+                throw new CircularSubscriptionError(this, observable);
+        }
 
         let unsubscribeExisting = this._sources.get(observable);
         if (unsubscribeExisting)
@@ -69,10 +71,14 @@ export class Reduction<T> extends ObservableValue<T> implements IReduction<T> {
                 Container: this.container,
                 Sources: sourceTree(this.sources)
             }), () => {
-                protectAgainstAccessingValueWithCommonSource(observable, () => value = reduce(this._value, eventValue));
+                if (process.env.NODE_ENV !== 'production') {
+                    protectAgainstAccessingValueWithCommonSource(observable, () => value = reduce(this._value, eventValue));
 
-                if (isEvent(value) || isEventsClass(value))
-                    throw new ReducedEventsError(this, value);
+                    if (isEvent(value) || isEventsClass(value))
+                        throw new ReducedEventsError(this, value);
+                } else {
+                    value = reduce(this._value, eventValue);
+                }
 
                 this.setValue(value)
             });
