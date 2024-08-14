@@ -21,5 +21,7 @@
         "parcel-bundler": "*",
         "typescript": "~5"
     },
-    "browserslist": ["last 2 Chrome versions"]
+    "browserslist": [
+        "last 2 Chrome versions"
+    ]
 }

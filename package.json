@@ -27,6 +27,6 @@
         "wattle": "~0"
     },
     "resolutions": {
-        "deasync": "0.1.28"
+        "deasync": "0.1.30"
     }
 }
