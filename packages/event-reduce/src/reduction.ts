@@ -6,7 +6,7 @@ import { IObservableValue, ObservableValue, protectAgainstAccessingValueWithComm
 import { State, setState } from "./state";
 import { Subject } from "./subject";
 import { Unsubscribe } from "./types";
-import { isObject } from "./utils";
+import { emptyArray, isObject } from "./utils";
 
 export function reduce<TValue>(initial: TValue, displayName?: string): IReduction<TValue>;
 export function reduce<TValue, TEvents>(initial: TValue, events: TEvents, displayName?: string): IBoundReduction<TValue, TEvents>;
@@ -63,7 +63,7 @@ export class Reduction<T> extends ObservableValue<T> implements IReduction<T> {
             let previousValue = this._value;
             let value!: T;
 
-            log('🧪 (reduction)', this.displayName, [], () => ({
+            log('🧪 (reduction)', this.displayName, emptyArray, () => ({
                 Previous: previousValue,
                 Current: value,
                 Container: this.container,
@@ -76,7 +76,7 @@ export class Reduction<T> extends ObservableValue<T> implements IReduction<T> {
 
                 this.setValue(value)
             });
-        }, () => this.displayName));
+        }, this.displayNameGetter));
 
         this.clearSourceInfo();
 

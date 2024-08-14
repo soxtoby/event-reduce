@@ -1,6 +1,6 @@
 import { ISourceInfo, sourceTree } from "./logging";
 import { Unsubscribe } from "./types";
-import { dispose, filteredName, NamedBase, nameOfCallback } from "./utils";
+import { constant, dispose, emptyArray, filteredName, NamedBase, nameOfCallback } from "./utils";
 
 export type Observe<T> = (value: T) => void;
 
@@ -29,11 +29,13 @@ export function merge<T>(observables: IObservable<T>[]): IObservable<T> {
         });
 }
 
+const anonymousObserverName = constant("(anonymous observer)");
+
 export class Observable<T> extends NamedBase {
     protected _observers = new Set<IObserver<T>>();
-    private _sourceInfo?: ISourceInfo[];
+    private _sourceInfo?: readonly ISourceInfo[];
 
-    get sources() { return [] as readonly IObservable<any>[]; }
+    get sources() { return emptyArray as readonly IObservable<any>[]; }
 
     get sourceInfo() { return this._sourceInfo ??= sourceTree(this.sources); }
 
@@ -46,10 +48,10 @@ export class Observable<T> extends NamedBase {
 
     get isObserved() { return this._observers.size > 0; }
 
-    subscribe(observe: Observe<T>, getObserverName = () => '(anonymous observer)'): Unsubscribe {
+    subscribe(observe: Observe<T>, getObserverName = anonymousObserverName): Unsubscribe {
         let observer = { getDisplayName: getObserverName, next: observe };
         this._observers.add(observer);
-        return () => this.unsubscribe(observer);
+        return this.unsubscribe.bind(this, observer);
     }
 
     protected unsubscribe(observer: IObserver<T>) {
@@ -101,10 +103,10 @@ export class ObservableOperation<T> extends Observable<T> {
 
     override get sources() { return this._sources; }
 
-    override subscribe(observer: Observe<T>, getObserverName = () => '(anonymous observer)'): Unsubscribe {
+    override subscribe(observer: Observe<T>, getObserverName = anonymousObserverName): Unsubscribe {
         let unsubscribe = super.subscribe(observer, getObserverName);
         if (this._observers.size == 1)
-            this._unsubscribeFromSources = this._subscribeToSources({ getDisplayName: () => this.displayName, next: this.notifyObservers.bind(this) });
+            this._unsubscribeFromSources = this._subscribeToSources({ getDisplayName: this.displayNameGetter, next: this.notifyObservers.bind(this) });
         return unsubscribe;
     }
 

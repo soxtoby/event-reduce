@@ -4,7 +4,7 @@ import { isEvent } from "./events";
 import { ObservableValue, ValueIsNotObservableError, getUnderlyingObservable, startTrackingScope } from "./observableValue";
 import { Reduction, reduce } from "./reduction";
 import { StringKey } from "./types";
-import { getAllPropertyDescriptors, getOrAdd, isObject, isPlainObject, nameOfFunction } from "./utils";
+import { emptyArray, getAllPropertyDescriptors, getOrAdd, isObject, isPlainObject, nameOfFunction } from "./utils";
 
 const StateProperties = Symbol('StateProperties');
 const ObservableValueFactories = Symbol('ObservableValueFactories');
@@ -196,13 +196,13 @@ function getOrAddObservableValueFactories(prototype: any) {
         base => base ? Object.create(base) : {});
 }
 
-export function getStateProperties<T>(model: T): string[] {
+export function getStateProperties<T>(model: T): readonly string[] {
     if (isPlainObject(model))
-        return [];
+        return emptyArray;
 
     let prototype = Object.getPrototypeOf(model);
     return getStateProperties(prototype)
-        .concat(prototype[StateProperties] as StringKey<T>[] | undefined || []);
+        .concat(prototype[StateProperties] as StringKey<T>[] | undefined || emptyArray);
 }
 
 /**

@@ -1,6 +1,7 @@
 import { sendEvent } from "./devtools";
 import { IObservable, Observable } from "./observable";
 import { RestoreSubject } from "./reduction";
+import { emptyArray } from "./utils";
 
 let loggingEnabled = false;
 
@@ -21,7 +22,7 @@ export function logEvent(type: string, displayName: string, arg: any, getInfo: (
     sendEvent(displayName, arg);
 }
 
-export function log<Info extends object>(type: string, displayName: string, args: any[], getInfo?: () => Info, work?: () => void) {
+export function log<Info extends object>(type: string, displayName: string, args: readonly any[], getInfo?: () => Info, work?: () => void) {
     if (process.env.NODE_ENV !== 'production') {
         if (!loggingEnabled)
             return void work?.();
@@ -88,7 +89,7 @@ export interface ISourceInfo {
     readonly observable: IObservable<any> | string;
 }
 
-export function sourceTree(sources: readonly IObservable<any>[]): ISourceInfo[] {
+export function sourceTree(sources: readonly IObservable<any>[]): readonly ISourceInfo[] {
     if (process.env.NODE_ENV !== 'production')
         return sources
             .filter(s => !(s instanceof RestoreSubject)) // Since every reduction has a restore source, this is just noise
@@ -101,5 +102,5 @@ export function sourceTree(sources: readonly IObservable<any>[]): ISourceInfo[] 
                 }
             });
     else
-        return [];
+        return emptyArray;
 }

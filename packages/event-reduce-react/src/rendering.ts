@@ -1,10 +1,10 @@
-import { IObservable, IObservableValue, Subject } from "event-reduce";
+import { IObservableValue } from "event-reduce";
 import { Derivation } from "event-reduce/lib/derivation";
 import { LogValue } from "event-reduce/lib/logging";
 import { ObservableValue } from "event-reduce/lib/observableValue";
 import { reactionQueue } from "event-reduce/lib/reactions";
-import { dispose, nameOfFunction } from "event-reduce/lib/utils";
-import { Children, Fragment, ReactElement, ReactNode, createElement, isValidElement, useCallback, useEffect } from "react";
+import { constant, disposeObject, emptyArray, nameOfFunction } from "event-reduce/lib/utils";
+import { Children, Fragment, ReactElement, ReactNode, createElement, isValidElement, useCallback } from "react";
 import { useSyncExternalStore } from "use-sync-external-store/shim";
 import { useDispose, useOnce } from "./utils";
 
@@ -34,10 +34,10 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
 
 function useSyncDerivation<T>(name: string) {
     // Using a bogus derive function because we'll provide a new one every render
-    let derivedValue = useOnce(() => new RenderedValue<T>(() => name, () => undefined!));
-    useDispose(() => derivedValue[dispose]());
+    let derivedValue = useOnce(() => new RenderedValue<T>(constant(name), constant(undefined!)));
+    useDispose(disposeObject.bind(null, derivedValue));
 
-    useSyncExternalStore(useCallback(o => derivedValue.render.subscribe(o), []), () => derivedValue.render.value);
+    useSyncExternalStore(useCallback(derivedValue.render.subscribe.bind(derivedValue.render), emptyArray), () => derivedValue.render.value);
 
     return derivedValue;
 }

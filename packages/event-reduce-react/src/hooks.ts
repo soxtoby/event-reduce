@@ -2,7 +2,7 @@ import { IObservableValue, IReduction, asyncEvent, derive, event, reduce } from 
 import { changeOwnedValue, disposeModel } from "event-reduce/lib/cleanup";
 import { ObservableValue } from "event-reduce/lib/observableValue";
 import { ValueOf } from "event-reduce/lib/types";
-import { dispose } from "event-reduce/lib/utils";
+import { disposeObject, emptyArray } from "event-reduce/lib/utils";
 import { DependencyList, useMemo, useRef } from "react";
 import { useDispose, useOnce } from "./utils";
 
@@ -16,8 +16,8 @@ export function useModel<T extends object>(createModel: () => T, unobservableDep
         let model = createModel();
         changeOwnedValue(modelOwner, undefined, model);
         return model;
-    }, unobservableDependencies ?? []);
-    useDispose(() => disposeModel(modelOwner));
+    }, unobservableDependencies ?? emptyArray);
+    useDispose(disposeModel.bind(null, modelOwner));
     return model;
 }
 
@@ -46,7 +46,7 @@ export function useDerived<T>(getValue: () => T, nameOrUnobservableDependencies?
 
     useMemo(() => derived.update(getValue, 'render'), unobservableDependencies);
 
-    useDispose(() => derived[dispose]());
+    useDispose(disposeObject.bind(null, derived));
 
     return derived;
 }
@@ -54,7 +54,7 @@ export function useDerived<T>(getValue: () => T, nameOrUnobservableDependencies?
 export function useReduced<T>(initial: T, name?: string): IReduction<T> {
     let reduction = useOnce(() => reduce(initial, name));
 
-    useDispose(() => reduction[dispose]());
+    useDispose(disposeObject.bind(null, reduction));
 
     return reduction;
 }

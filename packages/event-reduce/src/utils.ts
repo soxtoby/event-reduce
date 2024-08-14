@@ -1,3 +1,8 @@
+export const emptyArray = Object.freeze([]) as readonly any[];
+
+export function constant<T>(value: T) { return returnValue.bind(null, value) as () => T; }
+function returnValue<T>(value: T) { return value; }
+
 export function filteredName(baseName: string, predicate: Function) {
     return `${baseName}.filter(${nameOfCallback(predicate)})`;
 }
@@ -30,7 +35,10 @@ export class NamedBase {
     constructor(private _getDisplayName: () => string) { }
 
     get displayName() { return this._getDisplayName(); }
-    set displayName(name: string) { this._getDisplayName = () => name; }
+    set displayName(name: string) { this._getDisplayName = constant(name); }
+
+    /** Just for avoiding unnecessary arrow functions, but importantly reflects changes to the _getDisplayName callback. */
+    protected readonly displayNameGetter = () => this._getDisplayName();
 }
 
 export function matchesScope<Scope extends object>(scope: Scope): <Value>(value: Value) => boolean;
@@ -75,3 +83,6 @@ export function getAllPropertyDescriptors(obj: unknown) {
 }
 
 export const dispose: typeof Symbol.dispose = Symbol.dispose ?? Symbol('Symbol.dispose');
+
+export function disposer(disposable: { [dispose]: () => void }) { return disposeObject.bind(null, disposable); }
+export function disposeObject(disposable: { [dispose]: () => void }) { disposable[dispose](); }

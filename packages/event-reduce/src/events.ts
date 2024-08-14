@@ -3,7 +3,7 @@ import { log, logEvent } from "./logging";
 import { IObservable, ObservableOperation } from "./observable";
 import { ISubject, Subject } from "./subject";
 import { Scoped } from "./types";
-import { NamedBase, filteredName, matchesScope, scopedName } from "./utils";
+import { NamedBase, constant, filteredName, matchesScope, scopedName } from "./utils";
 
 export interface IEventBase {
     displayName: string;
@@ -50,8 +50,8 @@ export interface AsyncError<Context> {
     context: Context;
 }
 
-export function event<T = void>(name = anonymousEvent): IEvent<T> {
-    return makeEventFunction(new EventSubject<T>(() => name));
+export function event<T = void>(name?: string): IEvent<T> {
+    return makeEventFunction(new EventSubject<T>(name ? constant(name) : anonymousEventName));
 }
 
 class EventBase<TOut> extends ObservableOperation<TOut> {
@@ -92,9 +92,11 @@ class ScopedEventSubject<ObjectIn extends Scope, ObjectOut extends Scope, Scope 
     }
 }
 
+const anonymousAsyncEventName = constant("(anonymous async event)");
+
 /** Creates an event that takes promises as inputs, along with an optional context value */
-export function asyncEvent<Result = void, Context = void>(name = '(anonymous async event)'): IAsyncEvent<Result, Context> {
-    return makeEventFunction(new AsyncEvent<Result, Context>(() => name));
+export function asyncEvent<Result = void, Context = void>(name?: string): IAsyncEvent<Result, Context> {
+    return makeEventFunction(new AsyncEvent<Result, Context>(name ? constant(name) : anonymousAsyncEventName));
 }
 
 abstract class FilterableAsyncObservables<Result, Context> extends NamedBase {
@@ -202,7 +204,8 @@ export function fireEvent(type: string, displayName: string, arg: any, getInfo: 
 }
 
 let currentlyFiringEvent = null as string | null;
-const anonymousEvent = '(anonymous event)';
+const anonymousEvent = "(anonymous event)";
+const anonymousEventName = constant(anonymousEvent);
 const eventBrand = Symbol('IsEvent');
 
 export class ChainedEventsError extends Error {

@@ -4,11 +4,14 @@ import { isEventsClass } from "./models";
 import { IObservable } from "./observable";
 import { IObservableValue, ObservableValue, collectAccessedValues, withInnerTrackingScope } from "./observableValue";
 import { Unsubscribe } from "./types";
+import { constant, emptyArray } from "./utils";
 
 let currentlyRunningDerivation = null as IObservableValue<unknown> | null;
 
+const anonymousDerivationName = constant("(anonymous derivation)");
+
 export function derive<T>(getDerivedValue: () => T, name?: string, valuesEqual?: (previous: T, next: T) => boolean) {
-    return new Derivation(() => name || '(anonymous derivation)', getDerivedValue, valuesEqual);
+    return new Derivation(name ? constant(name) : anonymousDerivationName, getDerivedValue, valuesEqual);
 }
 
 export class Derivation<T> extends ObservableValue<T> implements IObservableValue<T> {
@@ -39,10 +42,14 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
 
     private reconcile() {
         if (this._state != 'settled') {
-            if (this._state == 'invalid' || this.sources.some(s => s.version > this._sourceVersion))
+            if (this._state == 'invalid' || this.sources.some(this.isNewerVersion.bind(this)))
                 this.update();
             this.onSettled();
         }
+    }
+
+    private isNewerVersion(source: ObservableValue<any>) {
+        return source.version > this._sourceVersion;
     }
 
     override setValue(value: T, notifyObservers?: boolean) {
@@ -71,7 +78,7 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
 
             this.unsubscribeFromSources();
 
-            log(this.getUpdateMessage(), this.displayName, [], () => ({
+            log(this.getUpdateMessage(), this.displayName, emptyArray, () => ({
                 Previous: this.loggedValue(previousValue),
                 Current: this.loggedValue(value),
                 Container: this.container,
@@ -104,12 +111,9 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
     }
 
     private subscribeTo(source: ObservableValue<any>): Unsubscribe {
-        let valueUnsub = source.subscribe(() => this.onSourceValueChanged(source), () => this.displayName);
-        let unsettledUnsub = source.unsettled.subscribe(() => this.onSourceUnsettled(source), () => this.displayName);
-        return () => {
-            valueUnsub();
-            unsettledUnsub();
-        };
+        let valueUnsub = source.subscribe(this.onSourceValueChanged.bind(this, source), this.displayNameGetter);
+        let unsettledUnsub = source.unsettled.subscribe(this.onSourceUnsettled.bind(this, source), this.displayNameGetter);
+        return unsubscribe2.bind(null, valueUnsub, unsettledUnsub);
     }
 
     protected onSourceUnsettled(source: IObservable<unknown>) {
@@ -127,7 +131,7 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
         if (this.isObserved)
             this.reconcile();
         else
-            log(this.getInvalidatedMessage(), this.displayName, [], () => ({
+            log(this.getInvalidatedMessage(), this.displayName, emptyArray, () => ({
                 Previous: this.loggedValue(this._value),
                 Container: this.container,
                 Sources: sourceTree(this.sources)
@@ -144,6 +148,11 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
         this._sources.forEach(unsub => unsub());
         this._sources.clear();
     }
+}
+
+function unsubscribe2(unsub1: Unsubscribe, unsub2: Unsubscribe) {
+    unsub1();
+    unsub2();
 }
 
 type DerivationState = 'invalid' | 'indeterminate' | 'settled';

@@ -2,19 +2,17 @@ import { changeOwnedValue } from "./cleanup";
 import { allSources, IObservable, Observable, pathToSource } from "./observable";
 import { Subject } from "./subject";
 import { Action, Unsubscribe } from "./types";
-import { dispose, firstIntersection } from "./utils";
+import { constant, dispose, firstIntersection } from "./utils";
 
-interface IValueAccess {
-    observable: ObservableValue<any>;
-    error?: Error;
-}
-
-let valueAccessed: Subject<IValueAccess>;
+let valueAccessed: Subject<ValueAccess>;
 let lastValueConsumed: Subject<void>;
-let lastAccessed: ObservableValue<any> | undefined;
+let lastAccess: ValueAccess | undefined;
 let triggeringSources = new Set<IObservable<any>>;
 let triggeringObservable: IObservable<any> | undefined;
 let latestVersion = 0; // Shared latest version, so no need to track version per source
+const accessedObservableValuesName = constant("(accessed observable values)");
+const consumedLastObservableValueName = constant("(consumed last observable value)");
+const lastAccessedName = constant("(last accessed)");
 
 startTrackingScope();
 
@@ -47,10 +45,11 @@ export class ObservableValue<T> extends Observable<T> implements IObservableValu
         let commonSource = triggeringSources.size
             ? firstIntersection(triggeringSources, allSources([this]))
             : undefined;
-        let error = commonSource
+
+        valueAccessed.next(commonSource
             ? new AccessedValueWithCommonSourceError(commonSource, triggeringObservable!, this)
-            : undefined;
-        valueAccessed.next({ observable: this, error });
+            : this);
+
         return this._value;
     }
 
@@ -75,7 +74,7 @@ export class ObservableValue<T> extends Observable<T> implements IObservableValu
 }
 
 export function collectAccessedValues(action: Action) {
-    return new Set(collectValueAccesses(action).map(a => a.observable));
+    return new Set(collectValueAccesses(action).map(accessedObservable));
 }
 
 export function protectAgainstAccessingValueWithCommonSource(currentSource: IObservable<any>, action: Action) {
@@ -88,19 +87,21 @@ export function protectAgainstAccessingValueWithCommonSource(currentSource: IObs
 
     try {
         let accesses = collectValueAccesses(action);
-        let invalidAccess = accesses.find(a => a.error != null);
-        if (invalidAccess)
-            throw invalidAccess.error;
+        let invalidAccessError = accesses.find(isAccessError);
+        if (invalidAccessError)
+            throw invalidAccessError;
     } finally {
         triggeringObservable = outerTriggeringObservable;
         triggeringSources = outerTriggeringSources;
     }
 }
 
+const accessedValueCollectionName = constant("(accessed value collection)");
+
 function collectValueAccesses(action: Action) {
-    let accesses = [] as IValueAccess[];
-    let unsubscribeFromAccessed = valueAccessed.subscribe(a => accesses.push(a), () => '(accessed value collection)');
-    let unsubscribeFromConsumed = lastValueConsumed.subscribe(() => accesses.pop());
+    let accesses = [] as ValueAccess[];
+    let unsubscribeFromAccessed = valueAccessed.subscribe(accesses.push.bind(accesses), accessedValueCollectionName);
+    let unsubscribeFromConsumed = lastValueConsumed.subscribe(accesses.pop.bind(accesses));
 
     try {
         action();
@@ -126,15 +127,19 @@ export function startTrackingScope(): Unsubscribe {
     let outerValueAccessed = valueAccessed;
     let outerLastValueConsumed = lastValueConsumed;
 
-    valueAccessed = new Subject<IValueAccess>(() => "(accessed observable values)");
-    lastValueConsumed = new Subject<void>(() => "(consumed last observable value)");
-    let unsubscribeLastAccessed = valueAccessed.subscribe(access => lastAccessed = access.observable, () => '(last accessed)');
+    valueAccessed = new Subject<ValueAccess>(accessedObservableValuesName);
+    lastValueConsumed = new Subject<void>(consumedLastObservableValueName);
+    let unsubscribeLastAccessed = valueAccessed.subscribe(setLastAccess, lastAccessedName);
 
-    return () => {
+    return function stopTrackingScope() {
         unsubscribeLastAccessed();
         lastValueConsumed = outerLastValueConsumed;
         valueAccessed = outerValueAccessed;
     }
+}
+
+function setLastAccess(access: ValueAccess) {
+    lastAccess = access;
 }
 
 /** Allows subscribing to the changes of the specified observable value. */
@@ -147,17 +152,28 @@ export function valueChanged<T>(observableValue: T) {
 
 export function getUnderlyingObservable<T>(value: T): ObservableValue<T> | undefined {
     let lastAccessed = consumeLastAccessed();
-    if (lastAccessed && withInnerTrackingScope(() => lastAccessed!.value) == value)
+    if (lastAccessed && withInnerTrackingScope(() => lastAccessed.value) == value)
         return lastAccessed;
 }
 
 export function consumeLastAccessed() {
-    if (lastAccessed) {
-        let consumed = lastAccessed
+    if (lastAccess) {
+        let consumed = lastAccess;
         lastValueConsumed.next();
-        lastAccessed = undefined;
-        return consumed;
+        lastAccess = undefined;
+        return accessedObservable(consumed);
     }
+}
+
+type ValueAccess = ObservableValue<any> | IAccessedObservablueError;
+interface IAccessedObservablueError extends Error { readonly accessedObservable: ObservableValue<any> };
+
+function isAccessError(value: ValueAccess): value is IAccessedObservablueError {
+    return (value as IAccessedObservablueError).accessedObservable != undefined;
+}
+
+function accessedObservable(value: ValueAccess): ObservableValue<any> {
+    return (value as IAccessedObservablueError).accessedObservable ?? value;
 }
 
 export class ValueIsNotObservableError extends Error {
@@ -168,11 +184,11 @@ export class ValueIsNotObservableError extends Error {
     }
 }
 
-export class AccessedValueWithCommonSourceError extends Error {
+export class AccessedValueWithCommonSourceError extends Error implements IAccessedObservablueError {
     constructor(
         public commonSource: IObservable<unknown>,
         public triggeringObservable: IObservable<unknown>,
-        public accessedObservable: IObservable<unknown>
+        public accessedObservable: ObservableValue<any>
     ) {
         super(`Accessed an observable value derived from the same event being fired.
 Fired:    ${pathToSource([triggeringObservable], commonSource)!.map(o => o.displayName).join(' -> ')}
