@@ -1,3 +1,5 @@
+import { Unsubscribe } from "./types";
+
 export const emptyArray = Object.freeze([]) as readonly any[];
 
 export function constant<T>(value: T) { return returnValue.bind(null, value) as () => T; }
@@ -80,6 +82,11 @@ export function getAllPropertyDescriptors(obj: unknown) {
         obj = Object.getPrototypeOf(obj);
     }
     return props;
+}
+
+export function unsubscribeAll(unsubscribes: Unsubscribe[]) {
+    for (let unsubscribe of unsubscribes)
+        unsubscribe();
 }
 
 export const dispose: typeof Symbol.dispose = Symbol.dispose ?? Symbol('Symbol.dispose');

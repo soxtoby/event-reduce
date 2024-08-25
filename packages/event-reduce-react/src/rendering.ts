@@ -3,10 +3,10 @@ import { Derivation } from "event-reduce/lib/derivation";
 import { LogValue } from "event-reduce/lib/logging";
 import { ObservableValue } from "event-reduce/lib/observableValue";
 import { reactionQueue } from "event-reduce/lib/reactions";
-import { constant, disposeObject, emptyArray, nameOfFunction } from "event-reduce/lib/utils";
-import { Children, Fragment, ReactElement, ReactNode, createElement, isValidElement, useCallback } from "react";
+import { constant, emptyArray, nameOfFunction, unsubscribeAll } from "event-reduce/lib/utils";
+import { Children, Fragment, ReactElement, ReactNode, createElement, isValidElement, useCallback, useEffect } from "react";
 import { useSyncExternalStore } from "use-sync-external-store/shim";
-import { useDispose, useOnce } from "./utils";
+import { useOnce } from "./utils";
 
 export function Reactive(props: { name?: string; children: () => ReactNode; }): ReactElement {
     return useReactive(props.name || 'Derived', () => createElement(Fragment, { children: props.children() }));
@@ -34,12 +34,13 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
 
 function useSyncDerivation<T>(name: string) {
     // Using a bogus derive function because we'll provide a new one every render
-    let derivedValue = useOnce(() => new RenderedValue<T>(constant(name), constant(undefined!)));
-    useDispose(disposeObject.bind(null, derivedValue));
+    let renderedValue = useOnce(() => new RenderedValue<T>(constant(name), constant(undefined!)));
 
-    useSyncExternalStore(useCallback(derivedValue.render.subscribe.bind(derivedValue.render), emptyArray), () => derivedValue.render.value);
+    useEffect(renderedValue.connect);
 
-    return derivedValue;
+    useSyncExternalStore(useCallback(renderedValue.render.subscribe.bind(renderedValue.render), emptyArray), () => renderedValue.render.value);
+
+    return renderedValue;
 }
 
 function useRenderValue<T>(derivation: RenderedValue<T>, deriveValue: () => T) {
@@ -49,6 +50,15 @@ function useRenderValue<T>(derivation: RenderedValue<T>, deriveValue: () => T) {
 
 class RenderedValue<T> extends Derivation<T> {
     public readonly render = new ObservableValue(() => `${this.displayName}.render`, { invalidatedBy: "(nothing)" });
+
+    connect = () => {
+        let subscriptions = this.subscribeToSources();
+        return unsubscribeAll.bind(null, subscriptions);
+    }
+
+    protected override onSourcesUpdated(): void {
+        // Do nothing - will subscribe later
+    }
 
     protected override onSourceValueChanged(source: IObservableValue<unknown>) {
         if (this._state == 'indeterminate') {

@@ -4,7 +4,7 @@ import { isEventsClass } from "./models";
 import { IObservable } from "./observable";
 import { IObservableValue, ObservableValue, collectAccessedValues, withInnerTrackingScope } from "./observableValue";
 import { Unsubscribe } from "./types";
-import { constant, emptyArray } from "./utils";
+import { constant, emptyArray, unsubscribeAll } from "./utils";
 
 let currentlyRunningDerivation = null as IObservableValue<unknown> | null;
 
@@ -16,7 +16,8 @@ export function derive<T>(getDerivedValue: () => T, name?: string, valuesEqual?:
 
 export class Derivation<T> extends ObservableValue<T> implements IObservableValue<T> {
     protected _state: DerivationState = 'invalid';
-    private _sources = new Map<ObservableValue<any>, Unsubscribe>();
+    private _sources = [] as ObservableValue<unknown>[];
+    private _sourceSubscriptions = [] as Unsubscribe[];
     protected _invalidatingSource?: IObservable<unknown>;
     private _sourceVersion = 0;
 
@@ -28,7 +29,7 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
         super(getDisplayName, undefined!, valuesEqual);
     }
 
-    override get sources() { return Array.from(this._sources.keys()); }
+    override get sources() { return this._sources; }
 
     override get version() {
         this.reconcile();
@@ -102,20 +103,31 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
                         throw new DerivedEventsError(this, value);
                 }
 
+                this._sources.length = 0;
                 for (let source of newSources)
-                    this._sources.set(source, this.subscribeTo(source));
+                    this._sources.push(source);
                 this._sourceVersion = Math.max(0, ...this.sources.map(s => s.version));
                 this.clearSourceInfo();
+                this.onSourcesUpdated();
 
                 this.setValue(value, notifyObservers);
             });
         });
     }
 
-    private subscribeTo(source: ObservableValue<any>): Unsubscribe {
-        let valueUnsub = source.subscribe(this.onSourceValueChanged.bind(this, source), this.displayNameGetter);
-        let unsettledUnsub = source.unsettled.subscribe(this.onSourceUnsettled.bind(this, source), this.displayNameGetter);
-        return unsubscribe2.bind(null, valueUnsub, unsettledUnsub);
+    protected onSourcesUpdated() { this._sourceSubscriptions = this.subscribeToSources(); }
+
+    protected subscribeToSources() {
+        let subscriptions = [] as Unsubscribe[];
+
+        for (let source of this._sources) {
+            subscriptions.push(
+                source.subscribe(this.onSourceValueChanged.bind(this, source), this.displayNameGetter),
+                source.unsettled.subscribe(this.onSourceUnsettled.bind(this, source), this.displayNameGetter)
+            );
+        }
+
+        return subscriptions;
     }
 
     protected onSourceUnsettled(source: IObservable<unknown>) {
@@ -147,14 +159,9 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
     protected loggedValue(value: T): unknown { return value; }
 
     override unsubscribeFromSources() {
-        this._sources.forEach(unsub => unsub());
-        this._sources.clear();
+        unsubscribeAll(this._sourceSubscriptions);
+        this._sourceSubscriptions.length = 0;
     }
-}
-
-function unsubscribe2(unsub1: Unsubscribe, unsub2: Unsubscribe) {
-    unsub1();
-    unsub2();
 }
 
 type DerivationState = 'invalid' | 'indeterminate' | 'settled';

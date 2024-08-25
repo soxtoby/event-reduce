@@ -1,24 +1,22 @@
 import { IObservableValue, IReduction, asyncEvent, derive, event, reduce } from "event-reduce";
-import { changeOwnedValue, disposeModel } from "event-reduce/lib/cleanup";
+import { changeOwnedValue } from "event-reduce/lib/cleanup";
 import { ObservableValue } from "event-reduce/lib/observableValue";
 import { ValueOf } from "event-reduce/lib/types";
-import { disposeObject, emptyArray } from "event-reduce/lib/utils";
+import { emptyArray } from "event-reduce/lib/utils";
 import { DependencyList, useMemo, useRef } from "react";
-import { useDispose, useOnce } from "./utils";
+import { useOnce } from "./utils";
 
 /**
- * Creates a model that persists across renders of the component and cleans up when the component is unmounted.
+ * Creates a model that persists across renders of the component.
  * @param unobservableDependencies - A list of dependencies that are not observable. The model will be re-created when any of these change.
 */
 export function useModel<T extends object>(createModel: () => T, unobservableDependencies?: DependencyList) {
     let modelOwner = useOnce(() => ({})); // Effectively makes the component the owner of the model for cleanup purposes
-    let model = useMemo(() => {
+    return useMemo(() => {
         let model = createModel();
         changeOwnedValue(modelOwner, undefined, model);
         return model;
     }, unobservableDependencies ?? emptyArray);
-    useDispose(disposeModel.bind(null, modelOwner));
-    return model;
 }
 
 export function useEvent<T>(name?: string) {
@@ -30,7 +28,7 @@ export function useAsyncEvent<Result = void, Context = void>(name?: string) {
 }
 
 /**
- * Creates a derived value that persists across renders of the component and cleans up when the component is unmounted.
+ * Creates a derived value that persists across renders of the component.
  * @param unobservableDependencies - A list of dependencies that are not observable. The derived value will be updated when any of these change.
  * If not specified, the derived value will be updated every render, but will still only *trigger* a re-render inside a reactive component if the derived value changes.
  */
@@ -46,17 +44,11 @@ export function useDerived<T>(getValue: () => T, nameOrUnobservableDependencies?
 
     useMemo(() => derived.update(getValue, 'render'), unobservableDependencies);
 
-    useDispose(disposeObject.bind(null, derived));
-
     return derived;
 }
 
 export function useReduced<T>(initial: T, name?: string): IReduction<T> {
-    let reduction = useOnce(() => reduce(initial, name));
-
-    useDispose(disposeObject.bind(null, reduction));
-
-    return reduction;
+    return useOnce(() => reduce(initial, name));
 }
 
 export function useObservedProps<T extends object>(values: T, name: string = '(anonymous observed values)') {
