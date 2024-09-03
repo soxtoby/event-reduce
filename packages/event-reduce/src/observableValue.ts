@@ -57,14 +57,13 @@ export class ObservableValue<T> extends Observable<T> implements IObservableValu
         return this._value;
     }
 
-    setValue(value: T, notifyObservers = true) {
+    setValue(value: T) {
         if (!this._valuesEqual(this._value, value)) {
             changeOwnedValue(this, this._value, value);
             this._value = value;
             this._version = ++latestVersion;
-            this.notifyObserversUnsettled(); // Still need to do this even if we're not notifying observers about the value changing
-            if (notifyObservers)
-                this.notifyObservers(value);
+            this.notifyObserversUnsettled();
+            this.notifyObservers(value);
         }
     }
 

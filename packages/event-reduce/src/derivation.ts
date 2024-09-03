@@ -53,9 +53,9 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
         return source.version > this._sourceVersion;
     }
 
-    override setValue(value: T, notifyObservers?: boolean) {
+    override setValue(value: T) {
         this.onSettled();
-        super.setValue(value, notifyObservers);
+        super.setValue(value);
     }
 
     private onSettled() {
@@ -70,7 +70,7 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
      * @param deriveValue Optional function to use to derive the value. If not provided, the original derivation function will be used.
      * @param reason Optional reason for the update. If not invalidated by a source change, this will be used as the reason for the update.
      **/
-    update(deriveValue?: () => T, reason?: string, notifyObservers = true) {
+    update(deriveValue?: () => T, reason?: string) {
         withInnerTrackingScope(() => {
             let trigger = this._invalidatingSource;
             let triggerRef = trigger && new WeakRef(trigger);
@@ -110,7 +110,7 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
                 this.clearSourceInfo();
                 this.onSourcesUpdated();
 
-                this.setValue(value, notifyObservers);
+                this.setValue(value);
             });
         });
     }

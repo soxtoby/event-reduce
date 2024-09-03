@@ -43,7 +43,7 @@ function useSyncDerivation<T>(name: string) {
 }
 
 function useRenderValue<T>(derivation: RenderedValue<T>, deriveValue: () => T) {
-    useCallback(function update() { derivation.update(deriveValue, 'render', false); }, [deriveValue])(); // need to use a hook to be considered a hook in devtools
+    useCallback(function update() { derivation.update(deriveValue, 'render'); }, [deriveValue])(); // need to use a hook to be considered a hook in devtools
     return derivation.value;
 }
 
