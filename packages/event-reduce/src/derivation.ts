@@ -77,7 +77,7 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
             let previousValue = this._value;
             let value!: T;
 
-            this.unsubscribeFromSources();
+            this._state = 'invalid'; // Ensures that sources unsettled during update don't trigger further updates
 
             log(this.getUpdateMessage(), this.displayName, emptyArray, () => ({
                 Previous: this.loggedValue(previousValue),
@@ -115,7 +115,10 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
         });
     }
 
-    protected onSourcesUpdated() { this._sourceSubscriptions = this.subscribeToSources(); }
+    protected onSourcesUpdated() {
+        this.unsubscribeFromSources();
+        this._sourceSubscriptions = this.subscribeToSources();
+    }
 
     protected subscribeToSources() {
         let subscriptions = [] as Unsubscribe[];
