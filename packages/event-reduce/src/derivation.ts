@@ -126,14 +126,14 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
         for (let source of this._sources) {
             subscriptions.push(
                 source.subscribe(this.onSourceValueChanged.bind(this, source), this.displayNameGetter),
-                source.unsettled.subscribe(this.onSourceUnsettled.bind(this, source), this.displayNameGetter)
+                source.unsettled.subscribe(this.onSourceUnsettled.bind(this), this.displayNameGetter)
             );
         }
 
         return subscriptions;
     }
 
-    protected onSourceUnsettled(source: IObservable<unknown>) {
+    protected onSourceUnsettled() {
         if (this._state == 'settled') {
             this._state = 'indeterminate';
             // Not logging this because it'd be too noisy,
