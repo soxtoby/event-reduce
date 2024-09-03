@@ -1,9 +1,9 @@
-import { IObservableValue } from "event-reduce";
+import { IObservableValue, Observe } from "event-reduce";
 import { Derivation } from "event-reduce/lib/derivation";
 import { LogValue } from "event-reduce/lib/logging";
 import { ObservableValue } from "event-reduce/lib/observableValue";
 import { reactionQueue } from "event-reduce/lib/reactions";
-import { constant, emptyArray, nameOfFunction, unsubscribeAll } from "event-reduce/lib/utils";
+import { constant, nameOfFunction, unsubscribeAll } from "event-reduce/lib/utils";
 import { Children, Fragment, ReactElement, ReactNode, createElement, isValidElement, useCallback, useEffect, useState } from "react";
 import { useSyncExternalStore } from "use-sync-external-store/shim";
 
@@ -37,7 +37,7 @@ function useSyncDerivation<T>(name: string) {
 
     useEffect(renderedValue.connect);
 
-    useSyncExternalStore(useCallback(renderedValue.render.subscribe.bind(renderedValue.render), emptyArray), () => renderedValue.render.value);
+    useSyncExternalStore(renderedValue.onInvalidated, renderedValue.getInvalidatedState);
 
     return renderedValue;
 }
@@ -48,7 +48,11 @@ function useRenderValue<T>(derivation: RenderedValue<T>, deriveValue: () => T) {
 }
 
 class RenderedValue<T> extends Derivation<T> {
-    public readonly render = new ObservableValue(() => `${this.displayName}.render`, { invalidatedBy: "(nothing)" });
+    private readonly _invalidatedState = new ObservableValue(() => `${this.displayName}.render`, { invalidatedBy: "(nothing)" });
+
+    onInvalidated = (observe: Observe<{ invalidatedBy: string }>) => this._invalidatedState.subscribe(observe);
+
+    getInvalidatedState = () => this._invalidatedState.value;
 
     connect = () => {
         let subscriptions = this.subscribeToSources();
@@ -62,7 +66,7 @@ class RenderedValue<T> extends Derivation<T> {
     protected override onSourceValueChanged(source: IObservableValue<unknown>) {
         if (this._state == 'indeterminate') {
             this._state = 'invalid';
-            reactionQueue.current.add(() => this.render.setValue({ invalidatedBy: source.displayName ?? "(unknown)" }));
+            reactionQueue.current.add(() => this._invalidatedState.setValue({ invalidatedBy: source.displayName ?? "(unknown)" }));
         }
     }
 
