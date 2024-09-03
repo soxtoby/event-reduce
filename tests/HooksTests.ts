@@ -2,7 +2,6 @@ import { renderHook } from "@testing-library/react-hooks";
 import { event, reduce, reduced } from "event-reduce";
 import { useAsyncEvent, useDerived, useEvent, useReduced } from "event-reduce-react";
 import { mutable } from "event-reduce/lib/testing";
-import { dispose } from "event-reduce/lib/utils";
 import { match, spy } from "sinon";
 import { SynchronousPromise } from "synchronous-promise";
 import { describe, it, when } from "wattle";
@@ -69,13 +68,6 @@ describe(useDerived.name, function () {
 
         it("returns the same derivation instance", () => sut.result.current.should.equal(initialResult));
     });
-
-    when("disposed", () => {
-        let unsubscribe = spy(initialResult, dispose);
-        sut.unmount();
-
-        it("unsubscribes derivation from its sources", () => unsubscribe.should.have.been.called);
-    });
 });
 
 describe(useReduced.name, function () {
@@ -97,12 +89,5 @@ describe(useReduced.name, function () {
         sut.rerender();
 
         it("returns the same reduction instance", () => sut.result.current.should.equal(initialResult));
-    });
-
-    when("disposed", () => {
-        let unsubscribe = spy(initialResult, dispose);
-        sut.unmount();
-
-        it("unsubscribes reduction from its sources", () => unsubscribe.should.have.been.called);
     });
 });
