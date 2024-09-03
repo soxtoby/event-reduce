@@ -3,15 +3,14 @@ import { changeOwnedValue } from "event-reduce/lib/cleanup";
 import { ObservableValue } from "event-reduce/lib/observableValue";
 import { ValueOf } from "event-reduce/lib/types";
 import { emptyArray } from "event-reduce/lib/utils";
-import { DependencyList, useMemo, useRef } from "react";
-import { useOnce } from "./utils";
+import { DependencyList, useMemo, useRef, useState } from "react";
 
 /**
  * Creates a model that persists across renders of the component.
  * @param unobservableDependencies - A list of dependencies that are not observable. The model will be re-created when any of these change.
 */
 export function useModel<T extends object>(createModel: () => T, unobservableDependencies?: DependencyList) {
-    let modelOwner = useOnce(() => ({})); // Effectively makes the component the owner of the model for cleanup purposes
+    let modelOwner = useState(() => ({}))[0]; // Effectively makes the component the owner of the model for cleanup purposes
     return useMemo(() => {
         let model = createModel();
         changeOwnedValue(modelOwner, undefined, model);
@@ -20,11 +19,11 @@ export function useModel<T extends object>(createModel: () => T, unobservableDep
 }
 
 export function useEvent<T>(name?: string) {
-    return useOnce(() => event<T>(name));
+    return useState(() => event<T>(name))[0];
 }
 
 export function useAsyncEvent<Result = void, Context = void>(name?: string) {
-    return useOnce(() => asyncEvent<Result, Context>(name))
+    return useState(() => asyncEvent<Result, Context>(name))[0];
 }
 
 /**
@@ -40,7 +39,7 @@ export function useDerived<T>(getValue: () => T, nameOrUnobservableDependencies?
         ? [nameOrUnobservableDependencies, undefined]
         : [name, nameOrUnobservableDependencies];
 
-    let derived = useOnce(() => derive(getValue, name));
+    let derived = useState(() => derive(getValue, name))[0];
 
     useMemo(() => derived.update(getValue, 'render'), unobservableDependencies);
 
@@ -48,7 +47,7 @@ export function useDerived<T>(getValue: () => T, nameOrUnobservableDependencies?
 }
 
 export function useReduced<T>(initial: T, name?: string): IReduction<T> {
-    return useOnce(() => reduce(initial, name));
+    return useState(() => reduce(initial, name))[0];
 }
 
 export function useObservedProps<T extends object>(values: T, name: string = '(anonymous observed values)') {

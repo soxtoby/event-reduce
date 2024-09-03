@@ -4,9 +4,8 @@ import { LogValue } from "event-reduce/lib/logging";
 import { ObservableValue } from "event-reduce/lib/observableValue";
 import { reactionQueue } from "event-reduce/lib/reactions";
 import { constant, emptyArray, nameOfFunction, unsubscribeAll } from "event-reduce/lib/utils";
-import { Children, Fragment, ReactElement, ReactNode, createElement, isValidElement, useCallback, useEffect } from "react";
+import { Children, Fragment, ReactElement, ReactNode, createElement, isValidElement, useCallback, useEffect, useState } from "react";
 import { useSyncExternalStore } from "use-sync-external-store/shim";
-import { useOnce } from "./utils";
 
 export function Reactive(props: { name?: string; children: () => ReactNode; }): ReactElement {
     return useReactive(props.name || 'Derived', () => createElement(Fragment, { children: props.children() }));
@@ -34,7 +33,7 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
 
 function useSyncDerivation<T>(name: string) {
     // Using a bogus derive function because we'll provide a new one every render
-    let renderedValue = useOnce(() => new RenderedValue<T>(constant(name), constant(undefined!)));
+    let renderedValue = useState(() => new RenderedValue<T>(constant(name), constant(undefined!)))[0];
 
     useEffect(renderedValue.connect);
 
