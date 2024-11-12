@@ -1,4 +1,4 @@
-import { asyncEvent, derived, events, reduce, reduced } from "event-reduce";
+import { asyncEvent, derived, events, model, reduce, reduced } from "event-reduce";
 import { reactive } from "event-reduce-react";
 import * as React from "react";
 import { CounterListEvents } from "./CounterList";
@@ -14,21 +14,24 @@ export class CounterEvents {
     valueFetched = asyncEvent<number>();
 }
 
+@model
 export class CounterModel {
     constructor(
         public events: CounterEvents,
         private _initial: { id: number, count?: number }
     ) { }
 
-    readonly id = this._initial.id;
+    get id() { return this._initial.id; }
 
     @reduced
-    count = reduce(this._initial.count || 0, this.events)
-        .on(e => e.incremented, (current) => current + 1)
-        .on(e => e.decremented, (current) => current - 1)
-        .on(e => e.reset, () => 0)
-        .on(e => e.valueFetched.resolved, (_, { result }) => result)
-        .value;
+    get count() {
+        return reduce(this._initial.count || 0, this.events)
+            .on(e => e.incremented, (current) => current + 1)
+            .on(e => e.decremented, (current) => current - 1)
+            .on(e => e.reset, () => 0)
+            .on(e => e.valueFetched.resolved, (_, { result }) => result)
+            .value;
+    }
 
     @derived
     get countTimesTwo() { return this.count * 2; }

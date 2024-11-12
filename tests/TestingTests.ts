@@ -1,7 +1,6 @@
-import { derived, event, events, reduce, reduced } from "event-reduce";
+import { derived, event, events, model, reduce, reduced } from "event-reduce";
 import { disposeModel } from "event-reduce/lib/cleanup";
-import { eventProxy, mutable, modelProxy } from "event-reduce/lib/testing";
-import { dispose } from "event-reduce/lib/utils";
+import { eventProxy, modelProxy, mutable } from "event-reduce/lib/testing";
 import { match, spy } from "sinon";
 import { describe, test, then, when } from "wattle";
 
@@ -11,13 +10,14 @@ describe("mutable", () => {
         nextValue = event<number>();
     }
 
+    @model
     class Model {
         private privateVal = 'private';
 
         events = new Events();
 
         @reduced
-        value = reduce(0)
+        accessor value = reduce(0)
             .on(this.events.nextValue, (_, val) => val)
             .value;
 
@@ -25,9 +25,9 @@ describe("mutable", () => {
         get valuePlusOne() { return this.value + 1; }
     }
 
-    let model = new Model();
-    model.valuePlusOne;
-    let sut = mutable(model);
+    let baseModel = new Model();
+    baseModel.valuePlusOne;
+    let sut = mutable(baseModel);
     let typedModel: Model = sut.target;
 
     when("without overrides", () => {

@@ -1,5 +1,5 @@
 import { renderHook } from "@testing-library/react-hooks";
-import { event, reduce, reduced } from "event-reduce";
+import { event, model, reduce, reduced } from "event-reduce";
 import { useAsyncEvent, useDerived, useEvent, useReduced } from "event-reduce-react";
 import { mutable } from "event-reduce/lib/testing";
 import { match, spy } from "sinon";
@@ -49,7 +49,7 @@ describe(useAsyncEvent.name, function () {
 });
 
 describe(useDerived.name, function () {
-    class SourceModel { @reduced value = reduce(1).value; }
+    @model class SourceModel { @reduced accessor value = reduce(1).value; }
     let source = mutable(new SourceModel());
     let sut = renderHook(() => useDerived(() => source.value * 2));
 

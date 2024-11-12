@@ -2,11 +2,11 @@ import { EventFn, IEventClass, isEvent } from "./events";
 import { log, sourceTree } from "./logging";
 import { isEventsClass } from "./models";
 import { IObservable, allSources, isObservable } from "./observable";
-import { IObservableValue, ObservableValue, protectAgainstAccessingValueWithCommonSource, valueChanged } from "./observableValue";
+import { IObservableValue, ObservableValue, protectionAgainstAccessingValueWithCommonSource, valueChanged } from "./observableValue";
 import { State, setState } from "./state";
 import { Subject } from "./subject";
 import { Unsubscribe } from "./types";
-import { emptyArray, isObject } from "./utils";
+import { emptyArray, isObject, using } from "./utils";
 
 export function reduce<TValue>(initial: TValue, displayName?: string): IReduction<TValue>;
 export function reduce<TValue, TEvents>(initial: TValue, events: TEvents, displayName?: string): IBoundReduction<TValue, TEvents>;
@@ -72,7 +72,9 @@ export class Reduction<T> extends ObservableValue<T> implements IReduction<T> {
                 Sources: sourceTree(this.sources)
             }), () => {
                 if (process.env.NODE_ENV !== 'production') {
-                    protectAgainstAccessingValueWithCommonSource(observable, () => value = reduce(this._value, eventValue));
+                    using(protectionAgainstAccessingValueWithCommonSource(observable), () => {
+                        value = reduce(this._value, eventValue);
+                    });
 
                     if (isEvent(value) || isEventsClass(value))
                         throw new ReducedEventsError(this, value);

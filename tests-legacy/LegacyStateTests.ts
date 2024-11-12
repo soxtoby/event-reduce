@@ -1,14 +1,13 @@
-import { derived, getState, model, reduce, reduced, setState, state, State } from "event-reduce";
+import { derived, getState, reduce, reduced, setState, state, State } from "event-reduce";
 import { describe, it } from "wattle";
 
-describe("state", function () {
-    @model
-    @state('constructorProperty')
+describe("legacy state", function () {
+    
     class BaseModel {
-        constructor(public constructorProperty: string) { }
+        constructor(@state('constructorProperty') public constructorProperty: string) { }
 
         @reduced
-        accessor valueProperty = reduce(1).value;
+        valueProperty = reduce(1).value;
 
         @derived
         get valuePlusOne() {
@@ -18,10 +17,10 @@ describe("state", function () {
         func() { }
 
         @reduced
-        accessor reducedModel = reduce(new ChildModel('child')).value;
+        reducedModel = reduce(new ChildModel('child')).value;
 
         @reduced
-        accessor modelArray = reduce([new ChildModel('one'), new ChildModel('two')])
+        modelArray = reduce([new ChildModel('one'), new ChildModel('two')])
             .onRestore((_, arr) => arr.map(c => new ChildModel(c.value)))
             .value;
 
@@ -31,24 +30,22 @@ describe("state", function () {
         ignoredValue = 'ignored';
     }
 
-    @model
     class TestModel extends BaseModel {
         @state
         subClassProperty = 'subClass';
     }
 
-    @model
     class ChildModel {
         constructor(private _initialValue: string) { }
 
         @reduced
-        accessor value = reduce(this._initialValue).value;
+        value = reduce(this._initialValue).value;
     }
 
-    let testModel = new TestModel('ctor');
+    let model = new TestModel('ctor');
 
     describe(getState.name, () => {
-        let result = getState(testModel);
+        let result = getState(model);
 
         it("copies the correct properties", () => JSON.stringify(result).should.equal(JSON.stringify({
             valueProperty: 1,
@@ -57,14 +54,14 @@ describe("state", function () {
                 { value: 'one' },
                 { value: 'two' }
             ],
-            constructorProperty: 'ctor',
             mergedModel: { value: 'merged' },
+            constructorProperty: 'ctor',
             subClassProperty: 'subClass'
         })));
     });
 
     describe(setState.name, () => {
-        let originalMergedModel = testModel.mergedModel;
+        let originalMergedModel = model.mergedModel;
         let state = {
             valueProperty: 2,
             reducedModel: { value: 'child*' },
@@ -77,22 +74,22 @@ describe("state", function () {
             subClassProperty: 'subClass*',
             ignoredValue: 'ignored*'
         } as State<TestModel>;
-        setState(testModel, state);
+        setState(model, state);
 
         it("updates properties correctly", () => {
-            testModel.valueProperty.should.equal(2);
-            testModel.reducedModel.should.be.an.instanceOf(ChildModel);
-            testModel.reducedModel.value.should.equal('child*');
-            testModel.modelArray[0].should.be.an.instanceOf(ChildModel);
-            testModel.modelArray[1].should.be.an.instanceOf(ChildModel);
-            testModel.modelArray[2].should.be.an.instanceOf(ChildModel);
-            testModel.modelArray[0].value.should.equal('one*');
-            testModel.modelArray[1].value.should.equal('two*');
-            testModel.modelArray[2].value.should.equal('three*');
-            testModel.mergedModel.should.equal(originalMergedModel);
-            testModel.mergedModel.value.should.equal('merged*');
-            testModel.subClassProperty.should.equal('subClass*');
-            testModel.ignoredValue.should.equal('ignored');
+            model.valueProperty.should.equal(2);
+            model.reducedModel.should.be.an.instanceOf(ChildModel);
+            model.reducedModel.value.should.equal('child*');
+            model.modelArray[0].should.be.an.instanceOf(ChildModel);
+            model.modelArray[1].should.be.an.instanceOf(ChildModel);
+            model.modelArray[2].should.be.an.instanceOf(ChildModel);
+            model.modelArray[0].value.should.equal('one*');
+            model.modelArray[1].value.should.equal('two*');
+            model.modelArray[2].value.should.equal('three*');
+            model.mergedModel.should.equal(originalMergedModel);
+            model.mergedModel.value.should.equal('merged*');
+            model.subClassProperty.should.equal('subClass*');
+            model.ignoredValue.should.equal('ignored');
         });
     });
 });

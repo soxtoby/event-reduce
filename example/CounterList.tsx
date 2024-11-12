@@ -1,4 +1,4 @@
-import { event, events, reduce, reduced } from "event-reduce";
+import { event, events, model, reduce, reduced } from "event-reduce";
 import { reactive } from "event-reduce-react";
 import * as React from "react";
 import { Counter, CounterEvents, CounterModel } from "./Counter";
@@ -14,15 +14,18 @@ export class CounterListEvents {
 
 let uid = 1;
 
+@model
 export class CounterListModel {
     constructor(public events: CounterListEvents) { }
 
     @reduced
-    counters = reduce([] as CounterModel[], this.events)
-        .on(e => e.counterAdded, (cs) => cs.concat(this.createCounter({ id: uid++ })))
-        .on(e => e.counterRemoved, (cs, { id }) => cs.filter(c => c.id != id))
-        .onRestore((_, counterStates) => counterStates.map(c => this.createCounter(c)))
-        .value;
+    get counters() {
+        return reduce([] as CounterModel[], this.events)
+            .on(e => e.counterAdded, (cs) => cs.concat(this.createCounter({ id: uid++ })))
+            .on(e => e.counterRemoved, (cs, { id }) => cs.filter(c => c.id != id))
+            .onRestore((_, counterStates) => counterStates.map(c => this.createCounter(c)))
+            .value;
+    }
 
     private createCounter(initial: { id: number, count?: number }) {
         return new CounterModel(new CounterEvents(this.events, { id: initial.id }), initial);

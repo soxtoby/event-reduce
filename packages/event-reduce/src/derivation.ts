@@ -2,9 +2,9 @@ import { EventFn, IEventClass, isEvent } from "./events";
 import { log, sourceTree } from "./logging";
 import { isEventsClass } from "./models";
 import { IObservable } from "./observable";
-import { IObservableValue, ObservableValue, collectAccessedValues, withInnerTrackingScope } from "./observableValue";
+import { IObservableValue, ObservableValue, collectAccessedValues, startTrackingScope } from "./observableValue";
 import { Unsubscribe } from "./types";
-import { constant, emptyArray, unsubscribeAll } from "./utils";
+import { constant, emptyArray, unsubscribeAll, using } from "./utils";
 
 let currentlyRunningDerivation = null as IObservableValue<unknown> | null;
 
@@ -71,7 +71,7 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
      * @param reason Optional reason for the update. If not invalidated by a source change, this will be used as the reason for the update.
      **/
     update(deriveValue?: () => T, reason?: string) {
-        withInnerTrackingScope(() => {
+        using(startTrackingScope(), () => {
             let trigger = this._invalidatingSource;
             let triggerRef = trigger && new WeakRef(trigger);
             let previousValue = this._value;

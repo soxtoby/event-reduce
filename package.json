@@ -13,12 +13,13 @@
     "workspaces": [
         "packages/*",
         "tests",
+        "tests-legacy",
         "example"
     ],
     "scripts": {
         "prepare": "tsc -b",
         "watch": "tsc -b -w",
-        "test": "wattle",
+        "test": "wattle && wattle --config wattle.config.legacy.js",
         "example": "cd example && parcel index.html --open"
     },
     "devDependencies": {

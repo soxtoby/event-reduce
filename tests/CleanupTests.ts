@@ -1,6 +1,6 @@
 import { derive, derived, event, reduce, reduced, state } from "event-reduce";
 import { changeOwnedValue } from "event-reduce/lib/cleanup";
-import { getObservableValue } from "event-reduce/lib/models";
+import { getObservableValue, model } from "event-reduce/lib/models";
 import { ObservableValue } from "event-reduce/lib/observableValue";
 import { StringKey } from "event-reduce/lib/types";
 import { dispose } from "event-reduce/lib/utils";
@@ -8,11 +8,12 @@ import { spy } from "sinon";
 import { describe, it, then, when } from "wattle";
 
 describe("subscription cleanup", function () {
+    @model
     class Model {
         constructor(private _initial: number) { }
 
         @reduced
-        reducedProp = reduce(this._initial).value;
+        get reducedProp() { return reduce(this._initial).value };
     }
 
     when("reduction returns a new model", () => {
@@ -245,11 +246,12 @@ describe("subscription cleanup", function () {
     });
 
     when("model disposed", () => {
+        @model
         class OuterModel {
             constructor(private _ownedModel: Model) { }
 
             @reduced
-            reducedProp = reduce(new Model(0)).value;
+            accessor reducedProp = reduce(new Model(0)).value;
 
             @derived
             get derivedProp() { return new Model(1); }
@@ -261,16 +263,16 @@ describe("subscription cleanup", function () {
             get externallyOwned() { return this._ownedModel; }
         }
         let externalOwner = new ObservableValue(() => 'external owner', new Model(3));
-        let model = new OuterModel(externalOwner.value);
-        let disposeReducedPropValue = spyOnDispose(model.reducedProp, 'reducedProp');
-        let disposeDerivedPropValue = spyOnDispose(model.derivedProp, 'reducedProp');
-        let disposeStatePropValue = spyOnDispose(model.stateProp, 'reducedProp');
-        let disposeExternallyOwnedPropValue = spyOnDispose(model.externallyOwned, 'reducedProp');
-        let disposeReducedProp = spyOnDispose(model, 'reducedProp');
-        let disposeDerivedProp = spyOnDispose(model, 'derivedProp');
-        let disposeExternallyOwnedProp = spyOnDispose(model, 'externallyOwned');
+        let outerModel = new OuterModel(externalOwner.value);
+        let disposeReducedPropValue = spyOnDispose(outerModel.reducedProp, 'reducedProp');
+        let disposeDerivedPropValue = spyOnDispose(outerModel.derivedProp, 'reducedProp');
+        let disposeStatePropValue = spyOnDispose(outerModel.stateProp, 'reducedProp');
+        let disposeExternallyOwnedPropValue = spyOnDispose(outerModel.externallyOwned, 'reducedProp');
+        let disposeReducedProp = spyOnDispose(outerModel, 'reducedProp');
+        let disposeDerivedProp = spyOnDispose(outerModel, 'derivedProp');
+        let disposeExternallyOwnedProp = spyOnDispose(outerModel, 'externallyOwned');
 
-        changeOwnedValue(undefined!, model, undefined);
+        changeOwnedValue(undefined!, outerModel, undefined);
 
         it("disposes reduced property", () => disposeReducedProp.should.have.been.called);
         it("disposes derived property", () => disposeDerivedProp.should.have.been.called);

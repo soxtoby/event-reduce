@@ -1,8 +1,8 @@
 import { changeOwnedValue } from "./cleanup";
 import { allSources, IObservable, Observable, pathToSource } from "./observable";
 import { Subject } from "./subject";
-import { Action, Unsubscribe } from "./types";
-import { constant, dispose, firstIntersection } from "./utils";
+import { Action } from "./types";
+import { constant, dispose, firstIntersection, using } from "./utils";
 
 let valueAccessed: Subject<ValueAccess>;
 let lastValueConsumed: Subject<void>;
@@ -72,65 +72,62 @@ export class ObservableValue<T> extends Observable<T> implements IObservableValu
     override[dispose]() {
         super[dispose]();
         changeOwnedValue(this, this._value, undefined);
-        // Keep the value, in case this is still being held onto (e.g. with useDerredValue)
+        // Keep the value, in case this is still being held onto (e.g. with useDeferredValue)
     }
 }
 
 export function collectAccessedValues(action: Action) {
-    return new Set(collectValueAccesses(action).map(accessedObservable));
+    let accessedValues: Set<ObservableValue<any>>;
+    using(valueAccessCollection(), collector => {
+        action();
+        accessedValues = new Set(collector.accesses.map(accessedObservable));
+    });
+    return accessedValues!;
 }
 
-export function protectAgainstAccessingValueWithCommonSource(currentSource: IObservable<any>, action: Action) {
-    if (process.env.NODE_ENV !== 'production') {
+export function protectionAgainstAccessingValueWithCommonSource(currentSource = triggeringObservable): Disposable {
+    if (process.env.NODE_ENV !== 'production' && currentSource) {
         let outerTriggeringObservable = triggeringObservable;
         let outerTriggeringSources = triggeringSources;
         triggeringObservable = currentSource;
         triggeringSources = new Set(
             Array.from(outerTriggeringSources)
                 .concat(Array.from(allSources([currentSource]))));
+        let collector = valueAccessCollection();
 
-        try {
-            let accesses = collectValueAccesses(action);
-            let invalidAccessError = accesses.find(isAccessError);
-            if (invalidAccessError)
-                throw invalidAccessError;
-        } finally {
-            triggeringObservable = outerTriggeringObservable;
-            triggeringSources = outerTriggeringSources;
+        return {
+            [dispose]() {
+                collector[dispose]();
+                triggeringObservable = outerTriggeringObservable;
+                triggeringSources = outerTriggeringSources;
+
+                let invalidAccessError = collector.accesses.find(isAccessError);
+                if (invalidAccessError)
+                    throw invalidAccessError;
+            }
         }
     } else {
-        action();
+        return startTrackingScope(); // Still need to create a new scope so accesses aren't picked up by outer scope
     }
 }
 
 const accessedValueCollectionName = constant("(accessed value collection)");
 
-function collectValueAccesses(action: Action) {
+function valueAccessCollection() {
     let accesses = [] as ValueAccess[];
     let unsubscribeFromAccessed = valueAccessed.subscribe(accesses.push.bind(accesses), accessedValueCollectionName);
     let unsubscribeFromConsumed = lastValueConsumed.subscribe(accesses.pop.bind(accesses));
 
-    try {
-        action();
-    } finally {
-        unsubscribeFromAccessed();
-        unsubscribeFromConsumed();
-    }
-
-    return accesses;
-}
-
-export function withInnerTrackingScope<T>(action: () => T) {
-    let endTrackingScope = startTrackingScope();
-
-    try {
-        return action();
-    } finally {
-        endTrackingScope();
+    return {
+        accesses,
+        [dispose]() {
+            unsubscribeFromAccessed();
+            unsubscribeFromConsumed();
+        }
     }
 }
 
-export function startTrackingScope(): Unsubscribe {
+export function startTrackingScope(): Disposable {
     let outerValueAccessed = valueAccessed;
     let outerLastValueConsumed = lastValueConsumed;
 
@@ -138,10 +135,12 @@ export function startTrackingScope(): Unsubscribe {
     lastValueConsumed = new Subject<void>(consumedLastObservableValueName);
     let unsubscribeLastAccessed = valueAccessed.subscribe(setLastAccess, lastAccessedName);
 
-    return function stopTrackingScope() {
-        unsubscribeLastAccessed();
-        lastValueConsumed = outerLastValueConsumed;
-        valueAccessed = outerValueAccessed;
+    return {
+        [dispose]() {
+            unsubscribeLastAccessed();
+            lastValueConsumed = outerLastValueConsumed;
+            valueAccessed = outerValueAccessed;
+        }
     }
 }
 
@@ -159,8 +158,12 @@ export function valueChanged<T>(observableValue: T) {
 
 export function getUnderlyingObservable<T>(value: T): ObservableValue<T> | undefined {
     let lastAccessed = consumeLastAccessed();
-    if (lastAccessed && withInnerTrackingScope(() => lastAccessed.value) == value)
-        return lastAccessed;
+    if (lastAccessed) {
+        let observableValue: unknown;
+        using(startTrackingScope(), () => { observableValue = lastAccessed.value; });
+        if (observableValue == value)
+            return lastAccessed;
+    }
 }
 
 export function consumeLastAccessed() {

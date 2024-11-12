@@ -52,6 +52,22 @@ export function matchesScope<Scope extends object, Value>(scope: Scope, value?: 
             .every(([k, v]) => value[k as keyof Scope] === v);
 }
 
+export function argsAre<Checks extends TypeCheck<any>[]>(args: any[], ...typeChecks: Checks): args is CheckedTypes<Checks> {
+    return typeChecks.length <= args.length
+        && typeChecks.every((typeCheck, i) => typeCheck(args[i]))
+        && args.slice(typeChecks.length).every(arg => arg === undefined);
+}
+
+type TypeCheck<T> = (value: any) => value is T;
+
+type CheckedTypes<Checks extends TypeCheck<any>[]> = Checks extends [TypeCheck<infer First>, ...infer Rest extends TypeCheck<any>[]]
+    ? [First, ...CheckedTypes<Rest>]
+    : [];
+
+export function isFunction(value: any): value is Function {
+    return typeof value == 'function';
+}
+
 export function isPlainObject<T>(value: T): value is T & object {
     return isObject(value)
         && Object.getPrototypeOf(value) == Object.prototype;
@@ -59,6 +75,14 @@ export function isPlainObject<T>(value: T): value is T & object {
 
 export function isObject<T>(value: T): value is T & object {
     return !!value && typeof value == 'object';
+}
+
+export function isString(value: any): value is string {
+    return typeof value == 'string';
+}
+
+export function isUndefined(value: any): value is undefined {
+    return value === undefined;
 }
 
 export function getOrAdd<T>(target: any, key: string | symbol, create: (base: T | undefined) => T): T {
@@ -91,5 +115,11 @@ export function unsubscribeAll(unsubscribes: Unsubscribe[]) {
 
 export const dispose: typeof Symbol.dispose = Symbol.dispose ?? Symbol('Symbol.dispose');
 
-export function disposer(disposable: { [dispose]: () => void }) { return disposeObject.bind(null, disposable); }
-export function disposeObject(disposable: { [dispose]: () => void }) { disposable[dispose](); }
+/** Shim for `using` declaration until it's properly supported. */
+export function using<Resource extends Disposable>(disposable: Resource, action: (resource: Resource) => void) {
+    try {
+        action(disposable);
+    } finally {
+        disposable[dispose]();
+    }
+}

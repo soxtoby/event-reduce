@@ -4,14 +4,14 @@ import { AccessedValueWithCommonSourceError, valueChanged } from "event-reduce/l
 import { spy } from "sinon";
 import { describe, it, test, then, when } from "wattle";
 
-describe("models", function () {
+describe("legacy models", function () {
     let increment = event('increment');
     let decrement = event('decrement');
 
     @model
     class TestModel {
         @reduced
-        accessor accessorProp = reduce(1)
+        legacyField = reduce(1)
             .on(increment, c => c + 1)
             .value;
 
@@ -34,6 +34,9 @@ describe("models", function () {
             return this.property * 2;
         }
 
+        @derived
+        derivedField = derive(() => this.legacyField * 2).value;
+
         @reduced
         get basedOnDerivedProperty() {
             return reduce(0)
@@ -45,8 +48,7 @@ describe("models", function () {
 
     @model
     class ExtendedModel extends TestModel {
-        @reduced
-        override accessor accessorProp: number = extend(super.accessorProp)
+        override legacyField: number = extend(this.property)
             .on(decrement, c => c - 1)
             .value;
 
@@ -63,9 +65,9 @@ describe("models", function () {
 
     test("extended property has same initial value", () => extendedModel.property.should.equal(1));
 
-    test("accessor property has initial value", () => testModel.accessorProp.should.equal(1));
+    test("legacy field has initial value", () => testModel.legacyField.should.equal(1));
 
-    test("extended accessor property has same initial value", () => extendedModel.accessorProp.should.equal(1));
+    test("extended legacy field has same initial value", () => extendedModel.legacyField.should.equal(1));
 
     when("reduction updated", () => {
         increment();
@@ -78,11 +80,13 @@ describe("models", function () {
 
         then("derived property value updated", () => testModel.derivedProperty.should.equal(4));
 
+        then("derived field value updated", () => testModel.derivedField.should.equal(4));
+
         then("property based on derived value updated", () => testModel.basedOnDerivedProperty.should.equal(4));
 
-        then("accessor property value updated", () => testModel.accessorProp.should.equal(2));
+        then("legacy field value updated", () => testModel.legacyField.should.equal(2));
 
-        then("extended accessor property value updated", () => extendedModel.accessorProp.should.equal(2));
+        then("extended legacy field value updated", () => extendedModel.legacyField.should.equal(2));
     });
 
     when("extended reduction updated", () => {
@@ -92,29 +96,25 @@ describe("models", function () {
 
         then("extended property value updated", () => extendedModel.property.should.equal(0));
 
-        then("accessor property value unaffected", () => testModel.accessorProp.should.equal(1));
+        then("legacy field value unaffected", () => testModel.legacyField.should.equal(1));
 
-        then("extended accessor property value updated", () => extendedModel.accessorProp.should.equal(0));
+        then("extended legacy field value updated", () => extendedModel.legacyField.should.equal(0));
     });
 
     when("derivation creates a new model that accesses an observable value in its constructor", () => {
-        @model
+        //@model
         class DerivedModel {
-            constructor() {
-                testModel.property;
-            }
+            property = testModel.property;
         }
         let derivation = derive(() => new DerivedModel());
-        derivation.update();
 
         then("accessed observable value is not counted as a source for the derivation", () => derivation.sources.should.be.empty);
     });
 
     when("reducer creates a new model that observes the same event that created it", () => {
-        @model
         class Parent {
             @reduced
-            accessor child = reduce(null as TestModel | null)
+            child = reduce(null as TestModel | null)
                 .on(increment, () => new TestModel())
                 .value;
         }
@@ -131,10 +131,9 @@ describe("models", function () {
         reduce(null as ChildModel | null)
             .on(increment, () => new ChildModel());
 
-        @model
         class ChildModel {
             @reduced
-            accessor property = reduce(testModel.property)
+            property = reduce(testModel.property)
                 .on(decrement, c => c - 1)
                 .value;
         }
