@@ -22,6 +22,8 @@ const ObservableValues = Symbol('ObservableValues');
 export function model<Class extends new (...args: any[]) => any>(target: Class): Class {
     (target as any)[ModelClassBrand] = true;
 
+    let legacyFactories = getOrAddLegacyObservablePropertyFactories(target.prototype);
+
     const className = nameOfFunction(target);
     return {
         [className]: class extends target {
@@ -38,7 +40,6 @@ export function model<Class extends new (...args: any[]) => any>(target: Class):
                         observableValues[key] = defineObservableProperty(this, key, propertyFactories[key]);
 
                     // Legacy decorators
-                    let legacyFactories = getOrAddLegacyObservablePropertyFactories(Object.getPrototypeOf(this));
                     for (let key of Object.getOwnPropertyNames(legacyFactories)) // Super class could have its own value factories
                         observableValues[key] = defineObservableProperty(this, key, legacyFactories[key]);
                 } finally {
@@ -118,7 +119,12 @@ export function reduced<Value, Model extends object>(...args:
             let getter = property.get;
             getOrAddLegacyObservablePropertyFactories(prototype)[key] = instance => getterReduction(instance, key, getter);
             return {
-                get(this: object) { throw new MissingModelDecoratorError(this, key); },
+                get(this: object) {
+                    let observableValue = getObservableValue(this, key as string);
+                    if (!observableValue)
+                        throw new MissingModelDecoratorError(this, key);
+                    return observableValue.value;
+                },
                 enumerable: true,
                 configurable: true
             };
@@ -228,7 +234,7 @@ export function state<Model, Value>(...args:
     if (argsAre(args, isObject, isString)) {
         // Legacy decorator
         let [instance, key] = args;
-        addStateProp(Object.getPrototypeOf(instance), key);
+        addStateProp(instance.constructor.prototype, key);
     } else if (argsAre(args, isUndefined, isClassFieldDecoratorContext)) {
         // Field decorator
         let [_, context] = args;

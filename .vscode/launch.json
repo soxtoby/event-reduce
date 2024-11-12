@@ -11,6 +11,14 @@
             "program": "${workspaceFolder}/node_modules/wattle/lib/cmd.js",
             "args": [ "${relativeFile}", "--show-stacks" ],
             "autoAttachChildProcesses": true
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Run legacy tests",
+            "program": "${workspaceFolder}/node_modules/wattle/lib/cmd.js",
+            "args": [ "${relativeFile}", "--show-stacks", "--config", "wattle.config.legacy.js" ],
+            "autoAttachChildProcesses": true
         }
     ]
 }
