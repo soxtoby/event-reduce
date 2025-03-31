@@ -34,6 +34,9 @@ describe("models", function () {
             return this.property * 2;
         }
 
+        @derived
+        get bool() { return true; } // Just needs to compile - since the getter type is the same as the valuesEqual type this was picking the wrong overload
+
         @reduced
         get basedOnDerivedProperty() {
             return reduce(0)

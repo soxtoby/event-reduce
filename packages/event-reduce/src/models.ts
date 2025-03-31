@@ -141,8 +141,8 @@ function getterReduction<Value>(instance: object, key: string | symbol, getter: 
     return observableValue;
 }
 
-export function derived<Value>(valuesEqual: (previous: Value, next: Value) => boolean): { <Model>(getter: () => Value, context: ClassGetterDecoratorContext<Model, Value>): () => Value; (prototype: Object, key: string | symbol): void; };
 export function derived<Model, Value>(getter: () => Value, context: ClassGetterDecoratorContext<Model, Value>): void;
+export function derived<Value>(valuesEqual: (previous: Value, next: Value) => boolean): { <Model>(getter: () => Value, context: ClassGetterDecoratorContext<Model, Value>): void; (prototype: Object, key: string | symbol): void; };
 export function derived(prototype: object, key: string | symbol): void;
 export function derived<Model extends object, Value>(...args:
     | [(previous: Value, next: Value) => boolean]
