@@ -13,14 +13,13 @@
   "main": "lib/index",
   "types": "lib/index",
   "scripts": {
-    "prepack": "shx cp ../../readme.md ."
+    "prepack": "cp ../../readme.md . && cp ../../LICENSE ."
   },
   "files": [
     "lib"
   ],
   "devDependencies": {
     "@types/node": "*",
-    "shx": "*",
     "typescript": "~5"
   }
 }

@@ -12,11 +12,14 @@
   "license": "MIT",
   "main": "lib/index",
   "types": "lib/index",
+  "scripts": {
+    "prepack": "cp ../../LICENSE ."
+  },
   "files": [
     "lib"
   ],
   "dependencies": {
-    "event-reduce": "^0.7.4",
+    "event-reduce": "workspace:*",
     "use-sync-external-store": "*"
   },
   "peerDependencies": {
