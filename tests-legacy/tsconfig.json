@@ -2,8 +2,13 @@
     "extends": "../tsconfig.base.json",
     "compilerOptions": {
         "baseUrl": ".",
-        "noEmit": true,
+        "outDir": "./dist",
+        "rootDir": ".",
         "experimentalDecorators": true,
         "useDefineForClassFields": false
-    }
+    },
+    "include": [
+        "./**/*.ts",
+        "./**/*.tsx"
+    ]
 }

@@ -6,46 +6,25 @@
         {
             "type": "typescript",
             "tsconfig": "tsconfig.json",
+            "label": "Compile TypeScript",
             "problemMatcher": [
                 "$tsc"
-            ]
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         },
         {
-            "label": "Run tests",
-            "type": "shell",
-            "command": "yarn test",
+            "type": "bun",
+            "script": "run test",
             "options": {
-                "cwd": "${workspaceFolder}" // Change this if your tests aren't using the top-level node_modules
-            },
-            "args": [
-                "--errors-only"
-            ],
-            "presentation": {
-                "echo": true,
-                "reveal": "never",
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": [
-                {
-                    "owner": "wattle",
-                    "fileLocation": [
-                        "relative",
-                        "${workspaceFolder}" // Make sure this matches the cwd above
-                    ],
-                    "pattern": [
-                        {
-                            "regexp": "✗"
-                        },
-                        {
-                            "regexp": "\\s(.*):(\\d+)  (.*)",
-                            "file": 1,
-                            "line": 2,
-                            "message": 3
-                        }
-                    ]
+                "env": {
+                    "AGENT": "1"
                 }
-            ],
+            },
+            "problemMatcher": [],
+            "label": "Run tests",
             "group": {
                 "kind": "test",
                 "isDefault": true

@@ -19,13 +19,11 @@
     "scripts": {
         "prepare": "tsc -b",
         "watch": "tsc -b -w",
-        "test": "wattle && wattle --config wattle.config.legacy.js",
+        "test": "tsc -b tests tests-legacy && bun test tests/dist tests-legacy/dist",
         "example": "bun example/serve.ts"
     },
     "devDependencies": {
-        "ts-node": "*",
-        "typescript": "~5",
-        "wattle": "~0"
+        "typescript": "~5"
     },
     "resolutions": {
         "deasync": "0.1.30"
