@@ -42,7 +42,7 @@ describe("state", function () {
         constructor(private _initialValue: string) { }
 
         @reduced
-        accessor value = reduce(this._initialValue).value;
+        get value() { return reduce(this._initialValue).value; }
     }
 
     let testModel = new TestModel('ctor');

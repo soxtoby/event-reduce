@@ -88,7 +88,7 @@ class RenderedValue<T> extends Derivation<T> {
                         .split('(').at(-1)!.split(')')[0]  // Unwrap HOC names
                         .replace(/^[0-9-]/, '_$&')  // Escape leading number or dash
                         .replace(/[^a-zA-Z0-9:_.-]/g, '_');  // Escape rest of element name
-                    let el = xmlDoc.createElement(type);
+                    let el = xmlDoc.createElement(type || ':unknown:');
                     for (let child of Children.toArray((node.props as any).children))
                         el.appendChild(xmlTree(child));
                     return el;
@@ -109,7 +109,6 @@ class RenderedValue<T> extends Derivation<T> {
                         if (elementType.displayName) return elementType.displayName;
                         if (elementType.type?.displayName) return elementType.type.displayName;
                 }
-                return ':unknown:';
             }
         }
         return value;

@@ -10,15 +10,15 @@
         "url": "https://github.com/soxtoby/event-reduce.git"
     },
     "dependencies": {
-        "event-reduce": "*",
-        "event-reduce-react": "*",
+        "event-reduce": "workspace:*",
+        "event-reduce-react": "workspace:*",
         "react": ">=16.8",
         "react-dom": ">=16.8"
     },
     "devDependencies": {
+        "@types/bun": "*",
         "@types/react": ">=16.8",
         "@types/react-dom": ">=16.8",
-        "parcel-bundler": "*",
         "typescript": "~5"
     },
     "browserslist": [

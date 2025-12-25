@@ -114,11 +114,15 @@ abstract class FilterableAsyncObservables<Result, Context> extends NamedBase {
 class FilteredAsyncObservables<Result, Context> extends FilterableAsyncObservables<Result, Context> {
     constructor(private _source: IFilterableAsyncObservables<Result, Context>, private _predicate: (context: Context) => boolean) {
         super(() => filteredName(_source.displayName, _predicate));
+
+        this.started = this._source.started.filter(s => this._predicate(s.context), () => `${this.displayName}.started`);
+        this.resolved = this._source.resolved.filter(r => this._predicate(r.context), () => `${this.displayName}.resolved`);
+        this.rejected = this._source.rejected.filter(r => this._predicate(r.context), () => `${this.displayName}.rejected`);
     }
 
-    readonly started = this._source.started.filter(s => this._predicate(s.context), () => `${this.displayName}.started`);
-    readonly resolved = this._source.resolved.filter(r => this._predicate(r.context), () => `${this.displayName}.resolved`);
-    readonly rejected = this._source.rejected.filter(r => this._predicate(r.context), () => `${this.displayName}.rejected`);
+    readonly started: IObservable<AsyncStart<Result, Context>>;
+    readonly resolved: IObservable<AsyncResult<Result, Context>>;
+    readonly rejected: IObservable<AsyncError<Context>>;
 }
 
 abstract class AsyncEventBase<Result, Context> extends FilterableAsyncObservables<Result, Context> {
@@ -149,11 +153,15 @@ class AsyncEvent<Result, Context> extends AsyncEventBase<Result, Context> implem
 class ScopedAsyncEvent<Result, ContextIn extends Scope, ContextOut extends Scope, Scope extends object> extends AsyncEventBase<Result, ContextOut> implements IEventClass {
     constructor(private _source: IAsyncEvent<Result, ContextIn, ContextOut>, private _scope: Scope) {
         super(() => scopedName(_source.displayName, _scope));
+
+        this.started = this._source.started.filter(s => matchesScope(this._scope, s.context), () => `${this.displayName}.started`);
+        this.resolved = this._source.resolved.filter(r => matchesScope(this._scope, r.context), () => `${this.displayName}.resolved`);
+        this.rejected = this._source.rejected.filter(e => matchesScope(this._scope, e.context), () => `${this.displayName}.rejected`);
     }
 
-    readonly started = this._source.started.filter(s => matchesScope(this._scope, s.context), () => `${this.displayName}.started`);
-    readonly resolved = this._source.resolved.filter(r => matchesScope(this._scope, r.context), () => `${this.displayName}.resolved`);
-    readonly rejected = this._source.rejected.filter(e => matchesScope(this._scope, e.context), () => `${this.displayName}.rejected`);
+    readonly started: IObservable<AsyncStart<Result, ContextOut>>;
+    readonly resolved: IObservable<AsyncResult<Result, ContextOut>>;
+    readonly rejected: IObservable<AsyncError<ContextOut>>;
 
     next<Promise extends PromiseLike<Result>>(promise: Promise, partialContext: Scoped<ContextIn, Scope>) {
         // Using plain log so only the unscoped event is logged as an event

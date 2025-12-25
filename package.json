@@ -20,7 +20,7 @@
         "prepare": "tsc -b",
         "watch": "tsc -b -w",
         "test": "wattle && wattle --config wattle.config.legacy.js",
-        "example": "cd example && parcel index.html --open"
+        "example": "bun example/serve.ts"
     },
     "devDependencies": {
         "ts-node": "*",

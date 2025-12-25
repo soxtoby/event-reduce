@@ -1,15 +1,10 @@
 {
-    "compilerOptions": {
-      "target": "ES2023",
-      "module": "commonjs",
-      "moduleResolution": "node",
-      "lib": ["es2017", "dom"],
-      "jsx": "react",
-      "baseUrl": ".",
-      "strict": true,
-      "inlineSourceMap": true,
-      "inlineSources": true,
-      "noEmit": true,
-      "skipLibCheck": true
-    }
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "esModuleInterop": true,
+    "types": [
+      "bun"
+    ]
   }
+}

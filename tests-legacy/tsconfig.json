@@ -3,6 +3,7 @@
     "compilerOptions": {
         "baseUrl": ".",
         "noEmit": true,
-        "experimentalDecorators": true
+        "experimentalDecorators": true,
+        "useDefineForClassFields": false
     }
 }
