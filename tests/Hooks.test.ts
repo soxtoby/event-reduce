@@ -1,9 +1,8 @@
-import { describe, test, expect, beforeEach } from "bun:test";
 import { renderHook } from "@testing-library/react-hooks";
-import { event, model, reduce, reduced } from "event-reduce";
+import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
+import { event, model, reduce, reduced, type AsyncResult } from "event-reduce";
 import { useAsyncEvent, useDerived, useEvent, useReduced } from "event-reduce-react";
 import { mutable } from "event-reduce/lib/testing";
-import { match, spy } from "sinon";
 import { SynchronousPromise } from "synchronous-promise";
 
 describe(useEvent.name, () => {
@@ -16,12 +15,12 @@ describe(useEvent.name, () => {
     });
 
     test("returns an event", () => {
-        let eventSpy = spy();
+        let eventSpy: Mock<(value: number) => void> = mock();
         initialResult.subscribe(eventSpy);
 
         initialResult(3);
 
-        expect(eventSpy.calledWith(3)).toBe(true);
+        expect(eventSpy).toHaveBeenCalledWith(3);
     });
 
     describe("when rendered again", () => {
@@ -43,12 +42,12 @@ describe(useAsyncEvent.name, () => {
     });
 
     test("returns an async event", () => {
-        let eventSpy = spy();
+        let eventSpy: Mock<(value: AsyncResult<number, void>) => void> = mock();
         initialResult.resolved.subscribe(eventSpy);
 
         initialResult(SynchronousPromise.resolve(3));
 
-        expect(eventSpy.calledWith(match({ result: 3 }))).toBe(true);
+        expect(eventSpy).toHaveBeenCalledWith(expect.objectContaining({ result: 3 }));
     });
 
     describe("when rendered again", () => {

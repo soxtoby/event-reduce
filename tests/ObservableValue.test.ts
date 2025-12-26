@@ -1,14 +1,13 @@
-import { describe, test, expect, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
 import { ObservableValue, collectAccessedValues, consumeLastAccessed } from "event-reduce/lib/observableValue";
-import * as sinon from "sinon";
 
 describe(ObservableValue.name, () => {
     let sut: ObservableValue<string>;
-    let observer: sinon.SinonStub;
+    let observer: Mock<(value: string) => void>;
 
     beforeEach(() => {
         sut = new ObservableValue(() => 'sut', 'initial');
-        observer = sinon.stub();
+        observer = mock();
         sut.subscribe(observer);
     });
 
@@ -31,7 +30,7 @@ describe(ObservableValue.name, () => {
 
         test("value updated", () => expect(sut.value).toBe('different'));
 
-        test("observers notified", () => expect(observer.called).toBe(true));
+        test("observers notified", () => expect(observer).toHaveBeenCalled());
     });
 
     describe("when value set to same value", () => {
@@ -39,7 +38,7 @@ describe(ObservableValue.name, () => {
             sut.setValue('initial');
         });
 
-        test("observers not notified", () => expect(observer.called).toBe(false));
+        test("observers not notified", () => expect(observer).not.toHaveBeenCalled());
     });
 });
 

@@ -1,17 +1,16 @@
-import { describe, test, expect, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
 import { event, events, reduce } from 'event-reduce';
 import { AccessedValueWithCommonSourceError, collectAccessedValues } from 'event-reduce/lib/observableValue';
-import { CircularSubscriptionError, ReducedEventsError } from "event-reduce/lib/reduction";
+import { CircularSubscriptionError, IBoundReduction, IReduction, ReducedEventsError } from "event-reduce/lib/reduction";
 import { Subject } from 'event-reduce/lib/subject';
-import * as sinon from 'sinon';
 
 describe(reduce.name, () => {
     describe("when unbound", () => {
-        let subscriber: sinon.SinonStub;
-        let sut: ReturnType<typeof reduce<number>>;
+        let subscriber: Mock<(value: number) => void>;
+        let sut: IReduction<number>;
 
         beforeEach(() => {
-            subscriber = sinon.stub();
+            subscriber = mock();
             sut = reduce(1, 'sut');
             sut.subscribe(subscriber);
         });
@@ -20,34 +19,34 @@ describe(reduce.name, () => {
 
         describe("when subscribed to an observable", () => {
             let subject: Subject<string>;
-            let reducer: sinon.SinonStub;
+            let reducer: Mock<(previous: number, event: string) => number>;
 
             beforeEach(() => {
                 subject = new Subject<string>(() => 'test');
-                reducer = sinon.stub();
+                reducer = mock();
                 sut.on(subject, reducer);
             });
 
             describe("when observable emits a value", () => {
                 beforeEach(() => {
-                    reducer.returns(3);
+                    reducer.mockReturnValue(3);
                     subject.next('foo');
                 });
 
                 test("reducer called with previous value and observable value", () => {
-                    expect(reducer.calledWith(1, 'foo')).toBe(true);
+                    expect(reducer).toHaveBeenCalledWith(1, 'foo');
                 });
 
                 test("value becomes return value of reducer", () => expect(sut.value).toBe(3));
 
                 describe("when another value is emitted", () => {
                     beforeEach(() => {
-                        reducer.returns(4);
+                        reducer.mockReturnValue(4);
                         subject.next('bar');
                     });
 
                     test("reducer called with previous value and observable value", () => {
-                        expect(reducer.calledWith(3, 'bar')).toBe(true);
+                        expect(reducer).toHaveBeenCalledWith(3, 'bar');
                     });
 
                     test("value becomes return value of reducer", () => expect(sut.value).toBe(4));
@@ -105,7 +104,7 @@ describe(reduce.name, () => {
 
     describe("when bound to events object", () => {
         let eventsObj: {};
-        let sut: ReturnType<typeof reduce<number>>;
+        let sut: IBoundReduction<number, typeof eventsObj>;
 
         beforeEach(() => {
             eventsObj = {};
@@ -114,23 +113,23 @@ describe(reduce.name, () => {
 
         describe("when subscribing to an observable", () => {
             let subject: Subject<string>;
-            let getEvent: any;
-            let reducer: sinon.SinonStub;
+            let getEvent: Mock<(events: typeof eventsObj) => Subject<string>>;
+            let reducer: Mock<(previous: number, event: string) => number>;
 
             beforeEach(() => {
                 subject = new Subject<string>(() => 'test');
-                getEvent = sinon.spy(() => subject);
-                reducer = sinon.stub();
+                getEvent = mock(() => subject);
+                reducer = mock();
                 sut.on(getEvent, reducer);
             });
 
             test("event getter called with bound events", () => {
-                expect(getEvent.calledWith(eventsObj)).toBe(true);
+                expect(getEvent).toHaveBeenCalledWith(eventsObj);
             });
 
             test("reduction subscribed to result of event getter", () => {
                 subject.next('foo');
-                expect(reducer.calledWith(1, 'foo')).toBe(true);
+                expect(reducer).toHaveBeenCalledWith(1, 'foo');
             });
         });
     });

@@ -1,29 +1,28 @@
-import { describe, test, expect, beforeEach } from "bun:test";
-import { IObservable, merge, Subject } from 'event-reduce';
+import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
+import { IObservable, IObserver, merge, Subject, Unsubscribe } from 'event-reduce';
 import { ObservableOperation } from 'event-reduce/lib/observable';
-import * as sinon from 'sinon';
 
 describe("ObservableOperation", () => {
     describe("when subscribing", () => {
-        let unsubscribe: sinon.SinonSpy;
-        let subscribe: sinon.SinonSpy;
-        let observer: sinon.SinonSpy;
+        let unsubscribe: Mock<Unsubscribe>;
+        let subscribe: Mock<(observer: IObserver<any>) => Unsubscribe>;
+        let observer: Mock<(value: any) => void>;
         let sut: ObservableOperation<any>;
         let result: () => void;
 
         beforeEach(() => {
-            unsubscribe = sinon.spy();
-            subscribe = sinon.spy(() => unsubscribe);
-            observer = sinon.spy();
+            unsubscribe = mock();
+            subscribe = mock(() => unsubscribe);
+            observer = mock();
             sut = new ObservableOperation(() => 'test', [], subscribe);
             result = sut.subscribe(observer);
         });
 
         test("subscribe function called with observer", () => {
-            expect(subscribe.calledWith(sinon.match({
-                getDisplayName: sinon.match.func,
-                next: sinon.match.func
-            }))).toBe(true);
+            expect(subscribe).toHaveBeenCalledWith(expect.objectContaining({
+                getDisplayName: expect.any(Function),
+                next: expect.any(Function)
+            }));
         });
 
         describe("when unsubscribed", () => {
@@ -31,7 +30,7 @@ describe("ObservableOperation", () => {
                 result();
             });
 
-            test("unsubscribed from inner subscription", () => expect(unsubscribe.called).toBe(true));
+            test("unsubscribed from inner subscription", () => expect(unsubscribe).toHaveBeenCalled());
         });
     });
 

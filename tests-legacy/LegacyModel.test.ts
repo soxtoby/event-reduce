@@ -1,8 +1,7 @@
-import { describe, test, expect, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
 import { asyncEvent, derive, derived, event, events, extend, model, reduce, reduced, state } from "event-reduce";
 import { EventsMarkedAsStateError } from "event-reduce/lib/models";
 import { AccessedValueWithCommonSourceError, valueChanged } from "event-reduce/lib/observableValue";
-import { spy } from "sinon";
 
 describe("legacy models", () => {
     let increment: ReturnType<typeof event<void>>;
@@ -183,7 +182,7 @@ describe("legacy models", () => {
 });
 
 describe("events decorator", () => {
-    let getterSpy: sinon.SinonSpy;
+    let getterSpy: Mock<() => void>;
 
     @events
     class TestEvents {
@@ -198,7 +197,7 @@ describe("events decorator", () => {
     let sut: TestEvents;
 
     beforeEach(() => {
-        getterSpy = spy();
+        getterSpy = mock();
         sut = new TestEvents();
     });
 
@@ -225,7 +224,7 @@ describe("events decorator", () => {
         sut.eventGetter;
         sut.eventGetter;
 
-        expect(getterSpy.callCount).toBe(1);
+        expect(getterSpy).toHaveBeenCalledTimes(1);
     });
 
     describe("when event class is marked as state", () => {

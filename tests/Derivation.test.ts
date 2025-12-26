@@ -1,19 +1,18 @@
-import { describe, test, expect, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
 import { derive, event, events } from "event-reduce";
 import { DerivedEventsError, SideEffectInDerivationError } from "event-reduce/lib/derivation";
 import { consumeLastAccessed, ObservableValue } from "event-reduce/lib/observableValue";
-import { spy, stub } from "sinon";
 
 describe(derive.name, () => {
     let sourceA: ObservableValue<string>;
     let sourceB: ObservableValue<string>;
-    let calculation: sinon.SinonSpy;
+    let calculation: Mock<() => string>;
     let sut: ReturnType<typeof derive<string>>;
 
     beforeEach(() => {
         sourceA = new ObservableValue(() => 'a', 'a');
         sourceB = new ObservableValue(() => 'b', 'b');
-        calculation = spy(() => sourceA.value + sourceB.value);
+        calculation = mock(() => sourceA.value + sourceB.value);
         sut = derive(calculation, 'sut');
     });
 
@@ -39,7 +38,7 @@ describe(derive.name, () => {
 
             test("returns same value", () => expect(result2).toBe(result));
 
-            test("doesn't re-compute the value", () => expect(calculation.callCount).toBe(1));
+            test("doesn't re-compute the value", () => expect(calculation).toHaveBeenCalledTimes(1));
         });
 
         describe("when a source value changed", () => {
@@ -60,7 +59,7 @@ describe(derive.name, () => {
 
         describe("when multiple source values changed", () => {
             beforeEach(() => {
-                calculation.resetHistory();
+                calculation.mockClear();
                 sourceA.setValue('A');
                 sourceB.setValue('B');
             });
@@ -74,26 +73,26 @@ describe(derive.name, () => {
 
                 test("returns updated value", () => expect(result2).toBe('AB'));
 
-                test("re-computes only once", () => expect(calculation.callCount).toBe(1));
+                test("re-computes only once", () => expect(calculation).toHaveBeenCalledTimes(1));
             });
         });
 
         describe("when subscribed to", () => {
-            let observe: sinon.SinonStub;
+            let observe: Mock<(value: string) => void>;
 
             beforeEach(() => {
-                observe = stub();
+                observe = mock();
                 sut.subscribe(observe);
             });
 
-            test("doesn't notify immediately", () => expect(observe.called).toBe(false));
+            test("doesn't notify immediately", () => expect(observe).not.toHaveBeenCalled());
 
             describe("when a source value changed", () => {
                 beforeEach(() => {
                     sourceA.setValue('A');
                 });
 
-                test("notifies observer", () => expect(observe.called).toBe(true));
+                test("notifies observer", () => expect(observe).toHaveBeenCalled());
             });
         });
     });
@@ -153,16 +152,16 @@ test("derivation that depends on other derivations only updates once", () => {
     let source = new ObservableValue(() => "source", "a");
     let inner1 = derive(() => source.value + "_inner1");
     let inner2 = derive(() => source.value + "_inner2");
-    let outerCalc = spy(() => inner1.value + inner2.value);
+    let outerCalc = mock(() => inner1.value + inner2.value);
     let outer = derive(outerCalc);
     outer.subscribe(() => { }); // Outer must be observed for sources to trigger an update
 
     // Initial access to set up dependencies
     outer.value;
-    outerCalc.should.have.been.calledOnce;
+    expect(outerCalc).toHaveBeenCalledTimes(1);
 
     // This should trigger updates to inner1 and inner2, but outer should only re-calculate once
     source.setValue("b");
     outer.value;
-    outerCalc.should.have.been.calledTwice;
+    expect(outerCalc).toHaveBeenCalledTimes(2);
 });

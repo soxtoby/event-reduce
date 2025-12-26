@@ -1,8 +1,7 @@
-import { describe, test, expect, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
 import { derived, event, events, model, reduce, reduced } from "event-reduce";
 import { disposeModel } from "event-reduce/lib/cleanup";
 import { eventProxy, modelProxy, mutable } from "event-reduce/lib/testing";
-import { match, spy } from "sinon";
 
 describe("mutable", () => {
     @events
@@ -112,21 +111,21 @@ describe("eventProxy", () => {
     });
 
     test("arbitrary events work", () => {
-        let handler = spy();
+        let handler: Mock<(value: string) => void> = mock();
         untyped.foo.subscribe(handler);
 
         untyped.foo('bar');
 
-        expect(handler.calledWith('bar')).toBe(true);
+        expect(handler).toHaveBeenCalledWith('bar');
     });
 
     test("custom event creation", () => {
         let custom = eventProxy(() => event<{ value: string }>().scope({ value: 'foo' }));
-        let handler = spy();
+        let handler: Mock<(value: { value: string }) => void> = mock();
         custom.foo.subscribe(handler);
 
         custom.foo({});
 
-        expect(handler.calledWith(match({ value: 'foo' }))).toBe(true);
+        expect(handler).toHaveBeenCalledWith(expect.objectContaining({ value: 'foo' }));
     });
 });

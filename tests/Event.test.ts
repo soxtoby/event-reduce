@@ -1,7 +1,6 @@
-import { describe, test, expect, beforeEach } from "bun:test";
-import { asyncEvent, event } from 'event-reduce';
+import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
+import { asyncEvent, event, type AsyncError, type AsyncResult, type AsyncStart } from 'event-reduce';
 import { ChainedEventsError } from "event-reduce/lib/events";
-import * as sinon from 'sinon';
 import { SynchronousPromise } from 'synchronous-promise';
 
 describe(event.name, () => {
@@ -13,10 +12,10 @@ describe(event.name, () => {
     });
 
     describe("when subscribed to", () => {
-        let subscriber: sinon.SinonStub;
+        let subscriber: Mock<(value: TestType) => void>;
 
         beforeEach(() => {
-            subscriber = sinon.stub();
+            subscriber = mock();
             sut.subscribe(subscriber);
         });
 
@@ -28,7 +27,7 @@ describe(event.name, () => {
                 sut(value);
             });
 
-            test("passes value to subscribers", () => expect(subscriber.calledWith(value)).toBe(true));
+            test("passes value to subscribers", () => expect(subscriber).toHaveBeenCalledWith(value));
         });
     });
 
@@ -54,13 +53,13 @@ describe(event.name, () => {
 
     describe("scope", () => {
         let scoped: any;
-        let rootSubscriber: sinon.SinonStub;
-        let scopedSubscriber: sinon.SinonStub;
+        let rootSubscriber: Mock<(value: TestType) => void>;
+        let scopedSubscriber: Mock<(value: TestType) => void>;
 
         beforeEach(() => {
             scoped = sut.scope({ foo: 'foo' });
-            rootSubscriber = sinon.stub();
-            scopedSubscriber = sinon.stub();
+            rootSubscriber = mock();
+            scopedSubscriber = mock();
             sut.subscribe(rootSubscriber);
             scoped.subscribe(scopedSubscriber);
         });
@@ -70,7 +69,7 @@ describe(event.name, () => {
                 sut({ foo: 'bar', bar: 1 });
             });
 
-            test("scoped event does not pass on value", () => expect(scopedSubscriber.called).toBe(false));
+            test("scoped event does not pass on value", () => expect(scopedSubscriber).not.toHaveBeenCalled());
         });
 
         describe("when matching value passed to parent event", () => {
@@ -81,7 +80,7 @@ describe(event.name, () => {
                 sut(value);
             });
 
-            test("scoped event passed on value", () => expect(scopedSubscriber.calledWith(value)).toBe(true));
+            test("scoped event passed on value", () => expect(scopedSubscriber).toHaveBeenCalledWith(value));
         });
 
         describe("when called with partial value", () => {
@@ -90,8 +89,8 @@ describe(event.name, () => {
             });
 
             test("scoped event fills in scope values", () => {
-                expect(rootSubscriber.calledWith(sinon.match({ foo: 'foo', bar: 2 }))).toBe(true);
-                expect(scopedSubscriber.calledWith(sinon.match({ foo: 'foo', bar: 2 }))).toBe(true);
+                expect(rootSubscriber).toHaveBeenCalledWith(expect.objectContaining({ foo: 'foo', bar: 2 }));
+                expect(scopedSubscriber).toHaveBeenCalledWith(expect.objectContaining({ foo: 'foo', bar: 2 }));
             });
         });
     });
@@ -102,15 +101,15 @@ describe(asyncEvent.name, () => {
     type Context = { bar: string; };
     let sut: ReturnType<typeof asyncEvent<Result, Context>>;
 
-    let started: sinon.SinonStub;
-    let resolved: sinon.SinonStub;
-    let rejected: sinon.SinonStub;
+    let started: Mock<(value: AsyncStart<Result, Context>) => void>;
+    let resolved: Mock<(value: AsyncResult<Result, Context>) => void>;
+    let rejected: Mock<(value: AsyncError<Context>) => void>;
 
     beforeEach(() => {
         sut = asyncEvent<Result, Context>();
-        started = sinon.stub();
-        resolved = sinon.stub();
-        rejected = sinon.stub();
+        started = mock();
+        resolved = mock();
+        rejected = mock();
         sut.started.subscribe(started);
         sut.resolved.subscribe(resolved);
         sut.rejected.subscribe(rejected);
@@ -126,7 +125,7 @@ describe(asyncEvent.name, () => {
             sut(promise, context);
         });
 
-        test("started event fired", () => expect(started.calledWith(sinon.match({ promise, context }))).toBe(true));
+        test("started event fired", () => expect(started).toHaveBeenCalledWith(expect.objectContaining({ promise, context })));
 
         describe("when promise resolved", () => {
             let result: Result;
@@ -136,7 +135,7 @@ describe(asyncEvent.name, () => {
                 (promise as any).resolve(result);
             });
 
-            test("resolved event fired", () => expect(resolved.calledWith(sinon.match({ result, context }))).toBe(true));
+            test("resolved event fired", () => expect(resolved).toHaveBeenCalledWith(expect.objectContaining({ result, context })));
         });
 
         describe("when promise rejected", () => {
@@ -147,7 +146,7 @@ describe(asyncEvent.name, () => {
                 (promise as any).reject(error);
             });
 
-            test("rejected event fired", () => expect(rejected.calledWith(sinon.match({ error, context }))).toBe(true));
+            test("rejected event fired", () => expect(rejected).toHaveBeenCalledWith(expect.objectContaining({ error, context })));
         });
     });
 });

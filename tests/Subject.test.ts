@@ -1,6 +1,5 @@
-import { describe, test, expect, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
 import { Subject } from 'event-reduce/lib/subject';
-import * as sinon from 'sinon';
 
 describe(Subject.name, () => {
     let sut: Subject<number>;
@@ -10,14 +9,14 @@ describe(Subject.name, () => {
     });
 
     describe("when subscribed to", () => {
-        let observer1: sinon.SinonSpy;
-        let observer2: sinon.SinonSpy;
+        let observer1: Mock<(value: number) => void>;
+        let observer2: Mock<(value: number) => void>;
         let unsub1: () => void;
         let unsub2: () => void;
 
         beforeEach(() => {
-            observer1 = sinon.spy();
-            observer2 = sinon.spy();
+            observer1 = mock();
+            observer2 = mock();
             unsub1 = sut.subscribe(observer1);
             unsub2 = sut.subscribe(observer2);
         });
@@ -28,8 +27,8 @@ describe(Subject.name, () => {
             });
 
             test("passes value to subscribers", () => {
-                expect(observer1.calledWithExactly(1)).toBe(true);
-                expect(observer2.calledWithExactly(1)).toBe(true);
+                expect(observer1).toHaveBeenCalledWith(1);
+                expect(observer2).toHaveBeenCalledWith(1);
             });
         });
 
@@ -44,8 +43,8 @@ describe(Subject.name, () => {
                 });
 
                 test("doesn't pass value to unsubscribed subscriber", () => {
-                    expect(observer1.called).toBe(false);
-                    expect(observer2.calledWithExactly(2)).toBe(true);
+                    expect(observer1).not.toHaveBeenCalled();
+                    expect(observer2).toHaveBeenCalledWith(2);
                 });
             });
         });

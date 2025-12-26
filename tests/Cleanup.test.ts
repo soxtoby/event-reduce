@@ -1,11 +1,10 @@
-import { describe, test, expect, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, spyOn, test, type Mock } from "bun:test";
 import { derive, derived, event, reduce, reduced, state } from "event-reduce";
 import { changeOwnedValue } from "event-reduce/lib/cleanup";
 import { getObservableValue, model } from "event-reduce/lib/models";
 import { ObservableValue } from "event-reduce/lib/observableValue";
 import { StringKey } from "event-reduce/lib/types";
 import { dispose } from "event-reduce/lib/utils";
-import { spy } from "sinon";
 
 describe("subscription cleanup", () => {
     @model
@@ -26,7 +25,7 @@ describe("subscription cleanup", () => {
 
             createNewModel();
 
-            expect(unsubscribe.called).toBe(true);
+            expect(unsubscribe).toHaveBeenCalled();
         });
     });
 
@@ -40,7 +39,7 @@ describe("subscription cleanup", () => {
 
             returnSameModel();
 
-            expect(unsubscribe.called).toBe(false);
+            expect(unsubscribe).not.toHaveBeenCalled();
         });
     });
 
@@ -54,7 +53,7 @@ describe("subscription cleanup", () => {
             source.setValue(1);
             derivation.value;
 
-            expect(unsubscribe.called).toBe(true);
+            expect(unsubscribe).toHaveBeenCalled();
         });
     });
 
@@ -72,7 +71,7 @@ describe("subscription cleanup", () => {
             source.setValue(1);
             derivation.value;
 
-            expect(unsubscribe.called).toBe(false);
+            expect(unsubscribe).not.toHaveBeenCalled();
         });
     });
 
@@ -82,7 +81,7 @@ describe("subscription cleanup", () => {
         let useModel2: ObservableValue<boolean>;
         let derivation: ReturnType<typeof derive<Model>>;
         let modelInstance: Model;
-        let disposeModelSpy: sinon.SinonSpy;
+        let disposeModelSpy: Mock<() => void>;
 
         beforeEach(() => {
             model1 = new ObservableValue(() => 'model 1', new Model(1));
@@ -99,7 +98,7 @@ describe("subscription cleanup", () => {
                 derivation.value;
             });
 
-            test("doesn't dispose model", () => expect(disposeModelSpy.called).toBe(false));
+            test("doesn't dispose model", () => expect(disposeModelSpy).not.toHaveBeenCalled());
         });
 
         describe("when source observable value no longer holds onto model", () => {
@@ -107,7 +106,7 @@ describe("subscription cleanup", () => {
                 model1.setValue(new Model(3));
             });
 
-            test("doesn't dispose model", () => expect(disposeModelSpy.called).toBe(false));
+            test("doesn't dispose model", () => expect(disposeModelSpy).not.toHaveBeenCalled());
         });
 
         describe("when both source observable value and derivation have switched to a different model", () => {
@@ -117,7 +116,7 @@ describe("subscription cleanup", () => {
                 derivation.value;
             });
 
-            test("model is disposed", () => expect(disposeModelSpy.called).toBe(true));
+            test("model is disposed", () => expect(disposeModelSpy).toHaveBeenCalled());
         });
     });
 
@@ -131,7 +130,7 @@ describe("subscription cleanup", () => {
 
             addModel();
 
-            expect(disposeModelSpy.called).toBe(false);
+            expect(disposeModelSpy).not.toHaveBeenCalled();
         });
     });
 
@@ -148,8 +147,8 @@ describe("subscription cleanup", () => {
 
                 removeModel();
 
-                expect(dispose2.called).toBe(true);
-                expect(dispose1.called).toBe(false);
+                expect(dispose2).toHaveBeenCalled();
+                expect(dispose1).not.toHaveBeenCalled();
             });
         });
 
@@ -167,8 +166,8 @@ describe("subscription cleanup", () => {
 
                 removeModel();
 
-                expect(dispose2.called).toBe(false);
-                expect(dispose1.called).toBe(false);
+                expect(dispose2).not.toHaveBeenCalled();
+                expect(dispose1).not.toHaveBeenCalled();
             });
         });
     });
@@ -183,7 +182,7 @@ describe("subscription cleanup", () => {
 
             replaceArray();
 
-            expect(disposeModelSpy.called).toBe(true);
+            expect(disposeModelSpy).toHaveBeenCalled();
         });
     });
 
@@ -197,7 +196,7 @@ describe("subscription cleanup", () => {
 
             addModel();
 
-            expect(disposeModelSpy.called).toBe(false);
+            expect(disposeModelSpy).not.toHaveBeenCalled();
         });
     });
 
@@ -217,8 +216,8 @@ describe("subscription cleanup", () => {
 
                 removeModel();
 
-                expect(dispose2.called).toBe(true);
-                expect(dispose1.called).toBe(false);
+                expect(dispose2).toHaveBeenCalled();
+                expect(dispose1).not.toHaveBeenCalled();
             });
         });
 
@@ -239,8 +238,8 @@ describe("subscription cleanup", () => {
 
                 removeModel();
 
-                expect(dispose2.called).toBe(false);
-                expect(dispose1.called).toBe(false);
+                expect(dispose2).not.toHaveBeenCalled();
+                expect(dispose1).not.toHaveBeenCalled();
             });
         });
     });
@@ -257,8 +256,8 @@ describe("subscription cleanup", () => {
 
             removeModel();
 
-            expect(dispose2.called).toBe(true);
-            expect(dispose1.called).toBe(false);
+            expect(dispose2).toHaveBeenCalled();
+            expect(dispose1).not.toHaveBeenCalled();
         });
     });
 
@@ -272,7 +271,7 @@ describe("subscription cleanup", () => {
 
             replaceObject();
 
-            expect(disposeModelSpy.called).toBe(true);
+            expect(disposeModelSpy).toHaveBeenCalled();
         });
     });
 
@@ -285,7 +284,7 @@ describe("subscription cleanup", () => {
 
                 arrayValue[dispose]();
 
-                expect(disposeModelSpy.called).toBe(false);
+                expect(disposeModelSpy).not.toHaveBeenCalled();
             });
         });
     });
@@ -299,7 +298,7 @@ describe("subscription cleanup", () => {
 
                 objectValue[dispose]();
 
-                expect(disposeModelSpy.called).toBe(false);
+                expect(disposeModelSpy).not.toHaveBeenCalled();
             });
         });
     });
@@ -334,20 +333,20 @@ describe("subscription cleanup", () => {
 
             changeOwnedValue(undefined!, outerModel, undefined);
 
-            expect(disposeReducedProp.called).toBe(true);
-            expect(disposeDerivedProp.called).toBe(true);
-            expect(disposeExternallyOwnedProp.called).toBe(true);
+            expect(disposeReducedProp).toHaveBeenCalled();
+            expect(disposeDerivedProp).toHaveBeenCalled();
+            expect(disposeExternallyOwnedProp).toHaveBeenCalled();
 
-            expect(disposeReducedPropValue.called).toBe(true);
-            expect(disposeDerivedPropValue.called).toBe(true);
-            expect(disposeStatePropValue.called).toBe(true);
+            expect(disposeReducedPropValue).toHaveBeenCalled();
+            expect(disposeDerivedPropValue).toHaveBeenCalled();
+            expect(disposeStatePropValue).toHaveBeenCalled();
 
-            expect(disposeExternallyOwnedPropValue.called).toBe(false);
+            expect(disposeExternallyOwnedPropValue).not.toHaveBeenCalled();
         });
     });
 
     function spyOnDispose<T>(model: T, property: StringKey<T>) {
         let observableValue = getObservableValue(model, property)!;
-        return spy(observableValue, dispose);
+        return spyOn(observableValue, dispose);
     }
 });
