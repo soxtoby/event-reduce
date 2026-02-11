@@ -65,7 +65,7 @@ class RenderedValue<T> extends Derivation<T> {
 
     protected override onSourceValueChanged(source: IObservableValue<unknown>) {
         if (this._state == 'indeterminate') {
-            this._state = 'invalid';
+            this._state = 'uninitialized';
             reactionQueue.current.add(() => this._invalidatedState.setValue({ invalidatedBy: source.displayName ?? "(unknown)" }));
         }
     }

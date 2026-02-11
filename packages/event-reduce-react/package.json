@@ -1,7 +1,7 @@
 {
   "name": "event-reduce-react",
   "description": "React integration for event-reduce: state management based on reducing observable events into state",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "author": "Simon Oxtoby",
   "homepage": "https://github.com/soxtoby/event-reduce",
   "repository": {
@@ -16,7 +16,7 @@
     "lib"
   ],
   "dependencies": {
-    "event-reduce": "^0.7",
+    "event-reduce": "^0.7.4",
     "use-sync-external-store": "*"
   },
   "peerDependencies": {

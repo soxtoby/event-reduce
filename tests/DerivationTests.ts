@@ -2,7 +2,7 @@ import { derive, event, events } from "event-reduce";
 import { DerivedEventsError, SideEffectInDerivationError } from "event-reduce/lib/derivation";
 import { consumeLastAccessed, ObservableValue } from "event-reduce/lib/observableValue";
 import { spy, stub } from "sinon";
-import { describe, it, then, when } from "wattle";
+import { describe, it, test, then, when } from "wattle";
 
 describe(derive.name, () => {
     let sourceA = new ObservableValue(() => 'a', 'a');
@@ -99,4 +99,22 @@ describe(derive.name, () => {
             err.has.property('value', eventsValue);
         });
     });
+});
+
+test("derivation that depends on other derivations only updates once", () => {
+    let source = new ObservableValue(() => "source", "a");
+    let inner1 = derive(() => source.value + "_inner1");
+    let inner2 = derive(() => source.value + "_inner2");
+    let outerCalc = spy(() => inner1.value + inner2.value);
+    let outer = derive(outerCalc);
+    outer.subscribe(() => { }); // Outer must be observed for sources to trigger an update
+
+    // Initial access to set up dependencies
+    outer.value;
+    outerCalc.should.have.been.calledOnce;
+
+    // This should trigger updates to inner1 and inner2, but outer should only re-calculate once
+    source.setValue("b");
+    outer.value;
+    outerCalc.should.have.been.calledTwice;
 });
