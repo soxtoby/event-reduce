@@ -20,6 +20,7 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
     private _sourceSubscriptions = [] as Unsubscribe[];
     protected _invalidatingSource?: IObservable<unknown>;
     private _sourceVersion = 0;
+    private _isUpdating = false;
 
     constructor(
         getDisplayName: () => string,
@@ -42,7 +43,7 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
     }
 
     private reconcile() {
-        if (this._state != 'settled') {
+        if (this._state != 'settled' && !this._isUpdating) {
             if (this._state == 'invalid' || this.sources.some(this.isNewerVersion.bind(this)))
                 this.update();
             this.onSettled();
@@ -71,13 +72,15 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
      * @param reason Optional reason for the update. If not invalidated by a source change, this will be used as the reason for the update.
      **/
     update(deriveValue?: () => T, reason?: string) {
-        using(startTrackingScope(), () => {
-            let trigger = this._invalidatingSource;
-            let triggerRef = trigger && new WeakRef(trigger);
-            let previousValue = this._value;
-            let value!: T;
+        this._isUpdating = true;
+        try {
+            using(startTrackingScope(), () => {
+                let trigger = this._invalidatingSource;
+                let triggerRef = trigger && new WeakRef(trigger);
+                let previousValue = this._value;
+                let value!: T;
 
-            this._state = 'invalid'; // Ensures that sources unsettled during update don't trigger further updates
+                this._state = 'invalid'; // Ensures that sources unsettled during update don't trigger further updates
 
             log(this.getUpdateMessage(), this.displayName, emptyArray, () => ({
                 Previous: this.loggedValue(previousValue),
@@ -113,6 +116,9 @@ export class Derivation<T> extends ObservableValue<T> implements IObservableValu
                 this.setValue(value);
             });
         });
+        } finally {
+            this._isUpdating = false;
+        }
     }
 
     protected onSourcesUpdated() {
