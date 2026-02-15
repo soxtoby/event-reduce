@@ -8,7 +8,7 @@ describe("state", () => {
         constructor(public constructorProperty: string) { }
 
         @reduced
-        accessor valueProperty = reduce(1).value;
+        get valueProperty() { return reduce(1).value; }
 
         @derived
         get valuePlusOne() {
@@ -18,12 +18,14 @@ describe("state", () => {
         func() { }
 
         @reduced
-        accessor reducedModel = reduce(new ChildModel('child')).value;
+        get reducedModel() { return reduce(new ChildModel('child')).value; }
 
         @reduced
-        accessor modelArray = reduce([new ChildModel('one'), new ChildModel('two')])
-            .onRestore((_, arr) => arr.map(c => new ChildModel(c.value)))
-            .value;
+        get modelArray() {
+            return reduce([new ChildModel('one'), new ChildModel('two')])
+                .onRestore((_, arr) => arr.map(c => new ChildModel(c.value)))
+                .value;
+        }
 
         @state
         mergedModel = new ChildModel('merged');

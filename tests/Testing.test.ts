@@ -16,9 +16,11 @@ describe("mutable", () => {
         events = new Events();
 
         @reduced
-        accessor value = reduce(0)
-            .on(this.events.nextValue, (_, val) => val)
-            .value;
+        get value() {
+            return reduce(0)
+                .on(this.events.nextValue, (_, val) => val)
+                .value;
+        }
 
         @derived
         get valuePlusOne() { return this.value + 1; }

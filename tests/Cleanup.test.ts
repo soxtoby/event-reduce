@@ -310,7 +310,7 @@ describe("subscription cleanup", () => {
                 constructor(private _ownedModel: Model) { }
 
                 @reduced
-                accessor reducedProp = reduce(new Model(0)).value;
+                get reducedProp() { return reduce(new Model(0)).value; }
 
                 @derived
                 get derivedProp() { return new Model(1); }

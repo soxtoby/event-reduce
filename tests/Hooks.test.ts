@@ -60,7 +60,7 @@ describe("useAsyncEvent", () => {
 });
 
 describe("useDerived", () => {
-    @model class SourceModel { @reduced accessor value = reduce(1).value; }
+    @model class SourceModel { @reduced get value() { return reduce(1).value; } }
     let source: ReturnType<typeof mutable<SourceModel>>;
     let sut: ReturnType<typeof renderHook<unknown, ReturnType<typeof useDerived<number>>>>;
     let initialResult: ReturnType<typeof useDerived<number>>;
