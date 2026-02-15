@@ -48,7 +48,7 @@ describe("legacy state", () => {
         model = new TestModel('ctor');
     });
 
-    describe(getState.name, () => {
+    describe("getState", () => {
         test("copies the correct properties", () => {
             let result = getState(model);
             expect(JSON.stringify(result)).toBe(JSON.stringify({
@@ -65,7 +65,7 @@ describe("legacy state", () => {
         });
     });
 
-    describe(setState.name, () => {
+    describe("setState", () => {
         test("updates properties correctly", () => {
             let originalMergedModel = model.mergedModel;
             let stateValue = {

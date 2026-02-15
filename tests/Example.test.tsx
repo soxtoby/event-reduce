@@ -6,7 +6,7 @@ import { eventProxy, mutable } from "event-reduce/lib/testing";
 import * as React from "react";
 import { SynchronousPromise } from "synchronous-promise";
 
-describe(CounterListModel.name, () => {
+describe("CounterListModel", () => {
     let events: CounterListEvents;
     let sut: CounterListModel;
 
@@ -50,7 +50,7 @@ describe(CounterListModel.name, () => {
     });
 });
 
-describe(CounterList.name, () => {
+describe("CounterList", () => {
     let model: CounterListModel;
     let sut: ReturnType<typeof render>;
 
@@ -76,7 +76,7 @@ describe(CounterList.name, () => {
     });
 });
 
-describe(CounterModel.name, () => {
+describe("CounterModel", () => {
     let id: number;
     let initialCount: number;
     let parentEvents: any;
@@ -157,7 +157,7 @@ describe(CounterModel.name, () => {
     });
 });
 
-describe(Counter.name, () => {
+describe("Counter", () => {
     let id: number;
     let model: CounterModel;
     let sut: ReturnType<typeof render>;

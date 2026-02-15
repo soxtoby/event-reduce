@@ -5,7 +5,7 @@ import { useAsyncEvent, useDerived, useEvent, useReduced } from "event-reduce-re
 import { mutable } from "event-reduce/lib/testing";
 import { SynchronousPromise } from "synchronous-promise";
 
-describe(useEvent.name, () => {
+describe("useEvent", () => {
     let sut: ReturnType<typeof renderHook<unknown, ReturnType<typeof useEvent<number>>>>;
     let initialResult: ReturnType<typeof useEvent<number>>;
 
@@ -32,7 +32,7 @@ describe(useEvent.name, () => {
     });
 });
 
-describe(useAsyncEvent.name, () => {
+describe("useAsyncEvent", () => {
     let sut: ReturnType<typeof renderHook<unknown, ReturnType<typeof useAsyncEvent<number>>>>;
     let initialResult: ReturnType<typeof useAsyncEvent<number>>;
 
@@ -59,7 +59,7 @@ describe(useAsyncEvent.name, () => {
     });
 });
 
-describe(useDerived.name, () => {
+describe("useDerived", () => {
     @model class SourceModel { @reduced accessor value = reduce(1).value; }
     let source: ReturnType<typeof mutable<SourceModel>>;
     let sut: ReturnType<typeof renderHook<unknown, ReturnType<typeof useDerived<number>>>>;
@@ -88,7 +88,7 @@ describe(useDerived.name, () => {
     });
 });
 
-describe(useReduced.name, () => {
+describe("useReduced", () => {
     let added: ReturnType<typeof event<number>>;
     let sut: ReturnType<typeof renderHook<unknown, ReturnType<typeof useReduced<number>>>>;
     let initialResult: ReturnType<typeof useReduced<number>>;

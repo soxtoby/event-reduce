@@ -4,7 +4,7 @@ import { AccessedValueWithCommonSourceError, collectAccessedValues } from 'event
 import { CircularSubscriptionError, IBoundReduction, IReduction, ReducedEventsError } from "event-reduce/lib/reduction";
 import { Subject } from 'event-reduce/lib/subject';
 
-describe(reduce.name, () => {
+describe("reduce", () => {
     describe("when unbound", () => {
         let subscriber: Mock<(value: number) => void>;
         let sut: IReduction<number>;

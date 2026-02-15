@@ -3,7 +3,7 @@ import { asyncEvent, event, type AsyncError, type AsyncResult, type AsyncStart }
 import { ChainedEventsError } from "event-reduce/lib/events";
 import { SynchronousPromise } from 'synchronous-promise';
 
-describe(event.name, () => {
+describe("event", () => {
     type TestType = { foo: string, bar: number };
     let sut: ReturnType<typeof event<TestType>>;
 
@@ -96,7 +96,7 @@ describe(event.name, () => {
     });
 });
 
-describe(asyncEvent.name, () => {
+describe("asyncEvent", () => {
     type Result = { foo: string; };
     type Context = { bar: string; };
     let sut: ReturnType<typeof asyncEvent<Result, Context>>;

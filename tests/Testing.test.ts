@@ -68,7 +68,7 @@ describe("mutable", () => {
     });
 });
 
-describe(modelProxy.name, () => {
+describe("modelProxy", () => {
     class ModelClass {
         constructor(
             public stringValue: string,

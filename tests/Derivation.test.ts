@@ -3,7 +3,7 @@ import { derive, event, events } from "event-reduce";
 import { DerivedEventsError, SideEffectInDerivationError } from "event-reduce/lib/derivation";
 import { consumeLastAccessed, ObservableValue } from "event-reduce/lib/observableValue";
 
-describe(derive.name, () => {
+describe("derive", () => {
     let sourceA: ObservableValue<string>;
     let sourceB: ObservableValue<string>;
     let calculation: Mock<() => string>;
