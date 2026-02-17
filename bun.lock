@@ -5,7 +5,7 @@
     "": {
       "name": "event-reduce-root",
       "devDependencies": {
-        "typescript": "~5",
+        "typescript": "latest",
       },
     },
     "example": {
@@ -26,7 +26,7 @@
     },
     "packages/event-reduce": {
       "name": "event-reduce",
-      "version": "0.7.3",
+      "version": "0.7.5",
       "devDependencies": {
         "@types/node": "*",
         "typescript": "~5",
@@ -34,9 +34,9 @@
     },
     "packages/event-reduce-react": {
       "name": "event-reduce-react",
-      "version": "0.7.3",
+      "version": "0.7.5",
       "dependencies": {
-        "event-reduce": "workspace:*",
+        "event-reduce": "workspace:^",
         "use-sync-external-store": "*",
       },
       "devDependencies": {
