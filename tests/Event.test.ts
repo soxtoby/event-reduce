@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
 import { asyncEvent, event, type AsyncError, type AsyncResult, type AsyncStart } from 'event-reduce';
 import { ChainedEventsError } from "event-reduce/lib/events";
-import { SynchronousPromise } from 'synchronous-promise';
 
 describe("event", () => {
     type TestType = { foo: string, bar: number };
@@ -116,11 +115,13 @@ describe("asyncEvent", () => {
     });
 
     describe("when called", () => {
-        let promise: SynchronousPromise<Result>;
+        let promise: Promise<Result>;
+        let resolve: (value: Result) => void;
+        let reject: (error: any) => void;
         let context: Context;
 
         beforeEach(() => {
-            promise = SynchronousPromise.unresolved<Result>();
+            ({ promise, resolve, reject } = Promise.withResolvers<Result>());
             context = { bar: 'context' };
             sut(promise, context);
         });
@@ -130,9 +131,10 @@ describe("asyncEvent", () => {
         describe("when promise resolved", () => {
             let result: Result;
 
-            beforeEach(() => {
+            beforeEach(async () => {
                 result = { foo: 'result' };
-                (promise as any).resolve(result);
+                resolve(result);
+                await promise;
             });
 
             test("resolved event fired", () => expect(resolved).toHaveBeenCalledWith(expect.objectContaining({ result, context })));
@@ -141,9 +143,10 @@ describe("asyncEvent", () => {
         describe("when promise rejected", () => {
             let error: { message: string };
 
-            beforeEach(() => {
+            beforeEach(async () => {
                 error = { message: 'error' };
-                (promise as any).reject(error);
+                reject(error);
+                await promise.catch(() => { }); // Catch to prevent unhandled rejection
             });
 
             test("rejected event fired", () => expect(rejected).toHaveBeenCalledWith(expect.objectContaining({ error, context })));

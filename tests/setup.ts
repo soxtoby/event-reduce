@@ -1,9 +1,10 @@
-import "jsdom-global/register";
+import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { cleanup } from "@testing-library/react";
 import { reactionQueue } from "event-reduce/lib/reactions";
-import { SynchronousPromise } from "synchronous-promise";
-import { beforeEach, afterEach } from "bun:test";
+import { afterEach } from "bun:test";
 import { Action } from "event-reduce/lib/types";
+
+GlobalRegistrator.register();
 
 reactionQueue.current = {
     add(reaction: Action) {
@@ -12,11 +13,6 @@ reactionQueue.current = {
     }
 }
 
-beforeEach(() => {
-    SynchronousPromise.installGlobally(() => { });
-});
-
 afterEach(() => {
     cleanup();
-    SynchronousPromise.uninstallGlobally();
 });

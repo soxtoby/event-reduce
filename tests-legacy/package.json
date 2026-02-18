@@ -14,16 +14,6 @@
     "event-reduce-react": "*"
   },
   "devDependencies": {
-    "@testing-library/react": "*",
-    "@testing-library/react-hooks": "*",
-    "@types/react": ">=16.8",
-    "@types/react-dom": ">=16.8",
-    "jsdom": "*",
-    "jsdom-global": "*",
-    "react": ">=16.8",
-    "react-dom": ">=16.8",
-    "react-test-renderer": ">=16.8",
-    "synchronous-promise": "~2",
     "typescript": "~5"
   }
 }

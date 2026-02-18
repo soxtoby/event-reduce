@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
 import { event, model, reduce, reduced, type AsyncResult } from "event-reduce";
 import { useAsyncEvent, useDerived, useEvent, useReduced } from "event-reduce-react";
 import { mutable } from "event-reduce/lib/testing";
-import { SynchronousPromise } from "synchronous-promise";
 
 describe("useEvent", () => {
     let sut: ReturnType<typeof renderHook<unknown, ReturnType<typeof useEvent<number>>>>;
@@ -41,11 +40,13 @@ describe("useAsyncEvent", () => {
         initialResult = sut.result.current;
     });
 
-    test("returns an async event", () => {
+    test("returns an async event", async () => {
         let eventSpy: Mock<(value: AsyncResult<number, void>) => void> = mock();
         initialResult.resolved.subscribe(eventSpy);
 
-        initialResult(SynchronousPromise.resolve(3));
+        let promise = Promise.resolve(3);
+        initialResult(promise);
+        await promise;
 
         expect(eventSpy).toHaveBeenCalledWith(expect.objectContaining({ result: 3 }));
     });

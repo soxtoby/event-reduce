@@ -1,10 +1,8 @@
-import { describe, test, expect, beforeEach } from "bun:test";
 import { fireEvent, render } from "@testing-library/react";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { Counter, CounterEvents, CounterModel } from "event-reduce-example/Counter";
 import { CounterList, CounterListEvents, CounterListModel } from "event-reduce-example/CounterList";
 import { eventProxy, mutable } from "event-reduce/lib/testing";
-import * as React from "react";
-import { SynchronousPromise } from "synchronous-promise";
 
 describe("CounterListModel", () => {
     let events: CounterListEvents;
@@ -119,10 +117,11 @@ describe("CounterModel", () => {
         });
 
         describe("when value fetched asynchronously", () => {
-            let request: SynchronousPromise<number>;
+            let request: Promise<number>;
+            let resolve: (value: number) => void;
 
             beforeEach(() => {
-                request = SynchronousPromise.unresolved<number>();
+                ({ promise: request, resolve } = Promise.withResolvers<number>());
                 events.valueFetched(request);
             });
 
@@ -131,9 +130,10 @@ describe("CounterModel", () => {
             describe("when value returned", () => {
                 let answer: number;
 
-                beforeEach(() => {
+                beforeEach(async () => {
                     answer = 42;
-                    (request as any).resolve(answer);
+                    resolve(answer);
+                    await request;
                 });
 
                 test("becomes the result", () => expect(sut.count).toBe(answer));
