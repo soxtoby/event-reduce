@@ -21,15 +21,11 @@ describe("Subject", () => {
             unsub2 = sut.subscribe(observer2);
         });
 
-        describe("when provided a value", () => {
-            beforeEach(() => {
-                sut.next(1);
-            });
+        test("when provided a value, passes value to subscribers", () => {
+            sut.next(1);
 
-            test("passes value to subscribers", () => {
-                expect(observer1).toHaveBeenCalledWith(1);
-                expect(observer2).toHaveBeenCalledWith(1);
-            });
+            expect(observer1).toHaveBeenCalledWith(1);
+            expect(observer2).toHaveBeenCalledWith(1);
         });
 
         describe("when unsubscribed", () => {
@@ -37,15 +33,11 @@ describe("Subject", () => {
                 unsub1();
             });
 
-            describe("when provided a value", () => {
-                beforeEach(() => {
-                    sut.next(2);
-                });
+            test("when provided a value, doesn't pass value to unsubscribed subscriber", () => {
+                sut.next(2);
 
-                test("doesn't pass value to unsubscribed subscriber", () => {
-                    expect(observer1).not.toHaveBeenCalled();
-                    expect(observer2).toHaveBeenCalledWith(2);
-                });
+                expect(observer1).not.toHaveBeenCalled();
+                expect(observer2).toHaveBeenCalledWith(2);
             });
         });
     });

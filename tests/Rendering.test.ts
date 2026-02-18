@@ -23,12 +23,10 @@ describe('useReactive', () => {
 
     test("returns result of render function", () => expect(sut.result.current).toBe('initial value'));
 
-    describe("when re-rendered", () => {
-        beforeEach(() => {
-            sut.rerender();
-        });
+    test("when re-rendered, render function called again", () => {
+        sut.rerender();
 
-        test("render function called again", () => expect(render).toHaveBeenCalledTimes(2)); // In case render function uses hooks
+        expect(render).toHaveBeenCalledTimes(2); // In case render function uses hooks
     });
 
     describe("when accessed observable value changed", () => {
@@ -41,13 +39,11 @@ describe('useReactive', () => {
         test("returns updated result", () => expect(sut.result.current).toBe('new value'));
     });
 
-    describe("when accessed observable value is changed during render", () => {
-        beforeEach(() => {
-            innerBehaviour = () => observableValue.setValue('new value');
-            render.mockClear();
-            sut.rerender();
-        });
+    test("when accessed observable value is changed during render, doesn't trigger an extra render", () => {
+        innerBehaviour = () => observableValue.setValue('new value');
+        render.mockClear();
+        sut.rerender();
 
-        test("doesn't trigger an extra render", () => expect(render).toHaveBeenCalledTimes(1));
+        expect(render).toHaveBeenCalledTimes(1);
     });
 });

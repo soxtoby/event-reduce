@@ -22,12 +22,10 @@ describe("useEvent", () => {
         expect(eventSpy).toHaveBeenCalledWith(3);
     });
 
-    describe("when rendered again", () => {
-        beforeEach(() => {
-            sut.rerender();
-        });
+    test("when rendered again, returns the same event instance", () => {
+        sut.rerender();
 
-        test("returns the same event instance", () => expect(sut.result.current).toBe(initialResult));
+        expect(sut.result.current).toBe(initialResult);
     });
 });
 
@@ -51,12 +49,10 @@ describe("useAsyncEvent", () => {
         expect(eventSpy).toHaveBeenCalledWith(expect.objectContaining({ result: 3 }));
     });
 
-    describe("when rendered again", () => {
-        beforeEach(() => {
-            sut.rerender();
-        });
+    test("when rendered again, returns the same event instance", () => {
+        sut.rerender();
 
-        test("returns the same event instance", () => expect(sut.result.current).toBe(initialResult));
+        expect(sut.result.current).toBe(initialResult);
     });
 });
 
@@ -80,12 +76,10 @@ describe("useDerived", () => {
         expect(initialResult.value).toBe(6);
     });
 
-    describe("when rendered again", () => {
-        beforeEach(() => {
-            sut.rerender();
-        });
+    test("when rendered again, returns the same derivation instance", () => {
+        sut.rerender();
 
-        test("returns the same derivation instance", () => expect(sut.result.current).toBe(initialResult));
+        expect(sut.result.current).toBe(initialResult);
     });
 });
 
@@ -109,11 +103,9 @@ describe("useReduced", () => {
         expect(initialResult.value).toBe(3);
     });
 
-    describe("when rendered again", () => {
-        beforeEach(() => {
-            sut.rerender();
-        });
+    test("when rendered again, returns the same reduction instance", () => {
+        sut.rerender();
 
-        test("returns the same reduction instance", () => expect(sut.result.current).toBe(initialResult));
+        expect(sut.result.current).toBe(initialResult);
     });
 });

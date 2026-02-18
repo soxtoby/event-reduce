@@ -64,41 +64,35 @@ describe("reduce", () => {
                 sut.on(subject, () => other.value);
             });
 
-            describe("when other value based on same event", () => {
-                beforeEach(() => {
-                    other.on(subject, () => 0);
-                });
+            test("when other value based on same event, throws", () => {
+                other.on(subject, () => 0);
 
-                test("throws", () => {
-                    try {
-                        subject.next(0);
-                        expect.unreachable("Should have thrown");
-                    } catch (e) {
-                        expect(e).toBeInstanceOf(AccessedValueWithCommonSourceError);
-                        expect((e as AccessedValueWithCommonSourceError).commonSource).toBe(subject);
-                        expect((e as AccessedValueWithCommonSourceError).triggeringObservable).toBe(subject);
-                        expect((e as AccessedValueWithCommonSourceError).accessedObservable).toBe(other as any);
-                    }
-                });
+                try {
+                    subject.next(0);
+                    expect.unreachable("Should have thrown");
+                } catch (e) {
+                    expect(e).toBeInstanceOf(AccessedValueWithCommonSourceError);
+                    expect((e as AccessedValueWithCommonSourceError).commonSource).toBe(subject);
+                    expect((e as AccessedValueWithCommonSourceError).triggeringObservable).toBe(subject);
+                    expect((e as AccessedValueWithCommonSourceError).accessedObservable).toBe(other as any);
+                }
             });
 
-            describe("when other value not based on same event", () => {
-                test("doesn't throw", () => subject.next(0));
+            test("when other value not based on same event, doesn't throw", () => {
+                subject.next(0);
             });
         });
 
-        describe("when subscribing to an observable based on itself", () => {
-            test("throws", () => {
-                let observable = sut.filter(n => n > 3);
-                try {
-                    sut.on(observable, (_, n) => n);
-                    expect.unreachable("Should have thrown");
-                } catch (e) {
-                    expect(e).toBeInstanceOf(CircularSubscriptionError);
-                    expect((e as CircularSubscriptionError).observable).toBe(observable);
-                    expect((e as CircularSubscriptionError).reduction).toBe(sut);
-                }
-            });
+        test("when subscribing to an observable based on itself, throws", () => {
+            let observable = sut.filter(n => n > 3);
+            try {
+                sut.on(observable, (_, n) => n);
+                expect.unreachable("Should have thrown");
+            } catch (e) {
+                expect(e).toBeInstanceOf(CircularSubscriptionError);
+                expect((e as CircularSubscriptionError).observable).toBe(observable);
+                expect((e as CircularSubscriptionError).reduction).toBe(sut);
+            }
         });
     });
 
@@ -147,41 +141,37 @@ describe("reduce", () => {
         expect(Array.from(accessed)).toContain(r2 as any);
     });
 
-    describe("when reducer returns an event", () => {
-        test("throws", () => {
-            let eventValue = event('test event');
-            let subject = new Subject<string>(() => 'test');
-            let sut = reduce(null as any, 'sut')
-                .on(subject, () => eventValue);
+    test("when reducer returns an event, throws", () => {
+        let eventValue = event('test event');
+        let subject = new Subject<string>(() => 'test');
+        let sut = reduce(null as any, 'sut')
+            .on(subject, () => eventValue);
 
-            try {
-                subject.next('foo');
-                expect.unreachable("Should have thrown");
-            } catch (e) {
-                expect(e).toBeInstanceOf(ReducedEventsError);
-                expect((e as ReducedEventsError).reduction).toBe(sut);
-                expect((e as ReducedEventsError).value).toBe(eventValue);
-            }
-        });
+        try {
+            subject.next('foo');
+            expect.unreachable("Should have thrown");
+        } catch (e) {
+            expect(e).toBeInstanceOf(ReducedEventsError);
+            expect((e as ReducedEventsError).reduction).toBe(sut);
+            expect((e as ReducedEventsError).value).toBe(eventValue);
+        }
     });
 
-    describe("when reducer returns an events object", () => {
-        test("throws", () => {
-            @events
-            class Events { }
-            let eventsValue = new Events();
-            let subject = new Subject<string>(() => 'test');
-            let sut = reduce(null as any, 'sut')
-                .on(subject, () => eventsValue);
+    test("when reducer returns an events object, throws", () => {
+        @events
+        class Events { }
+        let eventsValue = new Events();
+        let subject = new Subject<string>(() => 'test');
+        let sut = reduce(null as any, 'sut')
+            .on(subject, () => eventsValue);
 
-            try {
-                subject.next('foo');
-                expect.unreachable("Should have thrown");
-            } catch (e) {
-                expect(e).toBeInstanceOf(ReducedEventsError);
-                expect((e as ReducedEventsError).reduction).toBe(sut);
-                expect((e as ReducedEventsError).value).toBe(eventsValue);
-            }
-        });
+        try {
+            subject.next('foo');
+            expect.unreachable("Should have thrown");
+        } catch (e) {
+            expect(e).toBeInstanceOf(ReducedEventsError);
+            expect((e as ReducedEventsError).reduction).toBe(sut);
+            expect((e as ReducedEventsError).value).toBe(eventsValue);
+        }
     });
 });

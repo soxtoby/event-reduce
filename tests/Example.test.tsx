@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/react";
+import { fireEvent, render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, test } from "bun:test";
 import { Counter, CounterEvents, CounterModel } from "event-reduce-example/Counter";
 import { CounterList, CounterListEvents, CounterListModel } from "event-reduce-example/CounterList";
@@ -34,15 +34,11 @@ describe("CounterListModel", () => {
 
             test("has two counters", () => expect(sut.counters.length).toBe(2));
 
-            describe("when second counter removed", () => {
-                beforeEach(() => {
-                    events.counterRemoved({ id: sut.counters[1].id });
-                });
+            test("when second counter removed, only has first counter left", () => {
+                events.counterRemoved({ id: sut.counters[1].id });
 
-                test("only has first counter left", () => {
-                    expect(sut.counters.length).toBe(1);
-                    expect(sut.counters[0]).toBe(firstCounter);
-                });
+                expect(sut.counters.length).toBe(1);
+                expect(sut.counters[0]).toBe(firstCounter);
             });
         });
     });
@@ -64,12 +60,10 @@ describe("CounterList", () => {
 
         test("counter added", () => expect(sut.getByTestId('counter')).toBeDefined());
 
-        describe("when 'Remove' button clicked", () => {
-            beforeEach(() => {
-                fireEvent.click(sut.getByText('Remove'));
-            });
+        test("when 'Remove' button clicked, counter removed", () => {
+            fireEvent.click(sut.getByText('Remove'));
 
-            test("counter removed", () => expect(sut.queryByTestId('counter')).toBeNull());
+            expect(sut.queryByTestId('counter')).toBeNull();
         });
     });
 });
@@ -92,28 +86,22 @@ describe("CounterModel", () => {
     describe("count", () => {
         test("has initial count by default", () => expect(sut.count).toBe(3));
 
-        describe("when counter incremented", () => {
-            beforeEach(() => {
-                parentEvents.incremented({ id });
-            });
+        test("when counter incremented, is increased by 1", () => {
+            parentEvents.incremented({ id });
 
-            test("is increased by 1", () => expect(sut.count).toBe(initialCount + 1));
+            expect(sut.count).toBe(initialCount + 1);
         });
 
-        describe("when counter decremented", () => {
-            beforeEach(() => {
-                parentEvents.decremented({ id });
-            });
+        test("when counter decremented, is decreased by 1", () => {
+            parentEvents.decremented({ id });
 
-            test("is decreased by 1", () => expect(sut.count).toBe(initialCount - 1));
+            expect(sut.count).toBe(initialCount - 1);
         });
 
-        describe("when counter reset", () => {
-            beforeEach(() => {
-                parentEvents.reset({ id });
-            });
+        test("when counter reset, becomes 0", () => {
+            parentEvents.reset({ id });
 
-            test("becomes 0", () => expect(sut.count).toBe(0));
+            expect(sut.count).toBe(0);
         });
 
         describe("when value fetched asynchronously", () => {
@@ -127,16 +115,12 @@ describe("CounterModel", () => {
 
             test("remains the same", () => expect(sut.count).toBe(initialCount));
 
-            describe("when value returned", () => {
-                let answer: number;
+            test("when value returned, becomes the result", async () => {
+                let answer = 42;
+                resolve(answer);
+                await request;
 
-                beforeEach(async () => {
-                    answer = 42;
-                    resolve(answer);
-                    await request;
-                });
-
-                test("becomes the result", () => expect(sut.count).toBe(answer));
+                expect(sut.count).toBe(answer);
             });
         });
     });
@@ -144,15 +128,11 @@ describe("CounterModel", () => {
     describe("countTimesTwo", () => {
         test("is two times initial count by default", () => expect(sut.countTimesTwo).toBe(initialCount * 2));
 
-        describe("when count updated", () => {
-            let newCount: number;
+        test("when count updated, is two times the new count", () => {
+            let newCount = 11;
+            sut.count = newCount;
 
-            beforeEach(() => {
-                newCount = 11;
-                sut.count = newCount;
-            });
-
-            test("is two times the new count", () => expect(sut.countTimesTwo).toBe(newCount * 2));
+            expect(sut.countTimesTwo).toBe(newCount * 2);
         });
     });
 });
@@ -172,35 +152,29 @@ describe("Counter", () => {
 
     test("shows count times two", () => expect(sut.getByTestId('countTimesTwo').textContent).toBe('6'));
 
-    describe("when '+' button clicked", () => {
-        beforeEach(() => {
-            fireEvent.click(sut.getByText('+'));
-        });
+    test("when '+' button clicked, count incremented", () => {
+        fireEvent.click(sut.getByText('+'));
 
-        test("count incremented", () => expect(sut.getByTestId('count').textContent).toBe('4'));
+        expect(sut.getByTestId('count').textContent).toBe('4');
     });
 
-    describe("when '-' button clicked", () => {
-        beforeEach(() => {
-            fireEvent.click(sut.getByText('-'));
-        });
+    test("when '-' button clicked, count decremented", () => {
+        fireEvent.click(sut.getByText('-'));
 
-        test("count decremented", () => expect(sut.getByTestId('count').textContent).toBe('2'));
+        expect(sut.getByTestId('count').textContent).toBe('2');
     });
 
-    describe("when '0' button clicked", () => {
-        beforeEach(() => {
-            fireEvent.click(sut.getByText('0'));
-        });
+    test("when '0' button clicked, count reset to 0", () => {
+        fireEvent.click(sut.getByText('0'));
 
-        test("count reset to 0", () => expect(sut.getByTestId('count').textContent).toBe('0'));
+        expect(sut.getByTestId('count').textContent).toBe('0');
     });
 
-    describe("when 'Fetch' button clicked", () => {
-        beforeEach(() => {
-            fireEvent.click(sut.getByText('Fetch'));
-        });
+    test("when 'Fetch' button clicked, count set to 100", async () => {
+        fireEvent.click(sut.getByText('Fetch'));
 
-        test("count set to 100", () => expect(sut.getByTestId('count').textContent).toBe('100'));
+        await waitFor(() => {
+            expect(sut.getByTestId('count').textContent).toBe('100');
+        });
     });
 });

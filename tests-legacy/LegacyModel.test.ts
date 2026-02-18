@@ -116,67 +116,59 @@ describe("legacy models", () => {
             test("extended legacy field value updated", () => expect(extendedModel.legacyField).toBe(0));
         });
 
-        describe("when derivation creates a new model that accesses an observable value in its constructor", () => {
-            test("accessed observable value is not counted as a source for the derivation", () => {
-                //@model
-                class DerivedModel {
-                    property = testModel.property;
-                }
-                let derivation = derive(() => new DerivedModel());
+        test("when derivation creates a new model that accesses an observable value in its constructor, accessed observable value is not counted as a source for the derivation", () => {
+            //@model
+            class DerivedModel {
+                property = testModel.property;
+            }
+            let derivation = derive(() => new DerivedModel());
 
-                expect(derivation.sources.length).toBe(0);
-            });
+            expect(derivation.sources.length).toBe(0);
         });
 
-        describe("when reducer creates a new model that observes the same event that created it", () => {
-            test("doesn't throw", () => {
-                class Parent {
-                    @reduced
-                    child = reduce(null as TestModel | null)
-                        .on(increment, () => new TestModel())
-                        .value;
-                }
+        test("when reducer creates a new model that observes the same event that created it, doesn't throw", () => {
+            class Parent {
+                @reduced
+                child = reduce(null as TestModel | null)
+                    .on(increment, () => new TestModel())
+                    .value;
+            }
 
-                let parentModel = new Parent();
+            let parentModel = new Parent();
 
-                increment(undefined);
-                expect(parentModel.child).toBeInstanceOf(TestModel);
-            });
+            increment(undefined);
+            expect(parentModel.child).toBeInstanceOf(TestModel);
         });
 
-        describe("when initial value of a model's reduced property is derived from the same event that's creating the model", () => {
-            test("throws", () => {
-                reduce(null as ChildModel | null)
-                    .on(increment, () => new ChildModel());
+        test("when initial value of a model's reduced property is derived from the same event that's creating the model, throws", () => {
+            reduce(null as ChildModel | null)
+                .on(increment, () => new ChildModel());
 
-                class ChildModel {
-                    @reduced
-                    property = reduce(testModel.property)
-                        .on(decrement, c => c - 1)
-                        .value;
-                }
+            class ChildModel {
+                @reduced
+                property = reduce(testModel.property)
+                    .on(decrement, c => c - 1)
+                    .value;
+            }
 
-                expect(() => increment(undefined)).toThrow(AccessedValueWithCommonSourceError);
-            });
+            expect(() => increment(undefined)).toThrow(AccessedValueWithCommonSourceError);
         });
 
-        describe("when event is marked as state", () => {
-            test("throws when constructed", () => {
-                @model
-                class BadModel {
-                    @state
-                    event = event('bad state');
-                }
+        test("when event is marked as state, throws when constructed", () => {
+            @model
+            class BadModel {
+                @state
+                event = event('bad state');
+            }
 
-                try {
-                    new BadModel();
-                    expect.unreachable("Should have thrown");
-                } catch (e) {
-                    expect(e).toBeInstanceOf(EventsMarkedAsStateError);
-                    expect((e as EventsMarkedAsStateError).model).toBeDefined();
-                    expect((e as EventsMarkedAsStateError).property).toBe('event');
-                }
-            });
+            try {
+                new BadModel();
+                expect.unreachable("Should have thrown");
+            } catch (e) {
+                expect(e).toBeInstanceOf(EventsMarkedAsStateError);
+                expect((e as EventsMarkedAsStateError).model).toBeDefined();
+                expect((e as EventsMarkedAsStateError).property).toBe('event');
+            }
         });
     });
 });
@@ -227,22 +219,20 @@ describe("events decorator", () => {
         expect(getterSpy).toHaveBeenCalledTimes(1);
     });
 
-    describe("when event class is marked as state", () => {
-        test("throws when constructed", () => {
-            @model
-            class BadModel {
-                @state
-                events = new TestEvents();
-            }
+    test("when event class is marked as state, throws when constructed", () => {
+        @model
+        class BadModel {
+            @state
+            events = new TestEvents();
+        }
 
-            try {
-                new BadModel();
-                expect.unreachable("Should have thrown");
-            } catch (e) {
-                expect(e).toBeInstanceOf(EventsMarkedAsStateError);
-                expect((e as EventsMarkedAsStateError).model).toBeDefined();
-                expect((e as EventsMarkedAsStateError).property).toBe('events');
-            }
-        });
+        try {
+            new BadModel();
+            expect.unreachable("Should have thrown");
+        } catch (e) {
+            expect(e).toBeInstanceOf(EventsMarkedAsStateError);
+            expect((e as EventsMarkedAsStateError).model).toBeDefined();
+            expect((e as EventsMarkedAsStateError).property).toBe('events');
+        }
     });
 });

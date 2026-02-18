@@ -37,14 +37,12 @@ describe("mutable", () => {
         typedModel = sut.target;
     });
 
-    describe("without overrides", () => {
-        test("properties behave normally", () => {
-            sut.events.nextValue(3);
+    test("without overrides, properties behave normally", () => {
+        sut.events.nextValue(3);
 
-            expect(sut.value).toBe(3);
-            expect(sut.valuePlusOne).toBe(4);
-            expect(sut.valuePlusOne).toBe(4);
-        });
+        expect(sut.value).toBe(3);
+        expect(sut.valuePlusOne).toBe(4);
+        expect(sut.valuePlusOne).toBe(4);
     });
 
     describe("when reduced property overridden", () => {
@@ -57,12 +55,10 @@ describe("mutable", () => {
         test("computed value is still computed", () => expect(sut.valuePlusOne).toBe(3));
     });
 
-    describe("when computed property overridden", () => {
-        beforeEach(() => {
-            sut.valuePlusOne = 3;
-        });
+    test("when computed property overridden, computed value returns override", () => {
+        sut.valuePlusOne = 3;
 
-        test("computed value returns override", () => expect(sut.valuePlusOne).toBe(3));
+        expect(sut.valuePlusOne).toBe(3);
     });
 
     test("can be disposed", () => {

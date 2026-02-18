@@ -18,36 +18,27 @@ describe("event", () => {
             sut.subscribe(subscriber);
         });
 
-        describe("when called", () => {
-            let value: TestType;
+        test("when called, passes value to subscribers", () => {
+            let value = { foo: 'foo', bar: 1 };
 
-            beforeEach(() => {
-                value = { foo: 'foo', bar: 1 };
-                sut(value);
-            });
+            sut(value);
 
-            test("passes value to subscribers", () => expect(subscriber).toHaveBeenCalledWith(value));
+            expect(subscriber).toHaveBeenCalledWith(value);
         });
     });
 
-    describe("when handler calls another event", () => {
-        let otherEvent: ReturnType<typeof event<void>>;
+    test("when handler calls another event, throws", () => {
+        let otherEvent = event<void>('otherEvent');
+        sut.subscribe(() => otherEvent(undefined));
 
-        beforeEach(() => {
-            otherEvent = event<void>('otherEvent');
-            sut.subscribe(() => otherEvent(undefined));
-        });
-
-        test("throws", () => {
-            try {
-                sut({ foo: 'foo', bar: 1 });
-                expect.unreachable("Should have thrown");
-            } catch (e) {
-                expect(e).toBeInstanceOf(ChainedEventsError);
-                expect((e as ChainedEventsError).currentEvent).toBe(sut.displayName);
-                expect((e as ChainedEventsError).newEvent).toBe(otherEvent.displayName);
-            }
-        });
+        try {
+            sut({ foo: 'foo', bar: 1 });
+            expect.unreachable("Should have thrown");
+        } catch (e) {
+            expect(e).toBeInstanceOf(ChainedEventsError);
+            expect((e as ChainedEventsError).currentEvent).toBe(sut.displayName);
+            expect((e as ChainedEventsError).newEvent).toBe(otherEvent.displayName);
+        }
     });
 
     describe("scope", () => {
@@ -63,34 +54,25 @@ describe("event", () => {
             scoped.subscribe(scopedSubscriber);
         });
 
-        describe("when non-matching value passed to parent event", () => {
-            beforeEach(() => {
-                sut({ foo: 'bar', bar: 1 });
-            });
+        test("when non-matching value passed to parent event, scoped event does not pass on value", () => {
+            sut({ foo: 'bar', bar: 1 });
 
-            test("scoped event does not pass on value", () => expect(scopedSubscriber).not.toHaveBeenCalled());
+            expect(scopedSubscriber).not.toHaveBeenCalled();
         });
 
-        describe("when matching value passed to parent event", () => {
-            let value: TestType;
+        test("when matching value passed to parent event, scoped event passed on value", () => {
+            let value = { foo: 'foo', bar: 1 };
 
-            beforeEach(() => {
-                value = { foo: 'foo', bar: 1 };
-                sut(value);
-            });
+            sut(value);
 
-            test("scoped event passed on value", () => expect(scopedSubscriber).toHaveBeenCalledWith(value));
+            expect(scopedSubscriber).toHaveBeenCalledWith(value);
         });
 
-        describe("when called with partial value", () => {
-            beforeEach(() => {
-                scoped({ bar: 2 });
-            });
+        test("when called with partial value, scoped event fills in scope values", () => {
+            scoped({ bar: 2 });
 
-            test("scoped event fills in scope values", () => {
-                expect(rootSubscriber).toHaveBeenCalledWith(expect.objectContaining({ foo: 'foo', bar: 2 }));
-                expect(scopedSubscriber).toHaveBeenCalledWith(expect.objectContaining({ foo: 'foo', bar: 2 }));
-            });
+            expect(rootSubscriber).toHaveBeenCalledWith(expect.objectContaining({ foo: 'foo', bar: 2 }));
+            expect(scopedSubscriber).toHaveBeenCalledWith(expect.objectContaining({ foo: 'foo', bar: 2 }));
         });
     });
 });
@@ -128,28 +110,20 @@ describe("asyncEvent", () => {
 
         test("started event fired", () => expect(started).toHaveBeenCalledWith(expect.objectContaining({ promise, context })));
 
-        describe("when promise resolved", () => {
-            let result: Result;
+        test("when promise resolved, resolved event fired", async () => {
+            let result = { foo: 'result' };
+            resolve(result);
+            await promise;
 
-            beforeEach(async () => {
-                result = { foo: 'result' };
-                resolve(result);
-                await promise;
-            });
-
-            test("resolved event fired", () => expect(resolved).toHaveBeenCalledWith(expect.objectContaining({ result, context })));
+            expect(resolved).toHaveBeenCalledWith(expect.objectContaining({ result, context }));
         });
 
-        describe("when promise rejected", () => {
-            let error: { message: string };
+        test("when promise rejected, rejected event fired", async () => {
+            let error = { message: 'error' };
+            reject(error);
+            await promise.catch(() => { }); // Catch to prevent unhandled rejection
 
-            beforeEach(async () => {
-                error = { message: 'error' };
-                reject(error);
-                await promise.catch(() => { }); // Catch to prevent unhandled rejection
-            });
-
-            test("rejected event fired", () => expect(rejected).toHaveBeenCalledWith(expect.objectContaining({ error, context })));
+            expect(rejected).toHaveBeenCalledWith(expect.objectContaining({ error, context }));
         });
     });
 });

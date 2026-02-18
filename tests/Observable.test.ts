@@ -25,12 +25,10 @@ describe("ObservableOperation", () => {
             }));
         });
 
-        describe("when unsubscribed", () => {
-            beforeEach(() => {
-                result();
-            });
+        test("when unsubscribed, unsubscribed from inner subscription", () => {
+            result();
 
-            test("unsubscribed from inner subscription", () => expect(unsubscribe).toHaveBeenCalled());
+            expect(unsubscribe).toHaveBeenCalled();
         });
     });
 

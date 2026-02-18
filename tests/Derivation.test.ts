@@ -29,52 +29,30 @@ describe("derive", () => {
 
         test("derivation is last accessed value", () => expect(consumeLastAccessed()!).toBe(sut));
 
-        describe("when accessed again", () => {
-            let result2: string;
+        test("when accessed again, returns same value and doesn't re-compute the value", () => {
+            let result2 = sut.value;
 
-            beforeEach(() => {
-                result2 = sut.value;
-            });
-
-            test("returns same value", () => expect(result2).toBe(result));
-
-            test("doesn't re-compute the value", () => expect(calculation).toHaveBeenCalledTimes(1));
+            expect(result2).toBe(result);
+            expect(calculation).toHaveBeenCalledTimes(1);
         });
 
-        describe("when a source value changed", () => {
-            beforeEach(() => {
-                sourceB.setValue('B');
-            });
+        test("when a source value changed then accessed again, returns updated value", () => {
+            sourceB.setValue('B');
 
-            describe("when accessed again", () => {
-                let result2: string;
+            let result2 = sut.value;
 
-                beforeEach(() => {
-                    result2 = sut.value;
-                });
-
-                test("returns updated value", () => expect(result2).toBe('aB'));
-            });
+            expect(result2).toBe('aB');
         });
 
-        describe("when multiple source values changed", () => {
-            beforeEach(() => {
-                calculation.mockClear();
-                sourceA.setValue('A');
-                sourceB.setValue('B');
-            });
+        test("when multiple source values changed then accessed again, returns updated value and re-computes only once", () => {
+            calculation.mockClear();
+            sourceA.setValue('A');
+            sourceB.setValue('B');
 
-            describe("when accessed again", () => {
-                let result2: string;
+            let result2 = sut.value;
 
-                beforeEach(() => {
-                    result2 = sut.value;
-                });
-
-                test("returns updated value", () => expect(result2).toBe('AB'));
-
-                test("re-computes only once", () => expect(calculation).toHaveBeenCalledTimes(1));
-            });
+            expect(result2).toBe('AB');
+            expect(calculation).toHaveBeenCalledTimes(1);
         });
 
         describe("when subscribed to", () => {
@@ -87,64 +65,56 @@ describe("derive", () => {
 
             test("doesn't notify immediately", () => expect(observe).not.toHaveBeenCalled());
 
-            describe("when a source value changed", () => {
-                beforeEach(() => {
-                    sourceA.setValue('A');
-                });
+            test("when a source value changed, notifies observer", () => {
+                sourceA.setValue('A');
 
-                test("notifies observer", () => expect(observe).toHaveBeenCalled());
+                expect(observe).toHaveBeenCalled();
             });
         });
     });
 
-    describe("when derivation fires an event", () => {
-        test("throws", () => {
-            let sideEffect = event('some event');
-            let derivation = derive(() => sideEffect());
+    test("when derivation fires an event, throws", () => {
+        let sideEffect = event('some event');
+        let derivation = derive(() => sideEffect());
 
-            try {
-                derivation.value;
-                expect.unreachable("Should have thrown");
-            } catch (e) {
-                expect(e).toBeInstanceOf(SideEffectInDerivationError);
-                expect((e as SideEffectInDerivationError).derivation).toBe(derivation);
-                expect((e as SideEffectInDerivationError).sideEffect).toBe('some event');
-            }
-        });
+        try {
+            derivation.value;
+            expect.unreachable("Should have thrown");
+        } catch (e) {
+            expect(e).toBeInstanceOf(SideEffectInDerivationError);
+            expect((e as SideEffectInDerivationError).derivation).toBe(derivation);
+            expect((e as SideEffectInDerivationError).sideEffect).toBe('some event');
+        }
     });
 
-    describe("when derivation returns an event", () => {
-        test("accessing value throws", () => {
-            let eventValue = event('derived event');
-            let derivation = derive(() => sourceA.value && eventValue);
+    test("when derivation returns an event, accessing value throws", () => {
+        let eventValue = event('derived event');
+        let derivation = derive(() => sourceA.value && eventValue);
 
-            try {
-                derivation.value;
-                expect.unreachable("Should have thrown");
-            } catch (e) {
-                expect(e).toBeInstanceOf(DerivedEventsError);
-                expect((e as DerivedEventsError).derivation).toBe(derivation);
-                expect((e as DerivedEventsError).value).toBe(eventValue);
-            }
-        });
+        try {
+            derivation.value;
+            expect.unreachable("Should have thrown");
+        } catch (e) {
+            expect(e).toBeInstanceOf(DerivedEventsError);
+            expect((e as DerivedEventsError).derivation).toBe(derivation);
+            expect((e as DerivedEventsError).value).toBe(eventValue);
+        }
     });
 
-    describe("when derivation returns an events class", () => {
-        test("accessing value throws", () => {
-            @events
-            class Events { }
-            let eventsValue = new Events();
-            let derivation = derive(() => sourceA.value && eventsValue);
+    test("when derivation returns an events class, accessing value throws", () => {
+        @events
+        class Events { }
+        let eventsValue = new Events();
+        let derivation = derive(() => sourceA.value && eventsValue);
 
-            try {
-                derivation.value;
-                expect.unreachable("Should have thrown");
-            } catch (e) {
-                expect(e).toBeInstanceOf(DerivedEventsError);
-                expect((e as DerivedEventsError).derivation).toBe(derivation);
-                expect((e as DerivedEventsError).value).toBe(eventsValue);
-            }
-        });
+        try {
+            derivation.value;
+            expect.unreachable("Should have thrown");
+        } catch (e) {
+            expect(e).toBeInstanceOf(DerivedEventsError);
+            expect((e as DerivedEventsError).derivation).toBe(derivation);
+            expect((e as DerivedEventsError).value).toBe(eventsValue);
+        }
     });
 });
 

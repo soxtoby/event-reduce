@@ -33,12 +33,10 @@ describe("ObservableValue", () => {
         test("observers notified", () => expect(observer).toHaveBeenCalled());
     });
 
-    describe("when value set to same value", () => {
-        beforeEach(() => {
-            sut.setValue('initial');
-        });
+    test("when value set to same value, observers not notified", () => {
+        sut.setValue('initial');
 
-        test("observers not notified", () => expect(observer).not.toHaveBeenCalled());
+        expect(observer).not.toHaveBeenCalled();
     });
 });
 
@@ -51,16 +49,10 @@ describe("collectAccessedValues", () => {
         valueB = new ObservableValue(() => 'b', 'b');
     });
 
-    describe("when multiple values accessed", () => {
-        let result: Set<ObservableValue<any>>;
+    test("when multiple values accessed, all accessed values returned", () => {
+        let result = collectAccessedValues(() => valueA.value + valueB.value);
 
-        beforeEach(() => {
-            result = collectAccessedValues(() => valueA.value + valueB.value);
-        });
-
-        test("all accessed values returned", () => {
-            expect(Array.from(result)).toContain(valueA);
-            expect(Array.from(result)).toContain(valueB);
-        });
+        expect(Array.from(result)).toContain(valueA);
+        expect(Array.from(result)).toContain(valueB);
     });
 });

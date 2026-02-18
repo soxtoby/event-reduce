@@ -53,53 +53,49 @@ describe("state", () => {
         testModel = new TestModel('ctor');
     });
 
-    describe("getState", () => {
-        test("copies the correct properties", () => {
-            let result = getState(testModel);
-            expect(JSON.stringify(result)).toBe(JSON.stringify({
-                valueProperty: 1,
-                reducedModel: { value: 'child' },
-                modelArray: [
-                    { value: 'one' },
-                    { value: 'two' }
-                ],
-                constructorProperty: 'ctor',
-                mergedModel: { value: 'merged' },
-                subClassProperty: 'subClass'
-            }));
-        });
+    test("getState copies the correct properties", () => {
+        let result = getState(testModel);
+        expect(JSON.stringify(result)).toBe(JSON.stringify({
+            valueProperty: 1,
+            reducedModel: { value: 'child' },
+            modelArray: [
+                { value: 'one' },
+                { value: 'two' }
+            ],
+            constructorProperty: 'ctor',
+            mergedModel: { value: 'merged' },
+            subClassProperty: 'subClass'
+        }));
     });
 
-    describe("setState", () => {
-        test("updates properties correctly", () => {
-            let originalMergedModel = testModel.mergedModel;
-            let stateValue = {
-                valueProperty: 2,
-                reducedModel: { value: 'child*' },
-                modelArray: [
-                    { value: 'one*' },
-                    { value: 'two*' },
-                    { value: 'three*' }
-                ],
-                mergedModel: { value: 'merged*' },
-                subClassProperty: 'subClass*',
-                ignoredValue: 'ignored*'
-            } as State<TestModel>;
-            setState(testModel, stateValue);
+    test("setState updates properties correctly", () => {
+        let originalMergedModel = testModel.mergedModel;
+        let stateValue = {
+            valueProperty: 2,
+            reducedModel: { value: 'child*' },
+            modelArray: [
+                { value: 'one*' },
+                { value: 'two*' },
+                { value: 'three*' }
+            ],
+            mergedModel: { value: 'merged*' },
+            subClassProperty: 'subClass*',
+            ignoredValue: 'ignored*'
+        } as State<TestModel>;
+        setState(testModel, stateValue);
 
-            expect(testModel.valueProperty).toBe(2);
-            expect(testModel.reducedModel).toBeInstanceOf(ChildModel);
-            expect(testModel.reducedModel.value).toBe('child*');
-            expect(testModel.modelArray[0]).toBeInstanceOf(ChildModel);
-            expect(testModel.modelArray[1]).toBeInstanceOf(ChildModel);
-            expect(testModel.modelArray[2]).toBeInstanceOf(ChildModel);
-            expect(testModel.modelArray[0].value).toBe('one*');
-            expect(testModel.modelArray[1].value).toBe('two*');
-            expect(testModel.modelArray[2].value).toBe('three*');
-            expect(testModel.mergedModel).toBe(originalMergedModel);
-            expect(testModel.mergedModel.value).toBe('merged*');
-            expect(testModel.subClassProperty).toBe('subClass*');
-            expect(testModel.ignoredValue).toBe('ignored');
-        });
+        expect(testModel.valueProperty).toBe(2);
+        expect(testModel.reducedModel).toBeInstanceOf(ChildModel);
+        expect(testModel.reducedModel.value).toBe('child*');
+        expect(testModel.modelArray[0]).toBeInstanceOf(ChildModel);
+        expect(testModel.modelArray[1]).toBeInstanceOf(ChildModel);
+        expect(testModel.modelArray[2]).toBeInstanceOf(ChildModel);
+        expect(testModel.modelArray[0].value).toBe('one*');
+        expect(testModel.modelArray[1].value).toBe('two*');
+        expect(testModel.modelArray[2].value).toBe('three*');
+        expect(testModel.mergedModel).toBe(originalMergedModel);
+        expect(testModel.mergedModel.value).toBe('merged*');
+        expect(testModel.subClassProperty).toBe('subClass*');
+        expect(testModel.ignoredValue).toBe('ignored');
     });
 });
