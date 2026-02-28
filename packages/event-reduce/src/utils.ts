@@ -2,8 +2,8 @@ import { Unsubscribe } from "./types";
 
 export const emptyArray = Object.freeze([]) as readonly any[];
 
-export function constant<T>(value: T) { return returnValue.bind(null, value) as () => T; }
-function returnValue<T>(value: T) { return value; }
+export function constant<T>(value: T) { return identity.bind(null, value) as () => T; }
+export function identity<T>(value: T) { return value; }
 
 export function filteredName(baseName: string, predicate: Function) {
     return `${baseName}.filter(${nameOfCallback(predicate)})`;
