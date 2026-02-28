@@ -102,8 +102,6 @@ class Atom<T> extends SourceBase<T> {
     override setValue(value: T) { super.setValue(value, true) }
 }
 
-type Reducer<Result, Source> = (current: Result, next: Source) => Result
-
 export abstract class SourceObserverBase<Out, In = any> extends SourceBase<Out> implements Observer<In> {
     abstract readonly sources: ReadonlySet<Source<any>>
 
@@ -132,28 +130,6 @@ export abstract class SourceObserverBase<Out, In = any> extends SourceBase<Out> 
     }
 
     abstract sourceUpdated<S extends In>(source: Source<S>, value: S): void
-}
-
-class Reduction<T> extends SourceObserverBase<T, T> {
-    sources = new Set<Source<any>>()
-    private _reducers = new Map<Source<any>, (current: T, next: any) => T>()
-
-    on<S>(source: Source<S>, reduce: Reducer<T, S>) {
-        this.sources.add(source)
-        this._reducers.set(source, reduce)
-        if (this._observers.size)
-            source.subscribe(this)
-    }
-
-    override get value() { return super.value }
-
-    sourceUpdated<S>(source: Source<S>, value: S) {
-        let reduce = this._reducers.get(source)
-        if (reduce) {
-            let newValue = reduce(this._value, value)
-            this.setValue(newValue)
-        }
-    }
 }
 
 class Effect<T> implements Observer<any> {
