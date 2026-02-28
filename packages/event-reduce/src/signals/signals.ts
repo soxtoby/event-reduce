@@ -35,26 +35,26 @@ let globalTracker: SourceTracker | null = null
 let globalVersion = 0
 let reactingTo: Source<any> | null = null
 
-interface Source<T> {
-    readonly displayName: string
+export interface Source<T> {
+    displayName: string
     readonly lastUpdated: number
     subscribe(observer: Observer<T>): void
     unsubscribe(observer: Observer<T>): void
 }
 
-interface Observer<T> {
-    readonly displayName: string
+export interface Observer<T> {
+    displayName: string
     readonly sources: ReadonlySet<Source<any>>
     sourceUpdated<S extends T>(source: Source<S>, value: S): void
 }
 
-abstract class SourceBase<T> implements Source<T> {
+export abstract class SourceBase<T> implements Source<T> {
     protected readonly _observers = new Set<Observer<T>>()
     protected _value!: T
     lastUpdated = -1
 
     constructor(
-        public readonly displayName: string,
+        public displayName: string,
         private _skipUpdate = Object.is
     ) { }
 
@@ -104,7 +104,7 @@ class Atom<T> extends SourceBase<T> {
 
 type Reducer<Result, Source> = (current: Result, next: Source) => Result
 
-abstract class SourceObserverBase<Out, In = any> extends SourceBase<Out> implements Observer<In> {
+export abstract class SourceObserverBase<Out, In = any> extends SourceBase<Out> implements Observer<In> {
     abstract readonly sources: ReadonlySet<Source<any>>
 
     override subscribe(observer: Observer<Out>): void {
@@ -267,42 +267,6 @@ class Derivation<T> extends SourceObserverBase<T, any> {
     private update() {
         this.setValue(this._derive.run())
     }
-}
-
-class Event<T> extends SourceBase<T> {
-    constructor(displayName: string) { super(displayName, () => false) }
-    emit(value: T) { this.setValue(value, true) }
-}
-
-class BoundEvent<In, Out> extends SourceObserverBase<Out, In> {
-    readonly sources = new Set<Source<In>>()
-
-    constructor(
-        displayName: string,
-        source: Source<In>,
-        private _transform = identity as (value: In) => Out,
-        skipUpdate = (old: Out, next: Out) => false
-    ) {
-        super(displayName, skipUpdate)
-        this.sources.add(source)
-    }
-
-    sourceUpdated<S extends In>(source: Source<S>, value: S): void {
-        let newValue = this._transform(value)
-        this.setValue(newValue)
-    }
-}
-
-export function map<In, Out>(source: Source<In>, transform: (value: In) => Out, displayName = `${source.displayName}.map(${nameOfCallback(transform)})`) {
-    return new BoundEvent(displayName, source, transform)
-}
-
-export function filter<T>(source: Source<T>, predicate: (value: T) => boolean, displayName = `${source.displayName}.filter(${nameOfCallback(predicate)})`) {
-    return new BoundEvent(displayName, source, identity, (_, next) => !predicate(next))
-}
-
-export function filterMap<In, Out>(source: Source<In>, transform: (value: In) => Out | undefined, displayName = `${source.displayName}.filterMap(${nameOfCallback(transform)})`) {
-    return new BoundEvent(displayName, source, transform, (_, next) => next == undefined)
 }
 
 class CircularDependencyError extends Error {
