@@ -1,4 +1,5 @@
-import { dispose, identity, nameOfCallback } from "../utils"
+import { dispose } from "../utils"
+import { Owner, updateOwnedValues, withOwner } from "./tracking"
 
 class SourceTracker {
     private readonly _previous: SourceTracker | null
@@ -68,7 +69,9 @@ export abstract class SourceBase<T> implements Source<T> {
             throw new SideEffectDuringReactionError(reactingTo, this)
 
         if (!this._skipUpdate(this._value, value)) {
+            let previousValue = this._value
             this._value = value
+            updateOwnedValues(this, previousValue, value)
             this.lastUpdated = newVersion ? ++globalVersion : globalVersion
 
             if (newVersion)
@@ -140,7 +143,8 @@ class Effect<T> implements Observer<any> {
     constructor(
         public readonly displayName: string,
         private _effect: () => T,
-        private _onSourceUpdatedSinceLastRun: () => void
+        private _onSourceUpdatedSinceLastRun: () => void,
+        private _owner?: Owner
     ) { }
 
     attach() {
@@ -167,7 +171,9 @@ class Effect<T> implements Observer<any> {
         let tracker = new SourceTracker(this)
 
         try {
-            result = this._effect()
+            result = this._owner
+                ? withOwner(this._owner, this._effect)
+                : this._effect()
         } finally {
             tracker[dispose]()
         }
@@ -222,7 +228,7 @@ class Derivation<T> extends SourceObserverBase<T, any> {
         this._derive = new Effect(displayName, derive, () => {
             if (this._observers.size)
                 this.update()
-        })
+        }, this)
     }
 
     get sources() { return this._derive.sources }
