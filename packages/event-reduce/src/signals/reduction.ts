@@ -1,12 +1,9 @@
 import { dispose } from "../utils"
 import { Source, SourceObserverBase } from "./signals"
-import { addTrackableOwner, currentOwner } from "./tracking"
+import { currentOwnerScope } from "./tracking"
 
 export type Reducer<Result, Source> = (current: Result, next: Source) => Result
 
-export class OwnerlessReductionError extends Error {
-    constructor(reductionName: string) { super(`Reduction '${reductionName}' created without an owner`) }
-}
 
 export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
     sources = new Set<Source<any>>()
@@ -21,11 +18,9 @@ export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
     ) {
         super(displayName, isEqual)
 
-        let owner = currentOwner()
-        if (!owner)
+        if (!currentOwnerScope())
             throw new OwnerlessReductionError(displayName)
 
-        addTrackableOwner(this, owner)
         this.attach()
     }
 
@@ -81,4 +76,8 @@ export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
         this._disposed = true
         this.detach()
     }
+}
+
+export class OwnerlessReductionError extends Error {
+    constructor(reductionName: string) { super(`Reduction '${reductionName}' created without an owner.`) }
 }

@@ -64,14 +64,14 @@ export abstract class SourceBase<T> implements Source<T> {
         return this._value
     }
 
-    protected setValue(value: T, newVersion = false) {
+    protected setValue(newValue: T, newVersion = false) { // TODO better name for newVersion - creates new global version
         if (newVersion && reactingTo)
             throw new SideEffectDuringReactionError(reactingTo, this)
 
-        if (!this._skipUpdate(this._value, value)) {
+        if (!this._skipUpdate(this._value, newValue)) {
             let previousValue = this._value
-            this._value = value
-            updateOwnedValues(this, previousValue, value)
+            this._value = newValue
+            updateOwnedValues(this, previousValue, newValue)
             this.lastUpdated = newVersion ? ++globalVersion : globalVersion
 
             if (newVersion)
@@ -169,12 +169,12 @@ class Effect<T> implements Observer<any> {
 
         let result: T;
         let tracker = new SourceTracker(this)
+        let ownerScope = this._owner ? withOwner(this._owner) : null
 
         try {
-            result = this._owner
-                ? withOwner(this._owner, this._effect)
-                : this._effect()
+            result = this._effect()
         } finally {
+            ownerScope?.[dispose]()
             tracker[dispose]()
         }
 

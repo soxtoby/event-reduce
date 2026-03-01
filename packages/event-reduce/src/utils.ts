@@ -2,6 +2,8 @@ import { Unsubscribe } from "./types";
 
 export const emptyArray = Object.freeze([]) as readonly any[];
 
+export const emptySet = Object.freeze(new Set()) as ReadonlySet<any>;
+
 export function constant<T>(value: T) { return identity.bind(null, value) as () => T; }
 export function identity<T>(value: T) { return value; }
 
