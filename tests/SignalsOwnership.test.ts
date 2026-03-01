@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { asModel } from "event-reduce/lib/signals/models";
 import { OwnerlessReductionError, Reduction } from "event-reduce/lib/signals/reduction";
 import { SourceBase } from "event-reduce/lib/signals/signals";
-import { addSourceOwner, asModel, removeSourceOwner, withOwner } from "event-reduce/lib/signals/tracking";
+import { addTrackableOwner, removeTrackableOwner, withOwner } from "event-reduce/lib/signals/tracking";
 
 class TestSource<T> extends SourceBase<T> {
     constructor(name: string) { super(name, () => false); }
@@ -13,7 +14,7 @@ describe("signal reduction ownership", () => {
         expect(() => new Reduction<number>("r")).toThrow(OwnerlessReductionError);
     });
 
-    test("detaches after last owner removed", () => {
+    test("disposes after last owner removed", () => {
         let owner = new TestSource<any>("owner");
         let updates = new TestSource<number>("updates");
 
@@ -23,24 +24,20 @@ describe("signal reduction ownership", () => {
         updates.emit(1);
         expect(reduction.value).toBe(1);
 
-        reduction[removeSourceOwner](owner);
+        removeTrackableOwner(reduction, owner);
 
         updates.emit(1);
         expect(reduction.value).toBe(1);
     });
 
     test("array ownership diffs keep/remove/add owners", () => {
-        let bootstrapOwner = new TestSource<any>("bootstrap");
         let holder = new TestSource<any>("holder");
         let updates = new TestSource<number>("updates");
 
-        let r1 = withOwner(bootstrapOwner, () =>
+        let r1 = withOwner(holder, () =>
             new Reduction<number>("r1").on(updates, (current = 0, next) => current + next));
-        let r2 = withOwner(bootstrapOwner, () =>
+        let r2 = withOwner(holder, () =>
             new Reduction<number>("r2").on(updates, (current = 0, next) => current + next));
-
-        r1[removeSourceOwner](bootstrapOwner);
-        r2[removeSourceOwner](bootstrapOwner);
 
         holder.emit([r1, r2]);
         updates.emit(1);
@@ -54,7 +51,7 @@ describe("signal reduction ownership", () => {
 
         holder.emit([r2, r1]);
         updates.emit(1);
-        expect(r1.value).toBe(2);
+        expect(r1.value).toBe(1);
         expect(r2.value).toBe(3);
     });
 
@@ -66,10 +63,12 @@ describe("signal reduction ownership", () => {
         let reduction = withOwner(bootstrapOwner, () =>
             new Reduction<number>("r").on(updates, (current = 0, next) => current + next));
 
-        reduction[removeSourceOwner](bootstrapOwner);
+        addTrackableOwner(reduction, holder);
+        removeTrackableOwner(reduction, bootstrapOwner);
 
         let model = asModel({ reduction });
         holder.emit(model);
+        removeTrackableOwner(reduction, holder);
 
         updates.emit(1);
         expect(reduction.value).toBe(1);
@@ -79,7 +78,7 @@ describe("signal reduction ownership", () => {
         expect(reduction.value).toBe(1);
     });
 
-    test("withOwner can be used for exceptional explicit ownership", () => {
+    test("disposed reductions do not reactivate when owner is re-added", () => {
         let owner = new TestSource<any>("owner");
         let updates = new TestSource<number>("updates");
 
@@ -89,10 +88,10 @@ describe("signal reduction ownership", () => {
         updates.emit(1);
         expect(reduction.value).toBe(1);
 
-        reduction[removeSourceOwner](owner);
-        reduction[addSourceOwner](owner);
+        removeTrackableOwner(reduction, owner);
+        addTrackableOwner(reduction, owner);
 
         updates.emit(1);
-        expect(reduction.value).toBe(2);
+        expect(reduction.value).toBe(1);
     });
 });

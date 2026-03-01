@@ -1,5 +1,6 @@
+import { dispose } from "../utils"
 import { Source, SourceObserverBase } from "./signals"
-import { addSourceOwner, currentOwner, removeSourceOwner, Owner } from "./tracking"
+import { addTrackableOwner, currentOwner } from "./tracking"
 
 export type Reducer<Result, Source> = (current: Result, next: Source) => Result
 
@@ -10,8 +11,8 @@ export class OwnerlessReductionError extends Error {
 export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
     sources = new Set<Source<any>>()
     private _reducers = new Map<Source<any>, (current: T, next: any) => T>()
-    private _owners = new Set<Owner>()
     private _attached = false
+    private _disposed = false
 
     constructor(
         displayName: string,
@@ -24,7 +25,8 @@ export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
         if (!owner)
             throw new OwnerlessReductionError(displayName)
 
-        this[addSourceOwner](owner)
+        addTrackableOwner(this, owner)
+        this.attach()
     }
 
     on<S>(source: Source<S>, reduce: Reducer<T, S>): this
@@ -52,18 +54,8 @@ export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
         }
     }
 
-    [addSourceOwner](owner: Owner) {
-        this._owners.add(owner)
-        this.syncSubscriptionState()
-    }
-
-    [removeSourceOwner](owner: Owner) {
-        this._owners.delete(owner)
-        this.syncSubscriptionState()
-    }
-
     protected override attach() {
-        if (this._attached)
+        if (this._attached || this._disposed)
             return
 
         for (let source of this.sources)
@@ -73,7 +65,7 @@ export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
     }
 
     protected override detach() {
-        if (this._owners.size || !this._attached)
+        if (!this._attached)
             return
 
         for (let source of this.sources)
@@ -82,10 +74,11 @@ export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
         this._attached = false
     }
 
-    private syncSubscriptionState() {
-        if (this._owners.size || this._observers.size)
-            this.attach()
-        else
-            this.detach()
+    [dispose]() {
+        if (this._disposed)
+            return
+
+        this._disposed = true
+        this.detach()
     }
 }
