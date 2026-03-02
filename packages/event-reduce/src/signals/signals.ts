@@ -1,16 +1,16 @@
 import { dispose } from "../utils"
-import { Owner, updateOwnedValues, withOwner } from "./tracking"
+import { updateOwnedValues } from "./tracking"
 
-class SourceTracker {
+export class SourceTracker {
     private readonly _previous: SourceTracker | null
-    readonly accessed = new Set<Source<any>>()
+    readonly accessed = new Set<ISource<any>>()
 
-    constructor(private readonly _observer: Observer<any>) {
+    constructor(private readonly _observer: IObserver<any>) {
         this._previous = globalTracker
         globalTracker = this
     }
 
-    sourceAccessed(source: Source<any>) {
+    sourceAccessed(source: ISource<any>) {
         let circularDependency = this.findCircularDependency(source)
         if (circularDependency)
             throw new CircularDependencyError([...circularDependency, source])
@@ -18,12 +18,12 @@ class SourceTracker {
         this.accessed.add(source)
     }
 
-    private findCircularDependency(source: Source<any>): Source<any>[] | null {
-        if (this._observer == source as any as Observer<any>)
+    private findCircularDependency(source: ISource<any>): ISource<any>[] | null {
+        if (this._observer == source as any as IObserver<any>)
             return [source]
         let circularDependency = this._previous?.findCircularDependency(source)
         return circularDependency
-            ? [...circularDependency, this._observer as any as Source<any>]
+            ? [...circularDependency, this._observer as any as ISource<any>]
             : null
     }
 
@@ -32,25 +32,31 @@ class SourceTracker {
     }
 }
 
-let globalTracker: SourceTracker | null = null
-let globalVersion = 0
-let reactingTo: Source<any> | null = null
+export let globalTracker: SourceTracker | null = null
+export let globalVersion = 0
+export let reactingTo: ISource<any> | null = null
 
-export interface Source<T> {
+export function startReactingTo(source: ISource<any>) {
+    let previouslyReactingTo = reactingTo
+    reactingTo = source
+    return { [dispose]() { reactingTo = previouslyReactingTo } }
+}
+
+export interface ISource<T> {
     displayName: string
     readonly lastUpdated: number
-    subscribe(observer: Observer<T>): void
-    unsubscribe(observer: Observer<T>): void
+    subscribe(observer: IObserver<T>): void
+    unsubscribe(observer: IObserver<T>): void
 }
 
-export interface Observer<T> {
+export interface IObserver<T> {
     displayName: string
-    readonly sources: ReadonlySet<Source<any>>
-    sourceUpdated<S extends T>(source: Source<S>, value: S): void
+    readonly sources: ReadonlySet<ISource<any>>
+    sourceUpdated<S extends T>(source: ISource<S>, value: S): void
 }
 
-export abstract class SourceBase<T> implements Source<T> {
-    protected readonly _observers = new Set<Observer<T>>()
+export abstract class SourceBase<T> implements ISource<T> {
+    protected readonly _observers = new Set<IObserver<T>>()
     protected _value!: T
     lastUpdated = -1
 
@@ -87,10 +93,11 @@ export abstract class SourceBase<T> implements Source<T> {
         }
     }
 
-    subscribe(observer: Observer<T>) { this._observers.add(observer) }
-    unsubscribe(observer: Observer<T>) { this._observers.delete(observer) }
+    subscribe(observer: IObserver<T>) { this._observers.add(observer) }
+    unsubscribe(observer: IObserver<T>) { this._observers.delete(observer) }
 }
 
+// NOCOMMIT not sure I have a use for this (maybe replacement for Subject?)
 class Atom<T> extends SourceBase<T> {
     constructor(
         displayName: string,
@@ -105,17 +112,17 @@ class Atom<T> extends SourceBase<T> {
     override setValue(value: T) { super.setValue(value, true) }
 }
 
-export abstract class SourceObserverBase<Out, In = any> extends SourceBase<Out> implements Observer<In> {
-    abstract readonly sources: ReadonlySet<Source<any>>
+export abstract class SourceObserverBase<Out, In = any> extends SourceBase<Out> implements IObserver<In> {
+    abstract readonly sources: ReadonlySet<ISource<any>>
 
-    override subscribe(observer: Observer<Out>): void {
+    override subscribe(observer: IObserver<Out>): void {
         if (!this._observers.size)
             this.attach()
 
         super.subscribe(observer)
     }
 
-    override unsubscribe(observer: Observer<Out>): void {
+    override unsubscribe(observer: IObserver<Out>): void {
         super.unsubscribe(observer)
 
         if (!this._observers.size)
@@ -132,132 +139,16 @@ export abstract class SourceObserverBase<Out, In = any> extends SourceBase<Out> 
             source.unsubscribe(this)
     }
 
-    abstract sourceUpdated<S extends In>(source: Source<S>, value: S): void
-}
-
-class Effect<T> implements Observer<any> {
-    readonly sources = new Set<Source<any>>()
-    sourceLastUpdated = -1
-    lastRun = -1
-
-    constructor(
-        public readonly displayName: string,
-        private _effect: () => T,
-        private _onSourceUpdatedSinceLastRun: () => void,
-        private _owner?: Owner
-    ) { }
-
-    attach() {
-        for (let source of this.sources)
-            source.subscribe(this)
-    }
-
-    detach() {
-        for (let source of this.sources)
-            source.unsubscribe(this)
-    }
-
-    sourceUpdated<S>(source: Source<S>, value: S): void {
-        if (source.lastUpdated > this.lastRun) {
-            this.sourceLastUpdated = source.lastUpdated
-            this._onSourceUpdatedSinceLastRun()
-        }
-    }
-
-    run() {
-        this.lastRun = globalVersion
-
-        let result: T;
-        let tracker = new SourceTracker(this)
-        let ownerScope = this._owner ? withOwner(this._owner) : null
-
-        try {
-            result = this._effect()
-        } finally {
-            ownerScope?.[dispose]()
-            tracker[dispose]()
-        }
-
-        for (let oldSource of this.sources.difference(tracker.accessed)) {
-            this.sources.delete(oldSource)
-            oldSource.unsubscribe(this)
-        }
-
-        for (let newSource of tracker.accessed.difference(this.sources)) {
-            this.sources.add(newSource)
-            newSource.subscribe(this)
-        }
-
-        return result;
-    }
-}
-
-class Reaction extends Effect<void> {
-    constructor(
-        displayName: string,
-        reaction: () => void,
-        private _schedule?: (run: () => void) => void
-    ) {
-        super(displayName, reaction, () => {
-            let wasReactingTo = reactingTo
-            if (this._schedule) {
-                this._schedule(() => {
-                    reactingTo = wasReactingTo
-                    try {
-                        this.run()
-                    } finally {
-                        reactingTo = null
-                    }
-                })
-            } else {
-                this.run()
-            }
-        })
-    }
-}
-
-class Derivation<T> extends SourceObserverBase<T, any> {
-    private _derive: Effect<T>
-
-    constructor(
-        displayName: string,
-        derive: () => T,
-        skipUpdate = Object.is
-    ) {
-        super(displayName, skipUpdate)
-        this._derive = new Effect(displayName, derive, () => {
-            if (this._observers.size)
-                this.update()
-        }, this)
-    }
-
-    get sources() { return this._derive.sources }
-    protected override attach() { this._derive.attach() }
-    protected override detach() { this._derive.detach() }
-
-    sourceUpdated<S>(source: Source<S>, value: S) { this._derive.sourceUpdated(source, value) }
-
-    override get value() {
-        globalTracker?.sourceAccessed(this)
-
-        if (this._derive.sourceLastUpdated > this._derive.lastRun)
-            this.update()
-
-        return this._value
-    }
-
-    private update() {
-        this.setValue(this._derive.run())
-    }
+    abstract sourceUpdated<S extends In>(source: ISource<S>, value: S): void
 }
 
 class CircularDependencyError extends Error {
-    constructor(path: Source<any>[]) { super(`Circular dependency detected: ${path.map(s => s.displayName).join(' -> ')}`) }
+    constructor(path: ISource<any>[]) { super(`Circular dependency detected: ${path.map(s => s.displayName).join(' -> ')}`) }
 }
 
 class SideEffectDuringReactionError extends Error {
     constructor(
-        public reactingTo: Source<any>,
-        public causing: Source<any>
+        public reactingTo: ISource<any>,
+        public causing: ISource<any>
     ) { super(`Side effect during reaction to ${reactingTo.displayName} in ${causing.displayName}`) }
 }

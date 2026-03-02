@@ -1,13 +1,28 @@
 import { dispose } from "../utils"
-import { Source, SourceObserverBase } from "./signals"
+import { ISource, SourceObserverBase } from "./signals"
 import { currentOwnerScope } from "./tracking"
+
+export interface IReduction<T, Events> extends ISource<T> {
+    readonly value: T
+    on<S>(source: ISource<S>, reduce: Reducer<T, S>): this
+    on<S>(getSource: (events: Events) => ISource<S>, reduce: Reducer<T, S>): this
+}
+
+export function reduce<T>(initialValue: T, displayName?: string): IReduction<T, void>
+export function reduce<T, Events>(initialValue: T, events: Events, displayName?: string): IReduction<T, Events>
+export function reduce<T, Events>(initialValue: T, eventsOrDisplayName?: Events | string, maybeDisplayName?: string): IReduction<T, Events> {
+    let [events, displayName] = typeof eventsOrDisplayName == 'string'
+        ? [undefined as Events, eventsOrDisplayName]
+        : [eventsOrDisplayName, maybeDisplayName]
+
+    return new Reduction(displayName ?? "(anonymous reduction)", Object.is, events)
+}
 
 export type Reducer<Result, Source> = (current: Result, next: Source) => Result
 
-
 export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
-    sources = new Set<Source<any>>()
-    private _reducers = new Map<Source<any>, (current: T, next: any) => T>()
+    sources = new Set<ISource<any>>()
+    private _reducers = new Map<ISource<any>, (current: T, next: any) => T>()
     private _attached = false
     private _disposed = false
 
@@ -24,9 +39,9 @@ export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
         this.attach()
     }
 
-    on<S>(source: Source<S>, reduce: Reducer<T, S>): this
-    on<S>(getSource: (events: Events) => Source<S>, reduce: Reducer<T, S>): this
-    on<S>(source: Source<S> | ((events: Events) => Source<S>), reduce: Reducer<T, S>) {
+    on<S>(source: ISource<S>, reduce: Reducer<T, S>): this
+    on<S>(getSource: (events: Events) => ISource<S>, reduce: Reducer<T, S>): this
+    on<S>(source: ISource<S> | ((events: Events) => ISource<S>), reduce: Reducer<T, S>) {
         if (!('lastUpdated' in source))
             source = source(this._events!)
 
@@ -41,7 +56,7 @@ export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
 
     override get value() { return super.value }
 
-    sourceUpdated<S>(source: Source<S>, value: S) {
+    sourceUpdated<S>(source: ISource<S>, value: S) {
         let reduce = this._reducers.get(source)
         if (reduce) {
             let newValue = reduce(this._value, value)

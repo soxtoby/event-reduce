@@ -1,6 +1,6 @@
 import { dispose, identity, nameOfCallback } from "../utils"
 import { startLogging } from "./logging"
-import { Source, SourceBase, SourceObserverBase } from "./signals"
+import { ISource, SourceBase, SourceObserverBase } from "./signals"
 
 export function event<T = void>(name?: string) {
     let e = new Event<T>(name ?? "(anonymous event)")
@@ -16,9 +16,9 @@ export function event<T = void>(name?: string) {
 }
 
 export interface AsyncEventFn<Result, Context> extends EventFn<[PromiseLike<Result>, Context], AsyncValue<Result, Context>> {
-    started: Source<AsyncStart<Result, Context>>
-    resolved: Source<AsyncResult<Result, Context>>
-    rejected: Source<AsyncError<Context>>
+    started: ISource<AsyncStart<Result, Context>>
+    resolved: ISource<AsyncResult<Result, Context>>
+    rejected: ISource<AsyncError<Context>>
 }
 
 export type AsyncValue<Result, Context> =
@@ -97,11 +97,11 @@ class Event<T> extends SourceBase<T> {
 }
 
 class BoundEvent<In, Out> extends SourceObserverBase<Out, In> {
-    readonly sources = new Set<Source<In>>()
+    readonly sources = new Set<ISource<In>>()
 
     constructor(
         displayName: string,
-        source: Source<In>,
+        source: ISource<In>,
         private _transform = identity as (value: In) => Out,
         skipUpdate = (old: Out, next: Out) => false
     ) {
@@ -109,20 +109,20 @@ class BoundEvent<In, Out> extends SourceObserverBase<Out, In> {
         this.sources.add(source)
     }
 
-    sourceUpdated<S extends In>(source: Source<S>, value: S): void {
+    sourceUpdated<S extends In>(source: ISource<S>, value: S): void {
         let newValue = this._transform(value)
         this.setValue(newValue)
     }
 }
 
-export function map<In, Out>(source: Source<In>, transform: (value: In) => Out, displayName = `${source.displayName}.map(${nameOfCallback(transform)})`): Source<Out> {
+export function map<In, Out>(source: ISource<In>, transform: (value: In) => Out, displayName = `${source.displayName}.map(${nameOfCallback(transform)})`): ISource<Out> {
     return new BoundEvent(displayName, source, transform)
 }
 
-export function filter<In, Out extends In>(source: Source<In>, predicate: (value: In) => value is Out, displayName = `${source.displayName}.filter(${nameOfCallback(predicate)})`): Source<Out> {
+export function filter<In, Out extends In>(source: ISource<In>, predicate: (value: In) => value is Out, displayName = `${source.displayName}.filter(${nameOfCallback(predicate)})`): ISource<Out> {
     return new BoundEvent<In, Out>(displayName, source, identity as (value: In) => Out, (_, next) => !predicate(next))
 }
 
-export function filterMap<In, Out>(source: Source<In>, transform: (value: In) => Out | undefined, displayName = `${source.displayName}.filterMap(${nameOfCallback(transform)})`): Source<Out> {
+export function filterMap<In, Out>(source: ISource<In>, transform: (value: In) => Out | undefined, displayName = `${source.displayName}.filterMap(${nameOfCallback(transform)})`): ISource<Out> {
     return new BoundEvent(displayName, source, transform, (_, next) => next == undefined)
 }

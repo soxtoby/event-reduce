@@ -1,11 +1,11 @@
 import { dispose, emptySet } from "../utils"
 import { isModel, Model } from "./models"
 import { Reduction } from "./reduction"
-import { Source } from "./signals"
+import { ISource } from "./signals"
 
 export type Trackable = Reduction<any, any> | Model
 
-export type Owner = Source<any> | Model
+export type Owner = ISource<any> | Model
 
 let ownerStack: Owner[] = []
 
