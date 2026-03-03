@@ -1,5 +1,5 @@
 import { dispose } from "../utils"
-import { ISource, SourceObserverBase } from "./signals"
+import { globalVersion, ISource, SourceBase, SourceObserverBase, SourceTracker, trackSourceAccessed } from "./signals"
 import { currentOwnerScope } from "./tracking"
 
 export interface IReduction<T, Events> extends ISource<T> {
@@ -23,6 +23,7 @@ export type Reducer<Result, Source> = (current: Result, next: Source) => Result
 export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
     sources = new Set<ISource<any>>()
     private _reducers = new Map<ISource<any>, (current: T, next: any) => T>()
+    private _sourcesLastChecked = -1
     private _attached = false
     private _disposed = false
 
@@ -55,13 +56,37 @@ export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
     }
 
     sourceUpdated<S>(source: ISource<S>, value: S) {
-        let reduce = this._reducers.get(source)
-        if (reduce) {
-            let newValue = reduce(this._value, value)
-            this.setValue(newValue)
+        if (source.lastUpdated > this.lastUpdated) {
+            let reduce = this._reducers.get(source)
+            if (reduce) {
+                let tracker = new SourceTracker(this) // Required for detecting circular references in reducers
+                try {
+                    let newValue = reduce(this._value, value)
+                    this.setValue(newValue)
+                } finally {
+                    tracker[dispose]()
+                }
+            }
         }
     }
 
+    override get value() {
+        // Notifying tracker before checking for updates so circular reference is detected early
+        trackSourceAccessed(this)
+
+        if (this._sourcesLastChecked < globalVersion)
+            for (let source of this.sources) // At most one source should be newer
+                this.sourceUpdated(source, (source as SourceBase<any>).value)
+
+        return this._value // Not using super.value to avoid duplicate tracker notification
+    }
+
+    override setValue(value: T) {
+        super.setValue(value)
+        this._sourcesLastChecked = globalVersion
+    }
+
+    // NOCOMMIT shouldn't be required for reductions
     protected override attach() {
         if (this._attached || this._disposed)
             return
