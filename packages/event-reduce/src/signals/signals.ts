@@ -1,4 +1,6 @@
-import { dispose } from "../utils"
+import { dispose, isObject } from "../utils"
+import { derive, IDerivation } from "./derivation"
+import { getState, State } from "./state"
 import { updateOwnedValues } from "./tracking"
 
 export class SourceTracker {
@@ -58,6 +60,7 @@ export interface IObserver<T> {
 }
 
 export abstract class SourceBase<T> implements ISource<T> {
+    private _json?: IDerivation<State<T>>
     protected readonly _observers = new Set<IObserver<T>>()
     protected _value!: T
     lastUpdated = -1
@@ -66,6 +69,11 @@ export abstract class SourceBase<T> implements ISource<T> {
         public displayName: string,
         private _skipUpdate = Object.is
     ) { }
+
+    toJSON() {
+        // Lazy init to avoid infinite loop in Derivation constructor
+        return (this._json ??= derive(() => getState(this.value), `toJSON(${this.displayName})`)).value
+    }
 
     protected get value() {
         globalTracker?.sourceAccessed(this)
