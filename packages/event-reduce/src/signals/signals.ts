@@ -5,15 +5,17 @@ export class SourceTracker {
     private readonly _previous: SourceTracker | null
     readonly accessed = new Set<ISource<any>>()
 
-    constructor(private readonly _observer: IObserver<any>) {
+    constructor(private readonly _observer: IObserver<any> | null) {
         this._previous = globalTracker
         globalTracker = this
     }
 
     sourceAccessed(source: ISource<any>) {
-        let circularDependency = this.findCircularDependency(source)
-        if (circularDependency)
-            throw new CircularDependencyError([...circularDependency, source])
+        if (this._observer) {
+            let circularDependency = this.findCircularDependency(source)
+            if (circularDependency)
+                throw new CircularDependencyError([...circularDependency, source])
+        }
 
         this.accessed.add(source)
     }

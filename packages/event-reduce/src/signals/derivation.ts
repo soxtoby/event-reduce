@@ -1,6 +1,7 @@
-import { nameOfFunction } from "../utils"
+import { dispose, nameOfFunction } from "../utils"
 import { Effect } from "./effect"
 import { ISource, SourceObserverBase, globalTracker } from "./signals"
+import { withOwner } from "./tracking"
 
 export interface IDerivation<T> extends ISource<T> {
     readonly value: T
@@ -27,7 +28,7 @@ class Derivation<T> extends SourceObserverBase<T, any> {
         this._derive = new Effect(displayName, derive, () => {
             if (this._observers.size)
                 this.update()
-        }, this)
+        })
     }
 
     get sources() { return this._derive.sources }
@@ -47,6 +48,11 @@ class Derivation<T> extends SourceObserverBase<T, any> {
     }
 
     private update() {
-        this.setValue(this._derive.run())
+        let ownerScope = withOwner(this)
+        try {
+            this.setValue(this._derive.run())
+        } finally {
+            ownerScope[dispose]()
+        }
     }
 }

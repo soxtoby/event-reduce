@@ -10,8 +10,7 @@ export class Effect<T> implements IObserver<any> {
     constructor(
         public readonly displayName: string,
         private _effect: () => T,
-        private _onSourceUpdatedSinceLastRun: () => void,
-        private _owner?: Owner
+        private _onSourceUpdatedSinceLastRun: () => void
     ) { }
 
     attach() {
@@ -36,12 +35,10 @@ export class Effect<T> implements IObserver<any> {
 
         let result: T;
         let tracker = new SourceTracker(this)
-        let ownerScope = this._owner ? withOwner(this._owner) : null
 
         try {
             result = this._effect()
         } finally {
-            ownerScope?.[dispose]()
             tracker[dispose]()
         }
 

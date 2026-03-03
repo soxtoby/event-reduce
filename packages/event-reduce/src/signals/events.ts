@@ -91,12 +91,12 @@ export function makeEventFunction<T, Args extends [any, ...any[]] = [T], Return 
 
 type EventFn<Args extends [any, ...any[]], T = Args[0]> = ((...args: Args) => Args[0]) & Event<T>
 
-class Event<T> extends SourceBase<T> {
+export class Event<T> extends SourceBase<T> {
     constructor(displayName: string) { super(displayName, () => false) }
     emit(value: T) { this.setValue(value, true) }
 }
 
-class BoundEvent<In, Out> extends SourceObserverBase<Out, In> {
+class BoundSource<In, Out> extends SourceObserverBase<Out, In> {
     readonly sources = new Set<ISource<In>>()
 
     constructor(
@@ -116,13 +116,13 @@ class BoundEvent<In, Out> extends SourceObserverBase<Out, In> {
 }
 
 export function map<In, Out>(source: ISource<In>, transform: (value: In) => Out, displayName = `${source.displayName}.map(${nameOfCallback(transform)})`): ISource<Out> {
-    return new BoundEvent(displayName, source, transform)
+    return new BoundSource(displayName, source, transform)
 }
 
 export function filter<In, Out extends In>(source: ISource<In>, predicate: (value: In) => value is Out, displayName = `${source.displayName}.filter(${nameOfCallback(predicate)})`): ISource<Out> {
-    return new BoundEvent<In, Out>(displayName, source, identity as (value: In) => Out, (_, next) => !predicate(next))
+    return new BoundSource<In, Out>(displayName, source, identity as (value: In) => Out, (_, next) => !predicate(next))
 }
 
 export function filterMap<In, Out>(source: ISource<In>, transform: (value: In) => Out | undefined, displayName = `${source.displayName}.filterMap(${nameOfCallback(transform)})`): ISource<Out> {
-    return new BoundEvent(displayName, source, transform, (_, next) => next == undefined)
+    return new BoundSource(displayName, source, transform, (_, next) => next == undefined)
 }
