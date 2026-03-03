@@ -1,6 +1,6 @@
-import { dispose, identity, nameOfCallback } from "../utils"
+import { dispose } from "../utils"
 import { startLogging } from "./logging"
-import { ISource, SourceBase, SourceObserverBase } from "./signals"
+import { ISource, SourceBase } from "./signals"
 
 export interface IEvent<T, Args extends [any, ...any[]] = [T]> extends ISource<T> {
     (...args: Args): Args[0]
@@ -89,9 +89,9 @@ export function asyncEvent<Result = void, Context = void>(name?: string): IAsync
     })
 
     return Object.assign(fn, {
-        started: filter(e, v => 'promise' in v, `${e.displayName}.started`),
-        resolved: filter(e, v => 'result' in v, `${e.displayName}.resolved`),
-        rejected: filter(e, v => 'error' in v, `${e.displayName}.rejected`)
+        started: e.filter(v => 'promise' in v, `${e.displayName}.started`),
+        resolved: e.filter(v => 'result' in v, `${e.displayName}.resolved`),
+        rejected: e.filter(v => 'error' in v, `${e.displayName}.rejected`)
     })
 }
 
@@ -101,35 +101,4 @@ export function makeEventFunction<T, Args extends [any, ...any[]] = [T], Return 
     eventFn.apply = Function.prototype.apply;
     eventFn.call = Function.prototype.call;
     return eventFn as IEvent<T, Args>;
-}
-
-class BoundSource<In, Out> extends SourceObserverBase<Out, In> {
-    readonly sources = new Set<ISource<In>>()
-
-    constructor(
-        displayName: string,
-        source: ISource<In>,
-        private _transform = identity as (value: In) => Out,
-        skipUpdate = (old: Out, next: Out) => false
-    ) {
-        super(displayName, skipUpdate)
-        this.sources.add(source)
-    }
-
-    sourceUpdated<S extends In>(source: ISource<S>, value: S): void {
-        let newValue = this._transform(value)
-        this.setValue(newValue)
-    }
-}
-
-export function map<In, Out>(source: ISource<In>, transform: (value: In) => Out, displayName = `${source.displayName}.map(${nameOfCallback(transform)})`): ISource<Out> {
-    return new BoundSource(displayName, source, transform)
-}
-
-export function filter<In, Out extends In>(source: ISource<In>, predicate: (value: In) => value is Out, displayName = `${source.displayName}.filter(${nameOfCallback(predicate)})`): ISource<Out> {
-    return new BoundSource<In, Out>(displayName, source, identity as (value: In) => Out, (_, next) => !predicate(next))
-}
-
-export function filterMap<In, Out>(source: ISource<In>, transform: (value: In) => Out | undefined, displayName = `${source.displayName}.filterMap(${nameOfCallback(transform)})`): ISource<Out> {
-    return new BoundSource(displayName, source, transform, (_, next) => next == undefined)
 }

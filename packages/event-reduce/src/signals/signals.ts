@@ -1,7 +1,14 @@
-import { dispose } from "../utils"
+import { dispose, nameOfCallback } from "../utils"
 import { derive, IDerivation } from "./derivation"
 import { getState, State } from "./state"
 import { updateOwnedValues } from "./tracking"
+
+/** 
+ * TODO
+ * - Logging in derivations and reductions
+ * - Source "path" built by ownership (include derivations?)
+ * - extend
+ */
 
 export class SourceTracker {
     private readonly _previous: SourceTracker | null
@@ -67,6 +74,9 @@ export function startReactingTo(source: ISource<any>) {
 export interface ISource<T> {
     displayName: string
     readonly lastUpdated: number
+    map<Out>(transform: (value: T) => Out, displayName?: string): ISource<Out>
+    filter<Out extends T>(predicate: (value: T) => value is Out, displayName?: string): ISource<Out>
+    filterMap<Out>(transform: (value: T) => Out | undefined, displayName?: string): ISource<Out>
     subscribe(observer: IObserver<T>): void
     unsubscribe(observer: IObserver<T>): void
 }
@@ -92,7 +102,7 @@ export abstract class SourceBase<T> implements ISource<T> {
         // Lazy init to avoid infinite loop in Derivation constructor
         return (this._json ??= derive(() => getState(this.value), `toJSON(${this.displayName})`)).value
     }
-    
+
     get value() {
         trackSourceAccessed(this)
         return this._value
@@ -119,6 +129,18 @@ export abstract class SourceBase<T> implements ISource<T> {
                     reactingTo = null
             }
         }
+    }
+
+    map<Out>(transform: (value: T) => Out, displayName = `${this.displayName}.map(${nameOfCallback(transform)})`) {
+        return derive(() => transform(this.value), `${displayName}.map(${nameOfCallback(transform)})`)
+    }
+
+    filter<Out extends T>(predicate: (value: T) => value is Out, displayName = `${this.displayName}.filter(${nameOfCallback(predicate)})`) {
+        return derive(() => this.value as Out, (_, next) => !predicate(next), `${displayName}.filter(${nameOfCallback(predicate)})`)
+    }
+
+    filterMap<Out>(transform: (value: T) => Out | undefined, displayName = `${this.displayName}.filterMap(${nameOfCallback(transform)})`) {
+        return derive(() => transform(this.value) as Out, (_, next) => next == undefined, `${displayName}.filterMap(${nameOfCallback(transform)})`)
     }
 
     subscribe(observer: IObserver<T>) { this._observers.add(observer) }
