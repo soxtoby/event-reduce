@@ -2,20 +2,34 @@ import { dispose, identity, nameOfCallback } from "../utils"
 import { startLogging } from "./logging"
 import { ISource, SourceBase, SourceObserverBase } from "./signals"
 
-export function event<T = void>(name?: string) {
+export interface IEvent<T, Args extends [any, ...any[]] = [T]> extends ISource<T> {
+    (...args: Args): Args[0]
+}
+
+export function event<T = void>(name?: string): IEvent<T> {
     let e = new Event<T>(name ?? "(anonymous event)")
-    return makeEventFunction(e, (value: T) => {
-        let logging = startLogging('⚡ (event)', e.displayName, [value]) // NOCOMMIT Container
+    return makeEventFunction(e, (event: T) => {
+        let logging = startLogging('⚡ (event)', e.displayName, [event]) // NOCOMMIT Container
         try {
-            e.emit(value)
+            e.emit(event)
         } finally {
             logging?.[dispose]()
         }
-        return value
+        return event
     })
 }
 
-export interface AsyncEventFn<Result, Context> extends EventFn<[PromiseLike<Result>, Context], AsyncValue<Result, Context>> {
+export class Event<T> extends SourceBase<T> {
+    constructor(displayName: string) { super(displayName, () => false) }
+    emit(value: T) { this.setValue(value, true) }
+}
+
+export function isEvent(value: any): value is IEvent<any> {
+    return typeof value == 'function'
+        && value instanceof Event
+}
+
+export interface IAsyncEvent<Result, Context> extends IEvent<AsyncValue<Result, Context>, [PromiseLike<Result>, Context]> {
     started: ISource<AsyncStart<Result, Context>>
     resolved: ISource<AsyncResult<Result, Context>>
     rejected: ISource<AsyncError<Context>>
@@ -41,9 +55,9 @@ export interface AsyncError<Context> {
     error: any
 }
 
-export function asyncEvent<T = void, Context = void>(name?: string): AsyncEventFn<T, Context> {
-    let e = new Event<AsyncStart<T, Context> | AsyncResult<T, Context> | AsyncError<Context>>(name ?? "(anonymous async event)")
-    let fn = makeEventFunction(e, <P extends PromiseLike<T>>(promise: P, context: Context) => {
+export function asyncEvent<Result = void, Context = void>(name?: string): IAsyncEvent<Result, Context> {
+    let e = new Event<AsyncValue<Result, Context>>(name ?? "(anonymous async event)")
+    let fn = makeEventFunction(e, <P extends PromiseLike<Result>>(promise: P, context: Context) => {
         let logging = startLogging('⚡⌚ (async event)', e.displayName, [promise, context], () => ({ Promise: promise })) // NOCOMMIT Container
         try {
             e.emit({ promise, context })
@@ -86,14 +100,7 @@ export function makeEventFunction<T, Args extends [any, ...any[]] = [T], Return 
     Object.setPrototypeOf(eventFn, event);
     eventFn.apply = Function.prototype.apply;
     eventFn.call = Function.prototype.call;
-    return eventFn as EventFn<Args, T>;
-}
-
-type EventFn<Args extends [any, ...any[]], T = Args[0]> = ((...args: Args) => Args[0]) & Event<T>
-
-export class Event<T> extends SourceBase<T> {
-    constructor(displayName: string) { super(displayName, () => false) }
-    emit(value: T) { this.setValue(value, true) }
+    return eventFn as IEvent<T, Args>;
 }
 
 class BoundSource<In, Out> extends SourceObserverBase<Out, In> {

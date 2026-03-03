@@ -54,8 +54,6 @@ export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
         return this
     }
 
-    override get value() { return super.value }
-
     sourceUpdated<S>(source: ISource<S>, value: S) {
         let reduce = this._reducers.get(source)
         if (reduce) {

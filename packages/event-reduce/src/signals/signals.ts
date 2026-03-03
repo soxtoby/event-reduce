@@ -1,4 +1,4 @@
-import { dispose, isObject } from "../utils"
+import { dispose } from "../utils"
 import { derive, IDerivation } from "./derivation"
 import { getState, State } from "./state"
 import { updateOwnedValues } from "./tracking"
@@ -36,9 +36,27 @@ export class SourceTracker {
     }
 }
 
-export let globalTracker: SourceTracker | null = null
+let globalTracker: SourceTracker | null = null
+let lastSourceAccessed: ISource<any> | null = null
 export let globalVersion = 0
 export let reactingTo: ISource<any> | null = null
+
+export function trackSourceAccessed(source: ISource<any>) {
+    globalTracker?.sourceAccessed(source)
+    lastSourceAccessed = source
+}
+
+export function getUnderlyingSource<T>(value: T): ISource<T> | null {
+    return lastSourceAccessed
+        && lastSourceAccessed instanceof SourceBase
+        && Object.is(lastSourceAccessed.value, value)
+        ? lastSourceAccessed as ISource<T>
+        : null
+}
+
+export function isSource(value: any): value is ISource<any> {
+    return value instanceof SourceBase
+}
 
 export function startReactingTo(source: ISource<any>) {
     let previouslyReactingTo = reactingTo
@@ -74,9 +92,9 @@ export abstract class SourceBase<T> implements ISource<T> {
         // Lazy init to avoid infinite loop in Derivation constructor
         return (this._json ??= derive(() => getState(this.value), `toJSON(${this.displayName})`)).value
     }
-
-    protected get value() {
-        globalTracker?.sourceAccessed(this)
+    
+    get value() {
+        trackSourceAccessed(this)
         return this._value
     }
 
@@ -118,7 +136,6 @@ class Atom<T> extends SourceBase<T> {
         this.setValue(initialValue)
     }
 
-    override get value() { return super.value }
     override setValue(value: T) { super.setValue(value, true) }
 }
 
@@ -161,4 +178,12 @@ class SideEffectDuringReactionError extends Error {
         public reactingTo: ISource<any>,
         public causing: ISource<any>
     ) { super(`Side effect during reaction to ${reactingTo.displayName} in ${causing.displayName}`) }
+}
+
+export class NotASourceValueError extends Error {
+    constructor(
+        public value: unknown
+    ) {
+        super("Couldn't detect source for value. Make sure you pass in an observable value directly.");
+    }
 }

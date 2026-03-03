@@ -1,6 +1,6 @@
 import { dispose, nameOfFunction } from "../utils"
 import { Effect } from "./effect"
-import { ISource, SourceObserverBase, globalTracker } from "./signals"
+import { ISource, SourceObserverBase, trackSourceAccessed } from "./signals"
 import { withOwner } from "./tracking"
 
 export interface IDerivation<T> extends ISource<T> {
@@ -16,7 +16,7 @@ export function derive<T>(derive: () => T, displayNameOrSkip?: string | ((a: T, 
     return new Derivation(displayName ?? nameOfFunction(derive), derive, skipUpdate)
 }
 
-class Derivation<T> extends SourceObserverBase<T, any> {
+export class Derivation<T> extends SourceObserverBase<T, any> {
     private _derive: Effect<T>
 
     constructor(
@@ -39,7 +39,7 @@ class Derivation<T> extends SourceObserverBase<T, any> {
 
     override get value() {
         // Notifying tracker before checking for updates so circular reference is detected early
-        globalTracker?.sourceAccessed(this)
+        trackSourceAccessed(this)
 
         if (this._derive.sourceLastUpdated > this._derive.lastRun)
             this.update()
