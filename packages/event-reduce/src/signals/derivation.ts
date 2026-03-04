@@ -22,9 +22,9 @@ export class Derivation<T> extends SourceObserverBase<T, any> {
     constructor(
         displayName: string,
         derive: () => T,
-        skipUpdate = Object.is
+        private _skipUpdate = Object.is
     ) {
-        super(displayName, skipUpdate)
+        super(displayName)
         this._derive = new Effect(displayName, derive, () => {
             if (this._observers.size)
                 this.update()
@@ -46,6 +46,8 @@ export class Derivation<T> extends SourceObserverBase<T, any> {
 
         return this._value // Not using super.value to avoid duplicate tracker notification
     }
+
+    protected override skipUpdate(nextValue: T) { return this._skipUpdate(this._value, nextValue) }
 
     private update() {
         let ownerScope = withOwner(this)

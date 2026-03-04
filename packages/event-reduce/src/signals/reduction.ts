@@ -15,7 +15,7 @@ export function reduce<T, Events>(initialValue: T, eventsOrDisplayName?: Events 
         ? [undefined as Events, eventsOrDisplayName]
         : [eventsOrDisplayName, maybeDisplayName]
 
-    return new Reduction(displayName ?? "(anonymous reduction)", Object.is, events)
+    return new Reduction(displayName ?? "(anonymous reduction)", initialValue, Object.is, events)
 }
 
 export type Reducer<Result, Source> = (current: Result, next: Source) => Result
@@ -29,14 +29,16 @@ export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
 
     constructor(
         displayName: string,
-        isEqual = Object.is,
+        initialValue: T,
+        private _isEqual = Object.is,
         private _events?: Events
     ) {
-        super(displayName, isEqual)
+        super(displayName)
 
         if (!currentOwnerScope())
             throw new OwnerlessReductionError(displayName)
 
+        this._value = initialValue
         this.attach()
     }
 
@@ -85,6 +87,8 @@ export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
         super.setValue(value)
         this._sourcesLastChecked = globalVersion
     }
+
+    override skipUpdate(nextValue: T) { return this._isEqual(this._value, nextValue) }
 
     // NOCOMMIT shouldn't be required for reductions
     protected override attach() {

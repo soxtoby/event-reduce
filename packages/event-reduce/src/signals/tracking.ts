@@ -30,6 +30,8 @@ export function removeOwner(trackable: Trackable, owner: Owner) {
         owners.delete(owner)
 
         if (!owners.size) {
+            // NOCOMMIT register to be disposed at the end of the current operation
+            // In case an owner is added again. Also handle models.
             ownerRegistry.delete(trackable)
             if (trackable instanceof Reduction)
                 trackable[dispose]()

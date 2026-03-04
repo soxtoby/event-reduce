@@ -49,7 +49,7 @@ export function model<Class extends new (...args: any[]) => any>(target: Class):
                             enumerable: true,
                             configurable: true
                         })
-                    } else if (process.env.NODE_ENV !== 'production' 
+                    } else if (process.env.NODE_ENV !== 'production'
                         && (isEvent(property.value) || isEventsClass(property.value))
                     ) {
                         throw new EventsMarkedAsStateError(this, key)
@@ -304,6 +304,11 @@ function sourceSetter(key: PropertyKey, sourceType: { new(...args: any[]): ISour
 export function isModel(value: unknown): value is Model {
     return isObject(value)
         && modelProperties in value
+}
+
+// NOCOMMIT remove - just for compiling temp tests
+export function asModel<T extends object>(value: T): T & Model {
+    return Object.assign(value, { [modelProperties]: {} }) as T & Model
 }
 
 export class MissingModelDecoratorError extends Error {

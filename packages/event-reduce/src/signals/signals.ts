@@ -93,10 +93,7 @@ export abstract class SourceBase<T> implements ISource<T> {
     protected _value!: T
     lastUpdated = -1
 
-    constructor(
-        public displayName: string,
-        private _skipUpdate = Object.is
-    ) { }
+    constructor(public displayName: string) { }
 
     toJSON() {
         // Lazy init to avoid infinite loop in Derivation constructor
@@ -112,7 +109,7 @@ export abstract class SourceBase<T> implements ISource<T> {
         if (newVersion && reactingTo)
             throw new SideEffectDuringReactionError(reactingTo, this)
 
-        if (!this._skipUpdate(this._value, newValue)) {
+        if (!this.skipUpdate(newValue)) {
             let previousValue = this._value
             this._value = newValue
             updateOwnedValues(this, previousValue, newValue)
@@ -130,6 +127,8 @@ export abstract class SourceBase<T> implements ISource<T> {
             }
         }
     }
+
+    protected skipUpdate(nextValue: T) { return Object.is(this._value, nextValue) }
 
     map<Out>(transform: (value: T) => Out, displayName = `${this.displayName}.map(${nameOfCallback(transform)})`) {
         return derive(() => transform(this.value), `${displayName}.map(${nameOfCallback(transform)})`)
@@ -152,13 +151,15 @@ class Atom<T> extends SourceBase<T> {
     constructor(
         displayName: string,
         initialValue: T,
-        _isEqual = Object.is
+        private _isEqual = Object.is
     ) {
-        super(displayName, _isEqual)
+        super(displayName)
         this.setValue(initialValue)
     }
 
     override setValue(value: T) { super.setValue(value, true) }
+
+    override skipUpdate(nextValue: T) { return this._isEqual(this._value, nextValue) }
 }
 
 export abstract class SourceObserverBase<Out, In = any> extends SourceBase<Out> implements IObserver<In> {
