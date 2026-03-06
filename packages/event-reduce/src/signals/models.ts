@@ -1,11 +1,14 @@
-import { argsAre, constant, getAllPropertyDescriptors, isFunction, isObject, isString, isUndefined, nameOfFunction } from "../utils"
+import { argsAre, constant, dispose, getAllPropertyDescriptors, isFunction, isObject, isString, isUndefined, nameOfFunction } from "../utils"
 import { Derivation, derive } from "./derivation"
 import { isEvent } from "./events"
 import { Reduction } from "./reduction"
-import { getUnderlyingSource, ISource, isSource } from "./signals"
+import { ISource, isSource } from "./signals"
 import { getState } from "./state"
+import { getUnderlyingSource, trackAccessedSources, trackManagedSourceCreation, updateOwnedObjects } from "./tracking"
 
-export type Model = { [modelProperties]: Record<PropertyKey, ModelProperty> }
+export interface Model extends Disposable {
+    [modelProperties]: Record<PropertyKey, ModelProperty>
+}
 
 type UninitializedModel = { [modelPropertyFactories]?: Record<PropertyKey, () => ModelProperty> }
 type ModelPrototype = { [prototypePropertyFactories]?: Record<PropertyKey, (instance: any) => ModelProperty> }
@@ -29,40 +32,55 @@ export function model<Class extends new (...args: any[]) => any>(target: Class):
         [className]: class extends target {
             [modelProperties] = {} as Record<PropertyKey, ModelProperty>
             constructor(...args: any[]) {
-                super(...args)
+                let sourceCreation = trackManagedSourceCreation()
+                let accesses = trackAccessedSources(null) // Don't want anything accessed during construction to become a source for whatever is creating this
+                try {
 
-                let prototypeFactories = (target.prototype as ModelPrototype)?.[prototypePropertyFactories]
-                if (prototypeFactories)
-                    for (let key of Object.keys(prototypeFactories))
-                        this[modelProperties][key] = prototypeFactories[key](this)
+                    super(...args)
 
-                let instanceFactories = (this as UninitializedModel)[modelPropertyFactories]
-                if (instanceFactories)
-                    for (let key of Object.keys(instanceFactories))
-                        this[modelProperties][key] = instanceFactories[key]()
+                    let prototypeFactories = (target.prototype as ModelPrototype)?.[prototypePropertyFactories]
+                    if (prototypeFactories)
+                        for (let key of Object.keys(prototypeFactories))
+                            this[modelProperties][key] = prototypeFactories[key](this)
 
-                for (let [key, property] of Object.entries(this[modelProperties])) {
-                    if (isSource(property)) { // No need to do this for state properties
-                        Object.defineProperty(this, key, {
-                            // Bind directly to the property for cleaner call stack (NOCOMMIT check this works)
-                            get: Object.getOwnPropertyDescriptor(Object.getPrototypeOf(property), 'value')!.get!.bind(property),
-                            enumerable: true,
-                            configurable: true
-                        })
-                    } else if (process.env.NODE_ENV !== 'production'
-                        && (isEvent(property.value) || isEventsClass(property.value))
-                    ) {
-                        throw new EventsMarkedAsStateError(this, key)
+                    let instanceFactories = (this as UninitializedModel)[modelPropertyFactories]
+                    if (instanceFactories)
+                        for (let key of Object.keys(instanceFactories))
+                            this[modelProperties][key] = instanceFactories[key]()
+
+                    for (let property of Object.values(this[modelProperties]))
+                        updateOwnedObjects(this, null, property)
+
+                    sourceCreation.verifySourceManagement()
+
+                    for (let [key, property] of Object.entries(this[modelProperties])) {
+                        if (isSource(property)) { // No need to do this for state properties
+                            Object.defineProperty(this, key, {
+                                // Bind directly to the property for cleaner call stack (NOCOMMIT check this works)
+                                get: Object.getOwnPropertyDescriptor(Object.getPrototypeOf(property), 'value')!.get!.bind(property),
+                                enumerable: true,
+                                configurable: true
+                            })
+                        } else if (process.env.NODE_ENV !== 'production'
+                            && (isEvent(property.value) || isEventsClass(property.value))
+                        ) {
+                            throw new EventsMarkedAsStateError(this, key)
+                        }
                     }
+                } finally {
+                    accesses[dispose]()
+                    sourceCreation[dispose]()
                 }
             }
 
             #json = derive(() => getState(this[modelProperties]), `toJSON(${className})`)
 
-            toJSON() {
-                return 'toJSON' in target
-                    ? super.toJSON()
-                    : this.#json.value
+            toJSON() { return super.toJSON?.() ?? this.#json.value }
+
+            [dispose]() {
+                Object.values(this[modelProperties])
+                    .forEach(p => (p as any as Disposable)[dispose]?.())
+                super[dispose]?.()
             }
         }
     }[className]

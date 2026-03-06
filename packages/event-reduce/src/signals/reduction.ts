@@ -1,6 +1,6 @@
 import { dispose } from "../utils"
-import { globalVersion, ISource, SourceBase, SourceObserverBase, SourceTracker, trackSourceAccessed } from "./signals"
-import { currentOwnerScope } from "./tracking"
+import { ISource, SourceBase, SourceObserverBase } from "./signals"
+import { currentIteration, managedSourceCreated, sourceWasAccessed, trackAccessedSources } from "./tracking"
 
 export interface IReduction<T, Events> extends ISource<T> {
     readonly value: T
@@ -20,7 +20,7 @@ export function reduce<T, Events>(initialValue: T, eventsOrDisplayName?: Events 
 
 export type Reducer<Result, Source> = (current: Result, next: Source) => Result
 
-export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
+export class Reduction<T, Events = void> extends SourceObserverBase<T, T> implements Disposable {
     sources = new Set<ISource<any>>()
     private _reducers = new Map<ISource<any>, (current: T, next: any) => T>()
     private _sourcesLastChecked = -1
@@ -35,8 +35,7 @@ export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
     ) {
         super(displayName)
 
-        if (!currentOwnerScope())
-            throw new OwnerlessReductionError(displayName)
+        managedSourceCreated(this)
 
         this._value = initialValue
         this.attach()
@@ -61,7 +60,7 @@ export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
         if (source.lastUpdated > this.lastUpdated) {
             let reduce = this._reducers.get(source)
             if (reduce) {
-                let tracker = new SourceTracker(this) // Required for detecting circular references in reducers
+                let tracker = trackAccessedSources(this) // Required for detecting circular references in reducers
                 try {
                     let newValue = reduce(this._value, value)
                     this.setValue(newValue)
@@ -73,10 +72,9 @@ export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
     }
 
     override get value() {
-        // Notifying tracker before checking for updates so circular reference is detected early
-        trackSourceAccessed(this)
+        sourceWasAccessed(this) // Notifying tracker before checking for updates so circular reference is detected early
 
-        if (this._sourcesLastChecked < globalVersion)
+        if (this._sourcesLastChecked < currentIteration)
             for (let source of this.sources) // At most one source should be newer
                 this.sourceUpdated(source, (source as SourceBase<any>).value)
 
@@ -84,8 +82,8 @@ export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
     }
 
     override setValue(value: T) {
+        this._sourcesLastChecked = currentIteration
         super.setValue(value)
-        this._sourcesLastChecked = globalVersion
     }
 
     override skipUpdate(nextValue: T) { return this._isEqual(this._value, nextValue) }
@@ -118,8 +116,4 @@ export class Reduction<T, Events = void> extends SourceObserverBase<T, T> {
         this._disposed = true
         this.detach()
     }
-}
-
-export class OwnerlessReductionError extends Error {
-    constructor(reductionName: string) { super(`Reduction '${reductionName}' created without an owner.`) }
 }

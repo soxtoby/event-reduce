@@ -1,6 +1,6 @@
 import { dispose } from "../utils"
-import { globalVersion, IObserver, ISource, SourceTracker } from "./signals"
-import { Owner, withOwner } from "./tracking"
+import { IObserver, ISource } from "./signals"
+import { currentIteration, trackAccessedSources } from "./tracking"
 
 export class Effect<T> implements IObserver<any> {
     readonly sources = new Set<ISource<any>>()
@@ -31,10 +31,10 @@ export class Effect<T> implements IObserver<any> {
     }
 
     run() {
-        this.lastRun = globalVersion
+        this.lastRun = currentIteration
 
         let result: T;
-        let tracker = new SourceTracker(this)
+        let tracker = trackAccessedSources(this)
 
         try {
             result = this._effect()

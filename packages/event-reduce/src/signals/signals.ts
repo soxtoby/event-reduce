@@ -1,74 +1,19 @@
 import { dispose, nameOfCallback } from "../utils"
 import { derive, IDerivation } from "./derivation"
 import { getState, State } from "./state"
-import { updateOwnedValues } from "./tracking"
+import { beginTransition, currentIteration, sourceWasAccessed, updateOwnedObjects } from "./tracking"
 
 /** 
  * TODO
  * - Logging in derivations and reductions
  * - Source "path" built by ownership (include derivations?)
  * - extend
+ * - Some way to create top-level reductions
  */
 
-export class SourceTracker {
-    private readonly _previous: SourceTracker | null
-    readonly accessed = new Set<ISource<any>>()
-
-    constructor(private readonly _observer: IObserver<any> | null) {
-        this._previous = globalTracker
-        globalTracker = this
-    }
-
-    sourceAccessed(source: ISource<any>) {
-        if (this._observer) {
-            let circularDependency = this.findCircularDependency(source)
-            if (circularDependency)
-                throw new CircularDependencyError([...circularDependency, source])
-        }
-
-        this.accessed.add(source)
-    }
-
-    private findCircularDependency(source: ISource<any>): ISource<any>[] | null {
-        if (this._observer == source as any as IObserver<any>)
-            return [source]
-        let circularDependency = this._previous?.findCircularDependency(source)
-        return circularDependency
-            ? [...circularDependency, this._observer as any as ISource<any>]
-            : null
-    }
-
-    [dispose]() {
-        globalTracker = this._previous
-    }
-}
-
-let globalTracker: SourceTracker | null = null
-let lastSourceAccessed: ISource<any> | null = null
-export let globalVersion = 0
-export let reactingTo: ISource<any> | null = null
-
-export function trackSourceAccessed(source: ISource<any>) {
-    globalTracker?.sourceAccessed(source)
-    lastSourceAccessed = source
-}
-
-export function getUnderlyingSource<T>(value: T): ISource<T> | null {
-    return lastSourceAccessed
-        && lastSourceAccessed instanceof SourceBase
-        && Object.is(lastSourceAccessed.value, value)
-        ? lastSourceAccessed as ISource<T>
-        : null
-}
 
 export function isSource(value: any): value is ISource<any> {
     return value instanceof SourceBase
-}
-
-export function startReactingTo(source: ISource<any>) {
-    let previouslyReactingTo = reactingTo
-    reactingTo = source
-    return { [dispose]() { reactingTo = previouslyReactingTo } }
 }
 
 export interface ISource<T> {
@@ -101,29 +46,23 @@ export abstract class SourceBase<T> implements ISource<T> {
     }
 
     get value() {
-        trackSourceAccessed(this)
+        sourceWasAccessed(this)
         return this._value
     }
 
-    protected setValue(newValue: T, newVersion = false) { // TODO better name for newVersion - creates new global version
-        if (newVersion && reactingTo)
-            throw new SideEffectDuringReactionError(reactingTo, this)
-
+    protected setValue(newValue: T, isTriggerEvent = false) {
         if (!this.skipUpdate(newValue)) {
-            let previousValue = this._value
-            this._value = newValue
-            updateOwnedValues(this, previousValue, newValue)
-            this.lastUpdated = newVersion ? ++globalVersion : globalVersion
-
-            if (newVersion)
-                reactingTo = this
-
+            let transition = isTriggerEvent ? beginTransition(this) : undefined
             try {
+                this.lastUpdated = currentIteration
+                let previousValue = this._value
+                this._value = newValue
+                updateOwnedObjects(this, previousValue, newValue)
+
                 for (let observer of this._observers)
                     observer.sourceUpdated(this, this._value)
             } finally {
-                if (newVersion)
-                    reactingTo = null
+                transition?.[dispose]()
             }
         }
     }
@@ -190,17 +129,6 @@ export abstract class SourceObserverBase<Out, In = any> extends SourceBase<Out> 
     }
 
     abstract sourceUpdated<S extends In>(source: ISource<S>, value: S): void
-}
-
-class CircularDependencyError extends Error {
-    constructor(path: ISource<any>[]) { super(`Circular dependency detected: ${path.map(s => s.displayName).join(' -> ')}`) }
-}
-
-class SideEffectDuringReactionError extends Error {
-    constructor(
-        public reactingTo: ISource<any>,
-        public causing: ISource<any>
-    ) { super(`Side effect during reaction to ${reactingTo.displayName} in ${causing.displayName}`) }
 }
 
 export class NotASourceValueError extends Error {

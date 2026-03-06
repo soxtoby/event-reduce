@@ -1,6 +1,6 @@
 import { dispose } from "../utils"
 import { Effect } from "./effect"
-import { reactingTo, startReactingTo } from "./signals"
+import { beginTransition, iterationSource } from "./tracking"
 
 // NOCOMMIT not sure I have a use for this
 export class Reaction extends Effect<void> {
@@ -11,13 +11,13 @@ export class Reaction extends Effect<void> {
     ) {
         super(displayName, reaction, () => {
             if (this._schedule) {
-                let wasReactingTo = reactingTo
+                let reactionSource = iterationSource
                 this._schedule(() => {
-                    let reaction = wasReactingTo ? startReactingTo(wasReactingTo) : null
+                    let transition = reactionSource ? beginTransition(reactionSource) : null
                     try {
                         this.run()
                     } finally {
-                        reaction?.[dispose]()
+                        transition?.[dispose]()
                     }
                 })
             } else {

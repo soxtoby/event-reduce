@@ -1,7 +1,7 @@
 import { dispose, nameOfFunction } from "../utils"
 import { Effect } from "./effect"
-import { ISource, SourceObserverBase, trackSourceAccessed } from "./signals"
-import { withOwner } from "./tracking"
+import { ISource, SourceObserverBase } from "./signals"
+import { sourceWasAccessed, trackManagedSourceCreation } from "./tracking"
 
 export interface IDerivation<T> extends ISource<T> {
     readonly value: T
@@ -39,7 +39,7 @@ export class Derivation<T> extends SourceObserverBase<T, any> {
 
     override get value() {
         // Notifying tracker before checking for updates so circular reference is detected early
-        trackSourceAccessed(this)
+        sourceWasAccessed(this)
 
         if (this._derive.sourceLastUpdated > this._derive.lastRun)
             this.update()
@@ -50,11 +50,12 @@ export class Derivation<T> extends SourceObserverBase<T, any> {
     protected override skipUpdate(nextValue: T) { return this._skipUpdate(this._value, nextValue) }
 
     private update() {
-        let ownerScope = withOwner(this)
+        let sourceCreation = trackManagedSourceCreation()
         try {
             this.setValue(this._derive.run())
+            sourceCreation.verifySourceManagement()
         } finally {
-            ownerScope[dispose]()
+            sourceCreation[dispose]()
         }
     }
 }
