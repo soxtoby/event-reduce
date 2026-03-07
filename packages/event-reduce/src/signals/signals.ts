@@ -8,7 +8,7 @@ import { beginTransition, currentIteration, sourceWasAccessed, updateOwnedObject
  * - Logging in derivations and reductions
  * - Source "path" built by ownership (include derivations?)
  * - extend
- * - Some way to create top-level reductions
+ * - Some way to create top-level reductions - maybe a case for a "createModel" that marks a plain object as a model and adds a dispose
  */
 
 
@@ -85,8 +85,7 @@ export abstract class SourceBase<T> implements ISource<T> {
     unsubscribe(observer: IObserver<T>) { this._observers.delete(observer) }
 }
 
-// NOCOMMIT not sure I have a use for this (maybe replacement for Subject?)
-class Atom<T> extends SourceBase<T> {
+export class Atom<T> extends SourceBase<T> {
     constructor(
         displayName: string,
         initialValue: T,

@@ -2,7 +2,7 @@ import { dispose } from "../utils"
 import { ISource, SourceBase, SourceObserverBase } from "./signals"
 import { currentIteration, managedSourceCreated, sourceWasAccessed, trackAccessedSources } from "./tracking"
 
-export interface IReduction<T, Events> extends ISource<T> {
+export interface IReduction<T, Events = void> extends ISource<T> {
     readonly value: T
     on<S>(source: ISource<S>, reduce: Reducer<T, S>): this
     on<S>(getSource: (events: Events) => ISource<S>, reduce: Reducer<T, S>): this

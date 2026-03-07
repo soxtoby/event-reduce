@@ -5,6 +5,13 @@ import { sourceWasAccessed, trackManagedSourceCreation } from "./tracking"
 
 export interface IDerivation<T> extends ISource<T> {
     readonly value: T
+
+    /** 
+     * Forces the value to be re-calculated. 
+     * @param deriveValue Optional function to use to derive the value. If not provided, the original derivation function will be used.
+     * @param reason Optional reason for the update. If not invalidated by a source change, this will be used as the reason for the update.
+     **/
+    update(deriveValue?: () => T, reason?: string): void
 }
 
 export function derive<T>(derive: () => T, displayName?: string): IDerivation<T>
@@ -49,10 +56,10 @@ export class Derivation<T> extends SourceObserverBase<T, any> {
 
     protected override skipUpdate(nextValue: T) { return this._skipUpdate(this._value, nextValue) }
 
-    private update() {
+    update(deriveValue?: () => T, reason?: string) {
         let sourceCreation = trackManagedSourceCreation()
         try {
-            this.setValue(this._derive.run())
+            this.setValue(this._derive.run(deriveValue))
             sourceCreation.verifySourceManagement()
         } finally {
             sourceCreation[dispose]()

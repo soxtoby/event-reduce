@@ -30,14 +30,18 @@ export class Effect<T> implements IObserver<any> {
         }
     }
 
-    run() {
+    /** 
+     * Forces the effect to run.
+     * @param effect Optional function to use to run the effect. If not provided, the original effect function will be used.
+     **/
+    run(effect?: () => T) {
         this.lastRun = currentIteration
 
         let result: T;
         let tracker = trackAccessedSources(this)
 
         try {
-            result = this._effect()
+            result = (effect ?? this._effect)()
         } finally {
             tracker[dispose]()
         }
