@@ -1,4 +1,5 @@
-import { dispose } from "../utils"
+import { dispose, emptyArray } from "../utils"
+import { startLogging } from "./logging"
 import { ISource, SourceBase, SourceObserverBase } from "./signals"
 import { currentIteration, managedSourceCreated, sourceWasAccessed, trackAccessedSources } from "./tracking"
 
@@ -61,10 +62,19 @@ export class Reduction<T, Events = void> extends SourceObserverBase<T, T> implem
             let reduce = this._reducers.get(source)
             if (reduce) {
                 let tracker = trackAccessedSources(this) // Required for detecting circular references in reducers
+                let previousValue = this._value
+                let nextValue!: T
+                let logging = startLogging('🧪 (reduction)', this.displayName, emptyArray, () => ({
+                    Previous: previousValue,
+                    Current: nextValue,
+                    // Container: this.container,
+                    // Sources: sourceTree(this.sources)
+                }))
+
                 try {
-                    let newValue = reduce(this._value, value)
-                    this.setValue(newValue)
+                    this.setValue(nextValue = reduce(this._value, value))
                 } finally {
+                    logging?.[dispose]()
                     tracker[dispose]()
                 }
             }

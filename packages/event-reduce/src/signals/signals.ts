@@ -5,8 +5,6 @@ import { beginTransition, currentIteration, getPath, sourceWasAccessed, updateOw
 
 /** 
  * TODO
- * - Logging in derivations and reductions
- * - Source "path" built by ownership (include derivations?)
  * - extend
  * - Some way to create top-level reductions - maybe a case for a "createModel" that marks a plain object as a model and adds a dispose
  */

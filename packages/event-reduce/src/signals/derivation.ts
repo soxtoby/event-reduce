@@ -1,5 +1,6 @@
-import { dispose, nameOfFunction } from "../utils"
+import { dispose, emptyArray, nameOfFunction } from "../utils"
 import { Effect } from "./effect"
+import { startLogging } from "./logging"
 import { ISource, SourceObserverBase } from "./signals"
 import { sourceWasAccessed, trackManagedSourceCreation } from "./tracking"
 
@@ -25,6 +26,7 @@ export function derive<T>(derive: () => T, displayNameOrSkip?: string | ((a: T, 
 
 export class Derivation<T> extends SourceObserverBase<T, any> {
     private _derive: Effect<T>
+    private _invalidatingSource?: ISource<any>
 
     constructor(
         displayName: string,
@@ -32,7 +34,8 @@ export class Derivation<T> extends SourceObserverBase<T, any> {
         private _skipUpdate = Object.is
     ) {
         super(displayName)
-        this._derive = new Effect(displayName, derive, () => {
+        this._derive = new Effect(displayName, derive, (source) => {
+            this._invalidatingSource = source
             if (this._observers.size)
                 this.update()
         })
@@ -57,11 +60,26 @@ export class Derivation<T> extends SourceObserverBase<T, any> {
     protected override skipUpdate(nextValue: T) { return this._skipUpdate(this._value, nextValue) }
 
     update(deriveValue?: () => T, reason?: string) {
+        let previousValue = this._value
+        let nextValue!: T
+        let trigger = this._invalidatingSource ? new WeakRef(this._invalidatingSource) : undefined
+        delete this._invalidatingSource
+
         let sourceCreation = trackManagedSourceCreation()
+        let logging = startLogging('🔗 (derivation)', this.displayName, emptyArray, () => ({
+            Previous: previousValue,
+            Current: nextValue,
+            // Container: this.container,
+            // Sources: sourceTree(this.sources),
+            TriggeredBy: trigger
+                ? { name: trigger.deref()?.displayName ?? "(unknown)", get observable() { return trigger.deref() ?? "No longer in memory"; } }
+                : reason
+        }))
         try {
-            this.setValue(this._derive.run(deriveValue))
+            this.setValue(nextValue = this._derive.run(deriveValue))
             sourceCreation.verifySourceManagement()
         } finally {
+            logging?.[dispose]()
             sourceCreation[dispose]()
         }
     }
