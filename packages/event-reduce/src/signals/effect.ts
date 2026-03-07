@@ -10,7 +10,7 @@ export class Effect<T> implements IObserver<any> {
     constructor(
         public readonly displayName: string,
         private _effect: () => T,
-        private _onSourceUpdatedSinceLastRun: () => void
+        private _onSourceUpdatedSinceLastRun: (source: ISource<any>) => void
     ) { }
 
     attach() {
@@ -26,7 +26,7 @@ export class Effect<T> implements IObserver<any> {
     sourceUpdated<S>(source: ISource<S>, value: S): void {
         if (source.lastUpdated > this.lastRun) {
             this.sourceLastUpdated = source.lastUpdated
-            this._onSourceUpdatedSinceLastRun()
+            this._onSourceUpdatedSinceLastRun(source)
         }
     }
 

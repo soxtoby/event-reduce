@@ -27,8 +27,6 @@ export function useAsyncEvent<Result = void, Context = void>(name?: string) {
 /**
  * Creates a derived value that persists across renders of the component.
  * @param unobservableDependencies - A list of dependencies that are not observable. The derived value will be updated when any of these change.
- * If not specified, the derived value will be updated every render, but will still only *trigger* a re-render inside a reactive component if the derived value changes.
- * NOCOMMIT - not sure this last line is correct
  */
 export function useDerived<T>(getValue: () => T, name?: string): ISource<T>
 export function useDerived<T>(getValue: () => T, unobservableDependencies?: DependencyList, name?: string): ISource<T>
