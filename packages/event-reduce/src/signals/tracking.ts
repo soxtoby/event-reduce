@@ -1,10 +1,8 @@
-import { dispose, emptySet, isObject, nameOfFunction } from "../utils"
-import { isModel, Model } from "./models"
-import { Reduction } from "./reduction"
-import { IObserver, ISource, SourceBase } from "./signals"
+import { dispose, emptyMap, isObject, nameOfFunction } from "../utils"
+import { EventsClass, Model, isEventsClass, isModel } from "./models"
+import { IObserver, ISource, isSource, SourceBase } from "./signals"
 
-type ManagedObject = Reduction<any, any> | Model
-type Owner = ISource<any> | Model
+type GraphNode = ISource<any> | Model | EventsClass
 
 export let currentIteration = 0
 export let iterationSource: ISource<any> | null = null
@@ -12,11 +10,13 @@ export let iterationSource: ISource<any> | null = null
 let currentAccessTracker: AccessTracker | null = null
 let lastSourceAccessed: ISource<any> | null = null
 
-let ownerRegistry = new WeakMap<ManagedObject, Set<Owner>>()
-let ownedObjectsSnapshots = new WeakMap<object, ReadonlySet<ManagedObject>>()
-let garbage = new Set<ManagedObject>()
+/** Child -> parent, path. */
+let parentRegistry = new WeakMap<GraphNode, Map<GraphNode, string>>()
+/** Value -> node, path. */
+let childSnapshots = new WeakMap<object, ReadonlyMap<GraphNode, string>>()
+let garbage = new Set<GraphNode & Disposable>()
 
-let currentCreationScope: Set<ManagedObject & ISource<any>> | null = null
+let currentCreationScope: Set<GraphNode & ISource<any>> | null = null
 
 export function beginTransition(source: ISource<any>) {
     if (iterationSource)
@@ -50,67 +50,76 @@ export function getUnderlyingSource<T>(value: T): ISource<T> | null {
         : null
 }
 
-export function updateOwnedObjects(owner: Owner, previousValue: unknown, nextValue: unknown) {
+export function updateOwnedObjects(parent: GraphNode, previousValue: unknown, nextValue: unknown) {
     if (Object.is(previousValue, nextValue))
         return
 
-    let previouslyOwned = emptySet
+    let previousChildren: ReadonlyMap<GraphNode, string> = emptyMap
     if (isObject(previousValue)) {
-        previouslyOwned = ownedObjectsSnapshots.get(previousValue) ?? emptySet
-        ownedObjectsSnapshots.delete(previousValue)
+        previousChildren = childSnapshots.get(previousValue) ?? emptyMap
+        childSnapshots.delete(previousValue)
     }
 
-    let newlyOwned = emptySet
+    let newChildren: ReadonlyMap<GraphNode, string> = emptyMap
     if (isObject(nextValue)) {
-        newlyOwned = getManagedObjects(nextValue)
-        ownedObjectsSnapshots.set(nextValue, newlyOwned)
+        newChildren = getOwnedNodes(nextValue)
+        childSnapshots.set(nextValue, newChildren)
     }
 
-    for (let removed of previouslyOwned)
-        if (!newlyOwned.has(removed))
-            removeOwner(removed, owner)
+    for (let [removed, _] of previousChildren)
+        if (!newChildren.has(removed))
+            removeParent(removed, parent)
 
-    for (let added of newlyOwned)
-        if (!previouslyOwned.has(added))
-            addOwner(added, owner)
+    for (let [added, path] of newChildren)
+        if (!previousChildren.has(added))
+            addParent(added, parent, path)
 }
 
-function getManagedObjects(value: object): ReadonlySet<ManagedObject> {
-    return isManagedObject(value) ? new Set([value])
-        : Array.isArray(value) ? new Set(value.filter(isManagedObject))
-            : new Set(Object.values(value).filter(isManagedObject))
+function getOwnedNodes(value: object): ReadonlyMap<GraphNode, string> {
+    if (isGraphNode(value))
+        return new Map([[value, '']])
+
+    if (Array.isArray(value))
+        return new Map(value
+            .filter(isGraphNode)
+            .map((obj, i) => [obj, `[${i}]`]))
+
+    return new Map(Object.entries(value)
+        .filter(([_, val]) => isGraphNode(val))
+        .map(([key, val]) => [val, `.${key}`]))
 }
 
-export function isManagedObject(value: unknown): value is ManagedObject {
-    return isModel(value)
-        || value instanceof Reduction
+function isGraphNode(value: unknown): value is GraphNode {
+    return isSource(value)
+        || isModel(value)
+        || isEventsClass(value)
 }
 
-function addOwner(object: ManagedObject, owner: Owner) {
-    let owners = ownerRegistry.get(object)
+function addParent(object: GraphNode, owner: GraphNode, path: string) {
+    let owners = parentRegistry.get(object)
 
     if (!owners)
-        ownerRegistry.set(object, owners = new Set())
+        parentRegistry.set(object, owners = new Map())
 
-    owners.add(owner)
+    owners.set(owner, '')
 }
 
-function removeOwner(object: ManagedObject, owner: Owner) {
-    let owners = ownerRegistry.get(object)
+function removeParent(node: GraphNode, parent: GraphNode) {
+    let owners = parentRegistry.get(node)
     if (owners) {
-        owners.delete(owner)
+        owners.delete(parent)
 
-        if (!owners.size) {
-            ownerRegistry.delete(object)
-            garbage.add(object)
+        if (!owners.size && dispose in node) {
+            parentRegistry.delete(node)
+            garbage.add(node)
         }
     }
 }
 
 function disposeGarbage() {
-    for (let object of garbage)
-        if (!ownerRegistry.has(object)) // In case a new owner was added
-            object[dispose]()
+    for (let node of garbage)
+        if (!parentRegistry.has(node)) // In case a new owner was added
+            node[dispose]()
     garbage.clear()
 }
 
@@ -124,14 +133,14 @@ export function trackManagedSourceCreation(): IManagedSourceTracker {
     return {
         verifySourceManagement() {
             for (let object of currentScope)
-                if (!ownerRegistry.has(object))
+                if (!parentRegistry.has(object))
                     throw new UntrackedSourceError(object)
         },
         [dispose]() { currentCreationScope = previousScope }
     }
 }
 
-export function managedSourceCreated(source: ManagedObject & ISource<any>) {
+export function managedSourceCreated(source: GraphNode & ISource<any>) {
     if (!currentCreationScope)
         throw new UntrackedSourceError(source)
     currentCreationScope.add(source)
@@ -172,6 +181,15 @@ class AccessTracker implements IAccessTracker {
     [dispose]() {
         currentAccessTracker = this._previous
     }
+}
+
+export function getPath(node: GraphNode): string {
+    let primaryOwner = parentRegistry.get(node)?.entries().next().value
+    return primaryOwner
+        ? getPath(primaryOwner[0]) + primaryOwner[1]
+        : isSource(node) ? node.displayName
+            : isObject(node) ? nameOfFunction(node.constructor) || '$'
+                : '$'
 }
 
 class CircularDependencyError extends Error {

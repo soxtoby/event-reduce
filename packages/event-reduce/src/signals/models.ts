@@ -235,6 +235,10 @@ export function state<Model extends object, Value>(...args:
     }
 }
 
+export interface EventsClass {
+    [eventsBrand]: true
+}
+
 /**
  * Marks a class as an events class.
  * Automatically populates the names of event properties.
@@ -265,7 +269,7 @@ export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
     }[className]
 }
 
-export function isEventsClass(value: unknown): value is Object {
+export function isEventsClass(value: unknown): value is EventsClass {
     return value instanceof Object
         && eventsBrand in value
 }

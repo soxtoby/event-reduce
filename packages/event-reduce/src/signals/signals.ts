@@ -1,7 +1,7 @@
 import { dispose, nameOfCallback } from "../utils"
 import { derive, IDerivation } from "./derivation"
 import { getState, State } from "./state"
-import { beginTransition, currentIteration, sourceWasAccessed, updateOwnedObjects } from "./tracking"
+import { beginTransition, currentIteration, getPath, sourceWasAccessed, updateOwnedObjects } from "./tracking"
 
 /** 
  * TODO
@@ -18,6 +18,7 @@ export function isSource(value: any): value is ISource<any> {
 
 export interface ISource<T> {
     displayName: string
+    readonly path: string
     readonly lastUpdated: number
     map<Out>(transform: (value: T) => Out, displayName?: string): ISource<Out>
     filter<Out extends T>(predicate: (value: T) => value is Out, displayName?: string): ISource<Out>
@@ -39,6 +40,8 @@ export abstract class SourceBase<T> implements ISource<T> {
     lastUpdated = -1
 
     constructor(public displayName: string) { }
+
+    get path(): string { return getPath(this) }
 
     toJSON() {
         // Lazy init to avoid infinite loop in Derivation constructor
