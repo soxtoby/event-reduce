@@ -1,7 +1,7 @@
 import { dispose, nameOfCallback } from "../utils"
 import { derive, IDerivation } from "./derivation"
 import { getState, State } from "./state"
-import { beginTransition, currentIteration, getPath, sourceWasAccessed, updateOwnedObjects } from "./tracking"
+import { beginTransition, currentIteration, getPath, sourceWasAccessed, updateChildren } from "./tracking"
 
 /** 
  * TODO
@@ -58,7 +58,7 @@ export abstract class SourceBase<T> implements ISource<T> {
                 this.lastUpdated = currentIteration
                 let previousValue = this._value
                 this._value = newValue
-                updateOwnedObjects(this, previousValue, newValue)
+                updateChildren(this, previousValue, newValue)
 
                 for (let observer of this._observers)
                     observer.sourceUpdated(this, this._value)

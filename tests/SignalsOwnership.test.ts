@@ -1,17 +1,17 @@
 import { describe, expect, test } from "bun:test"
 import { asModel } from "event-reduce/lib/signals/models"
-import { OwnerlessReductionError, Reduction } from "event-reduce/lib/signals/reduction"
+import { Reduction } from "event-reduce/lib/signals/reduction"
 import { SourceBase } from "event-reduce/lib/signals/signals"
-import { addOwner, removeOwner, withOwner } from "event-reduce/lib/signals/tracking"
+import { trackManagedSourceCreation, UntrackedSourceError, updateChildren } from "event-reduce/lib/signals/tracking"
 
 class TestSource<T> extends SourceBase<T> {
-    constructor(name: string) { super(name, () => false) }
+    constructor(name: string) { super(name) }
     emit(value: T) { this.setValue(value, true) }
 }
 
 describe("signal reduction ownership", () => {
     test("ownerless reduction throws", () => {
-        expect(() => new Reduction<number>("r")).toThrow(OwnerlessReductionError)
+        expect(() => new Reduction<number>("r", 0)).toThrow(UntrackedSourceError)
     })
 
     test("disposes after last owner removed", () => {
@@ -20,8 +20,8 @@ describe("signal reduction ownership", () => {
 
         let reduction: Reduction<number>
         {
-            using _ = withOwner(owner)
-            reduction = new Reduction<number>("r").on(updates, (current = 0, next) => current + next)
+            using _ = trackManagedSourceCreation()
+            reduction = new Reduction<number>("r", 0).on(updates, (current, next) => current + next)
         }
 
         updates.emit(1)
@@ -39,9 +39,9 @@ describe("signal reduction ownership", () => {
         let updates = new TestSource<number>("updates")
         let r1, r2: Reduction<number>
         {
-            using _ = withOwner(holder)
-            r1 = new Reduction<number>("r1").on(updates, (current = 0, next) => current + next)
-            r2 = new Reduction<number>("r2").on(updates, (current = 0, next) => current + next)
+            using _ = trackManagedSourceCreation()
+            r1 = new Reduction<number>("r1", 0).on(updates, (current, next) => current + next)
+            r2 = new Reduction<number>("r2", 0).on(updates, (current, next) => current + next)
         }
 
         holder.emit([r1, r2])
@@ -67,8 +67,8 @@ describe("signal reduction ownership", () => {
 
         let reduction: Reduction<number>
         {
-            using _ = withOwner(bootstrapOwner)
-            reduction = new Reduction<number>("r").on(updates, (current = 0, next) => current + next)
+            using _ = trackManagedSourceCreation()
+            reduction = new Reduction<number>("r", 0).on(updates, (current, next) => current + next)
         }
 
         holder.emit(reduction)
@@ -92,16 +92,16 @@ describe("signal reduction ownership", () => {
 
         let reduction: Reduction<number>
         {
-            using _ = withOwner(owner)
-            reduction = new Reduction<number>("r").on(updates, (current = 0, next) => current + next)
+            using _ = trackManagedSourceCreation()
+            reduction = new Reduction<number>("r", 0).on(updates, (current, next) => current + next)
         }
 
         updates.emit(1)
         expect(reduction.value).toBe(1)
 
-        addOwner(reduction, owner)
-        removeOwner(reduction, owner)
-        addOwner(reduction, owner)
+        updateChildren(owner, undefined, reduction)
+        updateChildren(owner, reduction, undefined)
+        updateChildren(owner, undefined, reduction)
 
         updates.emit(1)
         expect(reduction.value).toBe(1)

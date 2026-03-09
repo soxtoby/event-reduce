@@ -4,7 +4,7 @@ import { isEvent } from "./events"
 import { Reduction } from "./reduction"
 import { ISource, isSource } from "./signals"
 import { getState } from "./state"
-import { getUnderlyingSource, trackAccessedSources, trackManagedSourceCreation, updateOwnedObjects } from "./tracking"
+import { getUnderlyingSource, trackAccessedSources, trackManagedSourceCreation, updateChildren } from "./tracking"
 
 export interface Model extends Disposable {
     [modelProperties]: Record<PropertyKey, ModelProperty>
@@ -35,25 +35,24 @@ export function model<Class extends new (...args: any[]) => any>(target: Class):
                 let sourceCreation = trackManagedSourceCreation()
                 let accesses = trackAccessedSources(null) // Don't want anything accessed during construction to become a source for whatever is creating this
                 try {
-
                     super(...args)
 
                     let prototypeFactories = (target.prototype as ModelPrototype)?.[prototypePropertyFactories]
                     if (prototypeFactories)
                         for (let key of Object.keys(prototypeFactories))
-                            this[modelProperties][key] = prototypeFactories[key](this)
+                            getModelProperties(this)[key] = prototypeFactories[key](this)
 
                     let instanceFactories = (this as UninitializedModel)[modelPropertyFactories]
                     if (instanceFactories)
                         for (let key of Object.keys(instanceFactories))
-                            this[modelProperties][key] = instanceFactories[key]()
+                            getModelProperties(this)[key] = instanceFactories[key]()
 
-                    for (let property of Object.values(this[modelProperties]))
-                        updateOwnedObjects(this, null, property)
+                    for (let property of Object.values(getModelProperties(this)))
+                        updateChildren(this, null, property)
 
                     sourceCreation.verifySourceManagement()
 
-                    for (let [key, property] of Object.entries(this[modelProperties])) {
+                    for (let [key, property] of Object.entries(getModelProperties(this))) {
                         if (isSource(property)) { // No need to do this for state properties
                             Object.defineProperty(this, key, {
                                 // Bind directly to the property for cleaner call stack (NOCOMMIT check this works)
@@ -78,7 +77,7 @@ export function model<Class extends new (...args: any[]) => any>(target: Class):
             toJSON() { return super.toJSON?.() ?? this.#json.value }
 
             [dispose]() {
-                Object.values(this[modelProperties])
+                Object.values(getModelProperties(this))
                     .forEach(p => (p as any as Disposable)[dispose]?.())
                 super[dispose]?.()
             }
@@ -326,6 +325,10 @@ function sourceSetter(key: PropertyKey, sourceType: { new(...args: any[]): ISour
 export function isModel(value: unknown): value is Model {
     return isObject(value)
         && modelProperties in value
+}
+
+export function getModelProperties(model: Model): Record<PropertyKey, ModelProperty> {
+    return model[modelProperties]
 }
 
 // NOCOMMIT remove - just for compiling temp tests

@@ -50,7 +50,7 @@ export function getUnderlyingSource<T>(value: T): ISource<T> | null {
         : null
 }
 
-export function updateOwnedObjects(parent: GraphNode, previousValue: unknown, nextValue: unknown) {
+export function updateChildren(parent: GraphNode, previousValue: unknown, nextValue: unknown) {
     if (Object.is(previousValue, nextValue))
         return
 
@@ -192,17 +192,17 @@ export function getPath(node: GraphNode): string {
                 : '$'
 }
 
-class CircularDependencyError extends Error {
+export class CircularDependencyError extends Error {
     constructor(path: ISource<any>[]) { super(`Circular dependency detected: ${path.map(s => s.displayName).join(' -> ')}`) }
 }
 
-class SideEffectDuringReactionError extends Error {
+export class SideEffectDuringReactionError extends Error {
     constructor(
         public reactingTo: ISource<any>,
         public causing: ISource<any>
     ) { super(`Side effect during reaction to ${reactingTo.displayName} in ${causing.displayName}`) }
 }
 
-class UntrackedSourceError extends Error {
+export class UntrackedSourceError extends Error {
     constructor(source: ISource<any>) { super(`Leak detected: ${nameOfFunction(source.constructor)} '${source.displayName}' created without an owner.`) } // NOCOMMIT say what to do about it
 }
