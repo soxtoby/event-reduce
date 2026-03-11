@@ -1,7 +1,7 @@
 import { dispose } from "../utils"
 import { startLogging } from "./logging"
 import { applyScope, DeepPartial, matchesScope, Scoped } from "./scoping"
-import { ISource, SourceBase } from "./signals"
+import { type ISource, SourceBase } from "./signals"
 
 export interface IEvent<T, Args extends any[] = [T]> extends ISource<T> {
     (...args: Args): Args[0]
@@ -98,17 +98,24 @@ export function makeEventFunction<T, Args extends any[] = [T], Return = Args[0],
     name: string,
     fire: (emit: (event: T) => void, ...args: Args) => Return,
     getMembers?: (event: IEvent<T, Args>) => Members
-) {
+): IEvent<T, Args> & Members {
     let eventBase = new Event<T>(name)
-    let eventFn = fire.bind(null, eventBase.emit) as IEvent<T, Args>
+    let eventFn = event as Event<T> & IEvent<T, Args>
     Object.setPrototypeOf(eventFn, eventBase);
     eventFn.apply = Function.prototype.apply;
     eventFn.call = Function.prototype.call;
-    return Object.assign(eventFn, getMembers?.(eventFn as IEvent<T, Args>) ?? {}) as IEvent<T, Args> & Members
+    return Object.assign(eventFn, getMembers?.(eventFn) ?? {} as Members)
+
+    function event(...args: Args) { return fire(eventFn.emit.bind(eventFn), ...args) }
 }
 
 class Event<T> extends SourceBase<T> {
-    emit = (value: T) => this.setValue(value, true)
+    emit(value: T) {
+        this.setValue(value, true)
+        this._value = undefined! // Events shouldn't hold on to their values
+    }
+    override skipUpdate(nextValue: T) { return false }
+    protected override updateChildren(previousValue: T, nextValue: T) { } // Value won't be held onto
 }
 
 export function isEvent(value: any): value is IEvent<any> {

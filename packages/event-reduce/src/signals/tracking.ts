@@ -1,6 +1,6 @@
-import { dispose, emptyMap, isObject, nameOfFunction } from "../utils"
-import { EventsClass, Model, isEventsClass, isModel } from "./models"
-import { IObserver, ISource, isSource, SourceBase } from "./signals"
+import { dispose, emptyMap, isDisposable, isObject, nameOfFunction } from "../utils"
+import { type EventsClass, isEventsClass, isModel, type Model, StateProperty } from "./nodes"
+import { type IObserver, type ISource, isSource, SourceBase } from "./signals"
 
 type GraphNode = ISource<any> | Model | EventsClass
 
@@ -56,13 +56,13 @@ export function updateChildren(parent: GraphNode, previousValue: unknown, nextVa
 
     let previousChildren: ReadonlyMap<GraphNode, string> = emptyMap
     if (isObject(previousValue)) {
-        previousChildren = childSnapshots.get(previousValue) ?? emptyMap
+        previousChildren = childSnapshots.get(previousValue) ?? getChildNodes(previousValue)
         childSnapshots.delete(previousValue)
     }
 
     let newChildren: ReadonlyMap<GraphNode, string> = emptyMap
     if (isObject(nextValue)) {
-        newChildren = getOwnedNodes(nextValue)
+        newChildren = getChildNodes(nextValue)
         childSnapshots.set(nextValue, newChildren)
     }
 
@@ -75,9 +75,14 @@ export function updateChildren(parent: GraphNode, previousValue: unknown, nextVa
             addParent(added, parent, path)
 }
 
-function getOwnedNodes(value: object): ReadonlyMap<GraphNode, string> {
+export function getChildNodes(value: object): ReadonlyMap<GraphNode, string> {
     if (isGraphNode(value))
         return new Map([[value, '']])
+
+    if (value instanceof StateProperty)
+        return new Map(getChildNodes(value.value)
+            .entries()
+            .map(([node, path]) => [node, `.${String(value.key)}${path}`]))
 
     if (Array.isArray(value))
         return new Map(value
@@ -101,7 +106,7 @@ function addParent(object: GraphNode, owner: GraphNode, path: string) {
     if (!owners)
         parentRegistry.set(object, owners = new Map())
 
-    owners.set(owner, '')
+    owners.set(owner, path)
 }
 
 function removeParent(node: GraphNode, parent: GraphNode) {
@@ -109,7 +114,7 @@ function removeParent(node: GraphNode, parent: GraphNode) {
     if (owners) {
         owners.delete(parent)
 
-        if (!owners.size && dispose in node) {
+        if (!owners.size && isDisposable(node)) {
             parentRegistry.delete(node)
             garbage.add(node)
         }

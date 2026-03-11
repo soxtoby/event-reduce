@@ -1,7 +1,9 @@
 import { dispose, emptyArray } from "../utils"
+import { derive, IDerivation } from "./derivation"
 import { startLogging } from "./logging"
-import { ISource, SourceBase, SourceObserverBase } from "./signals"
-import { currentIteration, managedSourceCreated, sourceWasAccessed, trackAccessedSources } from "./tracking"
+import { IObserver, ISource, SourceBase } from "./signals"
+import { getState, State } from "./state"
+import { currentIteration, managedSourceCreated, sourceWasAccessed, trackAccessedSources, updateChildren } from "./tracking"
 
 export interface IReduction<T, Events = void> extends ISource<T> {
     readonly value: T
@@ -21,12 +23,11 @@ export function reduce<T, Events>(initialValue: T, eventsOrDisplayName?: Events 
 
 export type Reducer<Result, Source> = (current: Result, next: Source) => Result
 
-export class Reduction<T, Events = void> extends SourceObserverBase<T, T> implements Disposable {
+export class Reduction<T, Events = void> extends SourceBase<T> implements IObserver<any> {
     sources = new Set<ISource<any>>()
     private _reducers = new Map<ISource<any>, (current: T, next: any) => T>()
     private _sourcesLastChecked = -1
-    private _attached = false
-    private _disposed = false
+    private _json: IDerivation<State<T>>
 
     constructor(
         displayName: string,
@@ -36,11 +37,15 @@ export class Reduction<T, Events = void> extends SourceObserverBase<T, T> implem
     ) {
         super(displayName)
 
+        this._json = derive(() => getState(this.value), `toJSON(${this.displayName})`)
+
         managedSourceCreated(this)
 
         this._value = initialValue
-        this.attach()
+        updateChildren(this, null, initialValue)
     }
+
+    toJSON() { return this._json.value; }
 
     on<S>(source: ISource<S>, reduce: Reducer<T, S>): this
     on<S>(getSource: (events: Events) => ISource<S>, reduce: Reducer<T, S>): this
@@ -48,11 +53,9 @@ export class Reduction<T, Events = void> extends SourceObserverBase<T, T> implem
         if (!('lastUpdated' in source))
             source = source(this._events!)
 
+        source.subscribe(this)
         this.sources.add(source)
         this._reducers.set(source, reduce)
-
-        if (this._attached)
-            source.subscribe(this)
 
         return this
     }
@@ -98,32 +101,9 @@ export class Reduction<T, Events = void> extends SourceObserverBase<T, T> implem
 
     override skipUpdate(nextValue: T) { return this._isEqual(this._value, nextValue) }
 
-    // NOCOMMIT shouldn't be required for reductions
-    protected override attach() {
-        if (this._attached || this._disposed)
-            return
-
-        for (let source of this.sources)
-            source.subscribe(this)
-
-        this._attached = true
-    }
-
-    protected override detach() {
-        if (!this._attached)
-            return
-
+    override[dispose]() {
         for (let source of this.sources)
             source.unsubscribe(this)
-
-        this._attached = false
-    }
-
-    [dispose]() {
-        if (this._disposed)
-            return
-
-        this._disposed = true
-        this.detach()
+        super[dispose]()
     }
 }

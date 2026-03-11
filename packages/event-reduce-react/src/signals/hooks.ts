@@ -1,5 +1,5 @@
 import { asyncEvent, Atom, derive, event, IReduction, ISource, reduce } from "event-reduce/lib/signals"
-import { isModel, Model } from "event-reduce/lib/signals/models"
+import { isModel, Model } from "event-reduce/lib/signals/nodes"
 import { Reduction } from "event-reduce/lib/signals/reduction"
 import { dispose, emptyArray } from "event-reduce/lib/utils"
 import { DependencyList, useEffect, useMemo, useRef, useState } from "react"

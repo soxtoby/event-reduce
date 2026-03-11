@@ -10,8 +10,8 @@
     "url": "https://github.com/soxtoby/event-reduce.git"
   },
   "dependencies": {
-    "event-reduce": "*",
-    "event-reduce-react": "*"
+    "event-reduce": "workspace:*",
+    "event-reduce-react": "workspace:*"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.6.2",

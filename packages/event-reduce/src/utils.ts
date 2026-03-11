@@ -116,6 +116,11 @@ export function unsubscribeAll(unsubscribes: Unsubscribe[]) {
         unsubscribe();
 }
 
+export function isDisposable(value: any): value is Disposable {
+    return isObject(value)
+        && dispose in value
+}
+
 export const dispose: typeof Symbol.dispose = Symbol.dispose ?? Symbol('Symbol.dispose');
 
 /** Shim for `using` declaration until it's properly supported. */

@@ -1,11 +1,12 @@
 import { dispose } from "../utils"
-import { IObserver, ISource } from "./signals"
+import type { IObserver, ISource } from "./signals"
 import { currentIteration, trackAccessedSources } from "./tracking"
 
 export class Effect<T> implements IObserver<any> {
+    private _attached = false
     readonly sources = new Set<ISource<any>>()
-    sourceLastUpdated = -1
-    lastRun = -1
+    invalidatingSource?: ISource<any>
+    lastRun = -2 // Stale from the start
 
     constructor(
         public readonly displayName: string,
@@ -14,21 +15,27 @@ export class Effect<T> implements IObserver<any> {
     ) { }
 
     attach() {
+        this._attached = true
         for (let source of this.sources)
             source.subscribe(this)
     }
 
     detach() {
+        this._attached = false
         for (let source of this.sources)
             source.unsubscribe(this)
     }
 
     sourceUpdated<S>(source: ISource<S>, value: S): void {
         if (source.lastUpdated > this.lastRun) {
-            this.sourceLastUpdated = source.lastUpdated
+            this.invalidatingSource = source
             this._onSourceUpdatedSinceLastRun(source)
         }
     }
+
+    get isStale() { return this.sourceLastUpdated > this.lastRun }
+
+    get sourceLastUpdated() { return Math.max(-1, ...[...this.sources].map(s => s.lastUpdated)) }
 
     /** 
      * Forces the effect to run.
@@ -36,8 +43,9 @@ export class Effect<T> implements IObserver<any> {
      **/
     run(effect?: () => T) {
         this.lastRun = currentIteration
+        delete this.invalidatingSource
 
-        let result: T;
+        let result: T
         let tracker = trackAccessedSources(this)
 
         try {
@@ -53,10 +61,11 @@ export class Effect<T> implements IObserver<any> {
 
         for (let newSource of tracker.accessed.difference(this.sources)) {
             this.sources.add(newSource)
-            newSource.subscribe(this)
+            if (this._attached)
+                newSource.subscribe(this)
         }
 
-        return result;
+        return result
     }
 
     [dispose]() {

@@ -1,24 +1,17 @@
 import { argsAre, constant, dispose, getAllPropertyDescriptors, isFunction, isObject, isString, isUndefined, nameOfFunction } from "../utils"
 import { Derivation, derive } from "./derivation"
 import { isEvent } from "./events"
+import { eventsBrand, isEventsClass, Model, modelProperties, ModelProperty, StateProperty } from "./nodes"
 import { Reduction } from "./reduction"
 import { ISource, isSource } from "./signals"
 import { getState } from "./state"
 import { getUnderlyingSource, trackAccessedSources, trackManagedSourceCreation, updateChildren } from "./tracking"
 
-export interface Model extends Disposable {
-    [modelProperties]: Record<PropertyKey, ModelProperty>
-}
-
 type UninitializedModel = { [modelPropertyFactories]?: Record<PropertyKey, () => ModelProperty> }
 type ModelPrototype = { [prototypePropertyFactories]?: Record<PropertyKey, (instance: any) => ModelProperty> }
 
-type ModelProperty = ISource<any> | StateProperty
-
 const modelPropertyFactories = Symbol('model property factories')
 const prototypePropertyFactories = Symbol('prototype property factories')
-const modelProperties = Symbol('model properties')
-const eventsBrand = Symbol('events class')
 
 /** 
  * Marks a class as a model.
@@ -37,22 +30,24 @@ export function model<Class extends new (...args: any[]) => any>(target: Class):
                 try {
                     super(...args)
 
+                    let properties = getModelProperties(this)
+
                     let prototypeFactories = (target.prototype as ModelPrototype)?.[prototypePropertyFactories]
                     if (prototypeFactories)
                         for (let key of Object.keys(prototypeFactories))
-                            getModelProperties(this)[key] = prototypeFactories[key](this)
+                            properties[key] = prototypeFactories[key](this)
 
                     let instanceFactories = (this as UninitializedModel)[modelPropertyFactories]
                     if (instanceFactories)
                         for (let key of Object.keys(instanceFactories))
-                            getModelProperties(this)[key] = instanceFactories[key]()
+                            properties[key] = instanceFactories[key]()
 
-                    for (let property of Object.values(getModelProperties(this)))
+                    for (let property of Object.values(properties))
                         updateChildren(this, null, property)
 
                     sourceCreation.verifySourceManagement()
 
-                    for (let [key, property] of Object.entries(getModelProperties(this))) {
+                    for (let [key, property] of Object.entries(properties)) {
                         if (isSource(property)) { // No need to do this for state properties
                             Object.defineProperty(this, key, {
                                 // Bind directly to the property for cleaner call stack (NOCOMMIT check this works)
@@ -77,8 +72,8 @@ export function model<Class extends new (...args: any[]) => any>(target: Class):
             toJSON() { return super.toJSON?.() ?? this.#json.value }
 
             [dispose]() {
-                Object.values(getModelProperties(this))
-                    .forEach(p => (p as any as Disposable)[dispose]?.())
+                for (let property of Object.values(this[modelProperties]))
+                    updateChildren(this, property, null)
                 super[dispose]?.()
             }
         }
@@ -211,8 +206,8 @@ export function state<Model extends object, Value>(...args:
 ) {
     if (argsAre(args, isObject, isString)) {
         // Legacy decorator
-        let [instance, key] = args
-        getModelPropertyFactories(instance)[key] = constant(new StateProperty(instance, key))
+        let [prototype, key] = args
+        getPrototypePropertyFactories(prototype)[key] = instance => new StateProperty(instance, key)
     } else if (argsAre(args, isUndefined, isClassFieldDecoratorContext)) {
         // Field decorator
         let [_, context] = args
@@ -232,10 +227,6 @@ export function state<Model extends object, Value>(...args:
                 getPrototypePropertyFactories(ctor.prototype)[key] = instance => new StateProperty(instance, key)
         }
     }
-}
-
-export interface EventsClass {
-    [eventsBrand]: true
 }
 
 /**
@@ -268,17 +259,6 @@ export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
     }[className]
 }
 
-export function isEventsClass(value: unknown): value is EventsClass {
-    return value instanceof Object
-        && eventsBrand in value
-}
-
-class StateProperty {
-    constructor(private _instance: any, private _key: PropertyKey) { }
-    toJSON() { return this.value }
-    get value() { return this._instance[this._key] }
-}
-
 function isClassFieldDecoratorContext(context: ClassFieldDecoratorContext<any, any> | unknown): context is ClassFieldDecoratorContext<any, any> {
     return isDecoratorContext(context) && context.kind == 'field'
 }
@@ -301,8 +281,11 @@ function getModelPropertyFactories(instance: object) {
 }
 
 /** For class decorators and legacy decorators that don't have access to the instance. */
-function getPrototypePropertyFactories(prototype: object) {
-    return (prototype as ModelPrototype)[prototypePropertyFactories] ??= {}
+function getPrototypePropertyFactories(prototype: object): Record<PropertyKey, (instance: any) => ModelProperty> {
+    let modelPrototype = prototype as ModelPrototype
+    return Object.hasOwn(prototype, prototypePropertyFactories)
+        ? modelPrototype[prototypePropertyFactories]!
+        : (modelPrototype[prototypePropertyFactories] = Object.create(modelPrototype[prototypePropertyFactories] ?? {}))
 }
 
 function sourceSetter(key: PropertyKey, sourceType: { new(...args: any[]): ISource<any> }, errorFactory: () => Error): PropertyDescriptor {
@@ -320,11 +303,6 @@ function sourceSetter(key: PropertyKey, sourceType: { new(...args: any[]): ISour
             configurable: true
         })
     }
-}
-
-export function isModel(value: unknown): value is Model {
-    return isObject(value)
-        && modelProperties in value
 }
 
 export function getModelProperties(model: Model): Record<PropertyKey, ModelProperty> {

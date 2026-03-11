@@ -1,10 +1,11 @@
 import { dispose, emptyArray, nameOfFunction } from "../utils"
 import { Effect } from "./effect"
 import { startLogging } from "./logging"
-import { ISource, SourceObserverBase } from "./signals"
+import { IObserver, ISource, SourceBase } from "./signals"
+import { getState, State } from "./state"
 import { sourceWasAccessed, trackManagedSourceCreation } from "./tracking"
 
-export interface IDerivation<T> extends ISource<T> {
+export interface IDerivation<T> extends ISource<T>, IObserver<any> {
     readonly value: T
 
     /** 
@@ -24,9 +25,9 @@ export function derive<T>(derive: () => T, displayNameOrSkip?: string | ((a: T, 
     return new Derivation(displayName ?? nameOfFunction(derive), derive, skipUpdate)
 }
 
-export class Derivation<T> extends SourceObserverBase<T, any> {
+export class Derivation<T> extends SourceBase<T> implements IDerivation<T> {
     private _derive: Effect<T>
-    private _invalidatingSource?: ISource<any>
+    private _json?: IDerivation<State<T>>
 
     constructor(
         displayName: string,
@@ -34,16 +35,32 @@ export class Derivation<T> extends SourceObserverBase<T, any> {
         private _skipUpdate = Object.is
     ) {
         super(displayName)
-        this._derive = new Effect(displayName, derive, (source) => {
-            this._invalidatingSource = source
+        this._derive = new Effect(displayName, derive, () => {
             if (this._observers.size)
                 this.update()
         })
     }
 
+    toJSON() {
+        // Lazy init to avoid infinite loop in Derivation constructor
+        return (this._json ??= derive(() => getState(this.value), `toJSON(${this.displayName})`)).value
+    }
+
     get sources() { return this._derive.sources }
-    protected override attach() { this._derive.attach() }
-    protected override detach() { this._derive.detach() }
+
+    override subscribe(observer: IObserver<T>): void {
+        if (!this._observers.size)
+            this._derive.attach()
+
+        super.subscribe(observer)
+    }
+
+    override unsubscribe(observer: IObserver<T>): void {
+        super.unsubscribe(observer)
+
+        if (!this._observers.size)
+            this._derive.detach()
+    }
 
     sourceUpdated<S>(source: ISource<S>, value: S) { this._derive.sourceUpdated(source, value) }
 
@@ -51,19 +68,18 @@ export class Derivation<T> extends SourceObserverBase<T, any> {
         // Notifying tracker before checking for updates so circular reference is detected early
         sourceWasAccessed(this)
 
-        if (this._derive.sourceLastUpdated > this._derive.lastRun)
-            this.update()
+        if (this._derive.isStale)
+            this.update(undefined, undefined, true)
 
         return this._value // Not using super.value to avoid duplicate tracker notification
     }
 
     protected override skipUpdate(nextValue: T) { return this._skipUpdate(this._value, nextValue) }
 
-    update(deriveValue?: () => T, reason?: string) {
+    update(deriveValue?: () => T, reason?: string, isTriggerEvent = false) {
         let previousValue = this._value
         let nextValue!: T
-        let trigger = this._invalidatingSource ? new WeakRef(this._invalidatingSource) : undefined
-        delete this._invalidatingSource
+        let trigger = this._derive.invalidatingSource ? new WeakRef(this._derive.invalidatingSource) : undefined
 
         let sourceCreation = trackManagedSourceCreation()
         let logging = startLogging('🔗 (derivation)', this.displayName, emptyArray, () => ({
@@ -76,11 +92,17 @@ export class Derivation<T> extends SourceObserverBase<T, any> {
                 : reason
         }))
         try {
-            this.setValue(nextValue = this._derive.run(deriveValue))
+            this.setValue(nextValue = this._derive.run(deriveValue), isTriggerEvent)
             sourceCreation.verifySourceManagement()
         } finally {
             logging?.[dispose]()
             sourceCreation[dispose]()
         }
+    }
+
+    override[dispose]() {
+        this._derive[dispose]()
+        this._json?.[dispose]()
+        super[dispose]()
     }
 }
