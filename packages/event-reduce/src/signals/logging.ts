@@ -1,4 +1,4 @@
-import { dispose } from "../utils";
+import { dispose, nullDisposable } from "../utils";
 
 let loggingEnabled = false;
 
@@ -23,10 +23,12 @@ export function enableLogging(enable = true) {
     loggingEnabled = enable;
 }
 
-export function startLogging<Info extends object>(type: string, displayName: string, args: readonly any[], getInfo?: () => Info) {
+export function startLogging<Info extends object>(type: string, displayName: string, args: readonly any[], getInfo?: () => Info): Disposable {
     if (process.env.NODE_ENV !== 'production' && loggingEnabled) {
         logStack.push([]);
         return { [dispose]() { logMessage(type, displayName, args, getInfo, logStack.pop()!); } }
+    } else {
+        return nullDisposable
     }
 }
 

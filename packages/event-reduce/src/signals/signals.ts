@@ -1,6 +1,7 @@
-import { dispose, nameOfCallback } from "../utils"
-import { derive } from "./derivation"
-import { beginTransition, currentIteration, getPath, sourceWasAccessed, updateChildren } from "./tracking"
+import { dispose, nameOfCallback, nameOfFunction } from "../utils"
+import type { IEventBase } from "./events"
+import { isEventsClass } from "./nodes"
+import { beginTransition, currentIteration, getPath, iterationSource, trackSourceAccessed, updateChildren } from "./tracking"
 
 /** 
  * NOCOMMIT
@@ -40,23 +41,26 @@ export abstract class SourceBase<T> implements ISource<T> {
     get path(): string { return getPath(this) }
 
     get value() {
-        sourceWasAccessed(this)
+        trackSourceAccessed(this)[dispose]()
         return this._value
     }
 
-    protected setValue(newValue: T, isTriggerEvent = false) {
-        if (!this.skipUpdate(newValue)) {
-            let transition = isTriggerEvent ? beginTransition(this) : undefined
-            try {
-                this.lastUpdated = currentIteration
-                this.updateChildren(this._value, newValue)
-                this._value = newValue
+    protected setValue(newValue: T) {
+        if (process.env.NODE_ENV !== 'production') {
+            if (isEventsClass(newValue) || newValue instanceof SourceBase && !newValue.isValidState)
+                throw new InvalidStateError(this, newValue)
 
-                for (let observer of this._observers)
-                    observer.sourceUpdated(this, this._value)
-            } finally {
-                transition?.[dispose]()
-            }
+            if (!iterationSource)
+                throw new StateChangeOutsideTransitionError(this)
+        }
+
+        if (!this.skipUpdate(newValue)) {
+            this.lastUpdated = currentIteration
+            this.updateChildren(this._value, newValue)
+            this._value = newValue
+
+            for (let observer of this._observers)
+                observer.sourceUpdated(this, this._value)
         }
     }
 
@@ -64,19 +68,22 @@ export abstract class SourceBase<T> implements ISource<T> {
 
     protected updateChildren(previousValue: T, nextValue: T) { updateChildren(this, previousValue, nextValue) }
 
+    protected isValidState = true
 
     // NOCOMMIT these shouldn't return IDerivation types for events
     map<Out>(transform: (value: T) => Out, displayName = `${this.displayName}.map(${nameOfCallback(transform)})`) {
-        return derive(() => transform(this.value), `${displayName}.map(${nameOfCallback(transform)})`)
+        return SourceBase.bind(this, v => transform(v), Object.is, displayName)
     }
 
     filter<Out extends T>(predicate: (value: T) => value is Out, displayName = `${this.displayName}.filter(${nameOfCallback(predicate)})`) {
-        return derive(() => this.value as Out, (_, next) => !predicate(next), `${displayName}.filter(${nameOfCallback(predicate)})`)
+        return SourceBase.bind(this, v => v as Out, (_, next) => !predicate(next), displayName)
     }
 
     filterMap<Out>(transform: (value: T) => Out | undefined, displayName = `${this.displayName}.filterMap(${nameOfCallback(transform)})`) {
-        return derive(() => transform(this.value) as Out, (_, next) => next == undefined, `${displayName}.filterMap(${nameOfCallback(transform)})`)
+        return SourceBase.bind(this, v => transform(v)!, (_, next) => next == undefined, displayName)
     }
+
+    static bind: <In, Out>(source: SourceBase<In>, transform: (value: In) => Out, skipUpdate: (previous: Out, next: Out) => boolean, displayName: string) => ISource<Out>
 
     subscribe(observer: IObserver<T>) { this._observers.add(observer) }
     unsubscribe(observer: IObserver<T>) { this._observers.delete(observer) }
@@ -93,5 +100,21 @@ export class NotASourceValueError extends Error {
         public value: unknown
     ) {
         super("Couldn't detect source for value. Make sure you pass in an observable value directly.");
+    }
+}
+
+export class InvalidStateError extends Error {
+    constructor(
+        public source: ISource<any>,
+        public value: IEventBase<unknown, unknown[]> | object
+    ) { super(`Tried to store ${isSource(value) ? value.displayName : value} in ${source.displayName}. ${nameOfFunction(value.constructor)}s cannot be state.`); }
+}
+
+export class StateChangeOutsideTransitionError extends Error {
+    constructor(
+        public source: ISource<any>
+    ) {
+        super(`Tried to change state of ${source.displayName} outside of a transition. '
+        + 'This usually means a bug in event-reduce, or in a custom source implementation.`);
     }
 }

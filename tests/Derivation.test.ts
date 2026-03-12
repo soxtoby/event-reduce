@@ -1,17 +1,19 @@
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
-import { derive, event, events } from "event-reduce";
-import { DerivedEventsError, SideEffectInDerivationError } from "event-reduce/lib/derivation";
-import { consumeLastAccessed, ObservableValue } from "event-reduce/lib/observableValue";
+import { getUnderlyingSource, SideEffectDuringReactionError } from "event-reduce/src/signals/tracking";
+import { Atom, derive, event, IDerivation } from "event-reduce/src/signals";
+import { MockObserver } from "./MockObserver";
+import { InvalidStateError } from "event-reduce/src/signals/signals";
+import { events } from "event-reduce/src/signals/models";
 
 describe("derive", () => {
-    let sourceA: ObservableValue<string>;
-    let sourceB: ObservableValue<string>;
+    let sourceA: Atom<string>;
+    let sourceB: Atom<string>;
     let calculation: Mock<() => string>;
-    let sut: ReturnType<typeof derive<string>>;
+    let sut: IDerivation<string>;
 
     beforeEach(() => {
-        sourceA = new ObservableValue(() => 'a', 'a');
-        sourceB = new ObservableValue(() => 'b', 'b');
+        sourceA = new Atom('a', 'a');
+        sourceB = new Atom('b', 'b');
         calculation = mock(() => sourceA.value + sourceB.value);
         sut = derive(calculation, 'sut');
     });
@@ -27,7 +29,7 @@ describe("derive", () => {
 
         test("returns result of calculation", () => expect(result).toBe('ab'));
 
-        test("derivation is last accessed value", () => expect(consumeLastAccessed()!).toBe(sut));
+        test("derivation is last accessed value", () => expect(getUnderlyingSource(result)!).toBe(sut));
 
         test("when accessed again, returns same value and doesn't re-compute the value", () => {
             let result2 = sut.value;
@@ -56,19 +58,19 @@ describe("derive", () => {
         });
 
         describe("when subscribed to", () => {
-            let observe: Mock<(value: string) => void>;
+            let observer: MockObserver<string>;
 
             beforeEach(() => {
-                observe = mock();
-                sut.subscribe(observe);
+                observer = new MockObserver();
+                sut.subscribe(observer);
             });
 
-            test("doesn't notify immediately", () => expect(observe).not.toHaveBeenCalled());
+            test("doesn't notify immediately", () => expect(observer.sourceUpdated).not.toHaveBeenCalled());
 
             test("when a source value changed, notifies observer", () => {
                 sourceA.setValue('A');
 
-                expect(observe).toHaveBeenCalled();
+                expect(observer.sourceUpdated).toHaveBeenCalled();
             });
         });
     });
@@ -81,23 +83,23 @@ describe("derive", () => {
             derivation.value;
             expect.unreachable("Should have thrown");
         } catch (e) {
-            expect(e).toBeInstanceOf(SideEffectInDerivationError);
-            expect((e as SideEffectInDerivationError).derivation).toBe(derivation);
-            expect((e as SideEffectInDerivationError).sideEffect).toBe('some event');
+            expect(e).toBeInstanceOf(SideEffectDuringReactionError);
+            expect((e as SideEffectDuringReactionError).reactingTo).toBe(derivation);
+            expect((e as SideEffectDuringReactionError).sideEffect).toBe(sideEffect);
         }
     });
 
     test("when derivation returns an event, accessing value throws", () => {
-        let eventValue = event('derived event');
+        let eventValue = event('derived event')
         let derivation = derive(() => sourceA.value && eventValue);
 
         try {
             derivation.value;
             expect.unreachable("Should have thrown");
         } catch (e) {
-            expect(e).toBeInstanceOf(DerivedEventsError);
-            expect((e as DerivedEventsError).derivation).toBe(derivation);
-            expect((e as DerivedEventsError).value).toBe(eventValue);
+            expect(e).toBeInstanceOf(InvalidStateError);
+            expect((e as InvalidStateError).source).toBe(derivation);
+            expect((e as InvalidStateError).value).toBe(eventValue);
         }
     });
 
@@ -111,20 +113,20 @@ describe("derive", () => {
             derivation.value;
             expect.unreachable("Should have thrown");
         } catch (e) {
-            expect(e).toBeInstanceOf(DerivedEventsError);
-            expect((e as DerivedEventsError).derivation).toBe(derivation);
-            expect((e as DerivedEventsError).value).toBe(eventsValue);
+            expect(e).toBeInstanceOf(InvalidStateError);
+            expect((e as InvalidStateError).source).toBe(derivation);
+            expect((e as InvalidStateError).value).toBe(eventsValue);
         }
     });
 });
 
 test("derivation that depends on other derivations only updates once", () => {
-    let source = new ObservableValue(() => "source", "a");
+    let source = new Atom("source", "a");
     let inner1 = derive(() => source.value + "_inner1");
     let inner2 = derive(() => source.value + "_inner2");
     let outerCalc = mock(() => inner1.value + inner2.value);
     let outer = derive(outerCalc);
-    outer.subscribe(() => { }); // Outer must be observed for sources to trigger an update
+    outer.subscribe(new MockObserver()); // Outer must be observed for sources to trigger an update
 
     // Initial access to set up dependencies
     outer.value;

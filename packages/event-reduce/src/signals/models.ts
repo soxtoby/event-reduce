@@ -5,7 +5,7 @@ import { eventsBrand, isEventsClass, Model, modelProperties, ModelProperty, Stat
 import { Reduction } from "./reduction"
 import { ISource, isSource } from "./signals"
 import { getState } from "./state"
-import { getUnderlyingSource, trackAccessedSources, trackManagedSourceCreation, updateChildren } from "./tracking"
+import { getUnderlyingSource, collectAccessedSources, trackManagedSourceCreation, updateChildren } from "./tracking"
 
 type UninitializedModel = { [modelPropertyFactories]?: Record<PropertyKey, () => ModelProperty> }
 type ModelPrototype = { [prototypePropertyFactories]?: Record<PropertyKey, (instance: any) => ModelProperty> }
@@ -26,7 +26,7 @@ export function model<Class extends new (...args: any[]) => any>(target: Class):
             [modelProperties] = {} as Record<PropertyKey, ModelProperty>
             constructor(...args: any[]) {
                 let sourceCreation = trackManagedSourceCreation()
-                let accesses = trackAccessedSources(null) // Don't want anything accessed during construction to become a source for whatever is creating this
+                let accesses = collectAccessedSources(null) // Don't want anything accessed during construction to become a source for whatever is creating this
                 try {
                     super(...args)
 

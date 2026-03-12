@@ -1,6 +1,7 @@
 import { LogValue } from "event-reduce/lib/logging"
 import { Effect, log, startLogging } from "event-reduce/lib/signals"
 import { ISource } from "event-reduce/lib/signals/signals"
+import { beginTransition } from "event-reduce/lib/signals/tracking"
 import { constant, dispose, emptyArray, nameOfFunction } from "event-reduce/lib/utils"
 import { Children, ReactNode, isValidElement, useState } from "react"
 import { useSyncExternalStore } from "use-sync-external-store/shim"
@@ -52,6 +53,7 @@ class RenderEffect<T> extends Effect<T> {
         let value!: T
         let trigger = this._trigger
 
+        let transition = beginTransition(this, true)
         let logging = startLogging('⚛️ (render)', this.displayName, emptyArray, () => ({
             // Previous: this.loggedValue(previousValue),
             Current: loggedReactValue(value),
@@ -65,7 +67,8 @@ class RenderEffect<T> extends Effect<T> {
         try {
             return value = super.run(deriveValue)
         } finally {
-            logging?.[dispose]()
+            transition[dispose]()
+            logging[dispose]()
         }
     }
 }

@@ -123,6 +123,8 @@ export function isDisposable(value: any): value is Disposable {
 
 export const dispose: typeof Symbol.dispose = Symbol.dispose ?? Symbol('Symbol.dispose');
 
+export const nullDisposable: Disposable = Object.freeze({ [dispose]() { } })
+
 /** Shim for `using` declaration until it's properly supported. */
 export function using<Resource extends Disposable>(disposable: Resource, action: (resource: Resource) => void) {
     try {

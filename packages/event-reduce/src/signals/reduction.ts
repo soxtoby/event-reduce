@@ -3,7 +3,7 @@ import { derive, IDerivation } from "./derivation"
 import { startLogging } from "./logging"
 import { IObserver, ISource, SourceBase } from "./signals"
 import { getState, State } from "./state"
-import { currentIteration, managedSourceCreated, sourceWasAccessed, trackAccessedSources, updateChildren } from "./tracking"
+import { currentIteration, managedSourceCreated, trackSourceAccessed, collectAccessedSources, updateChildren } from "./tracking"
 
 export interface IReduction<T, Events = void> extends ISource<T> {
     readonly value: T
@@ -64,7 +64,7 @@ export class Reduction<T, Events = void> extends SourceBase<T> implements IObser
         if (source.lastUpdated > this.lastUpdated) {
             let reduce = this._reducers.get(source)
             if (reduce) {
-                let tracker = trackAccessedSources(this) // Required for detecting circular references in reducers
+                let tracker = collectAccessedSources(this) // Required for detecting circular references in reducers
                 let previousValue = this._value
                 let nextValue!: T
                 let logging = startLogging('🧪 (reduction)', this.displayName, emptyArray, () => ({
@@ -85,11 +85,15 @@ export class Reduction<T, Events = void> extends SourceBase<T> implements IObser
     }
 
     override get value() {
-        sourceWasAccessed(this) // Notifying tracker before checking for updates so circular reference is detected early
+        let access = trackSourceAccessed(this) // Notifying tracker before checking for updates so circular reference is detected early
 
-        if (this._sourcesLastChecked < currentIteration)
-            for (let source of this.sources) // At most one source should be newer
-                this.sourceUpdated(source, (source as SourceBase<any>).value)
+        try {
+            if (this._sourcesLastChecked < currentIteration)
+                for (let source of this.sources) // At most one source should be newer
+                    this.sourceUpdated(source, (source as SourceBase<any>).value)
+        } finally {
+            access[dispose]()
+        }
 
         return this._value // Not using super.value to avoid duplicate tracker notification
     }

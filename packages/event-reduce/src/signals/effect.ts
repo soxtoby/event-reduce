@@ -1,6 +1,6 @@
 import { dispose } from "../utils"
 import type { IObserver, ISource } from "./signals"
-import { currentIteration, trackAccessedSources } from "./tracking"
+import { currentIteration, collectAccessedSources } from "./tracking"
 
 export class Effect<T> implements IObserver<any> {
     private _attached = false
@@ -46,7 +46,7 @@ export class Effect<T> implements IObserver<any> {
         delete this.invalidatingSource
 
         let result: T
-        let tracker = trackAccessedSources(this)
+        let tracker = collectAccessedSources(this)
 
         try {
             result = (effect ?? this._effect)()

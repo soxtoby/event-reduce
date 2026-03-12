@@ -1,6 +1,6 @@
 import { dispose, isDisposable, isObject } from "../utils"
 import { ISource, isSource } from "./signals"
-import { getChildNodes, trackAccessedSources, trackManagedSourceCreation, updateChildren } from "./tracking"
+import { getChildNodes, collectAccessedSources, trackManagedSourceCreation, updateChildren } from "./tracking"
 
 export const modelProperties = Symbol('model properties')
 export const eventsBrand = Symbol('events class')
@@ -44,7 +44,7 @@ export class StateProperty implements Disposable {
 
 export function createModel<T extends object>(create: () => T): T & Model {
     let sourceCreation = trackManagedSourceCreation()
-    let accesses = trackAccessedSources(null) // Don't want anything accessed during construction to become a source for whatever is creating this
+    let accesses = collectAccessedSources(null) // Don't want anything accessed during construction to become a source for whatever is creating this
     try {
         let instance = create()
         if (isModel(instance))

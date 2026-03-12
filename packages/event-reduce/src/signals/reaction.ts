@@ -11,13 +11,13 @@ export class Reaction extends Effect<void> {
     ) {
         super(displayName, reaction, () => {
             if (this._schedule) {
-                let reactionSource = iterationSource
+                let reactionSource = iterationSource!
                 this._schedule(() => {
-                    let transition = reactionSource ? beginTransition(reactionSource) : null
+                    let transition = beginTransition(reactionSource, true)
                     try {
                         this.run()
                     } finally {
-                        transition?.[dispose]()
+                        transition[dispose]()
                     }
                 })
             } else {

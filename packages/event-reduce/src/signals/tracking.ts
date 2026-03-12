@@ -1,11 +1,12 @@
-import { dispose, emptyMap, isDisposable, isObject, nameOfFunction } from "../utils"
+import { dispose, emptyMap, isDisposable, isObject, nameOfFunction, nullDisposable } from "../utils"
+import { Effect } from "./effect"
 import { type EventsClass, isEventsClass, isModel, type Model, StateProperty } from "./nodes"
 import { type IObserver, type ISource, isSource, SourceBase } from "./signals"
 
 type GraphNode = ISource<any> | Model | EventsClass
 
 export let currentIteration = 0
-export let iterationSource: ISource<any> | null = null
+export let iterationSource: ISource<any> | Effect<any> | null = null
 
 let currentAccessTracker: AccessTracker | null = null
 let lastSourceAccessed: ISource<any> | null = null
@@ -18,28 +19,32 @@ let garbage = new Set<GraphNode & Disposable>()
 
 let currentCreationScope: Set<GraphNode & ISource<any>> | null = null
 
-export function beginTransition(source: ISource<any>) {
-    if (iterationSource)
-        throw new SideEffectDuringReactionError(iterationSource, source)
+export function beginTransition(source: ISource<any> | Effect<any>, isTriggerEvent: boolean): Disposable {
+    if (isTriggerEvent) {
+        if (iterationSource)
+            throw new SideEffectDuringReactionError(iterationSource, source)
 
-    currentIteration++
-    iterationSource = source
+        currentIteration++
+        iterationSource = source
 
-    return {
-        [dispose]() {
-            iterationSource = null
-            disposeGarbage()
+        return {
+            [dispose]() {
+                iterationSource = null
+                disposeGarbage()
+            }
         }
+    } else {
+        return nullDisposable
     }
 }
 
-export function trackAccessedSources(observer: IObserver<any> | null) {
+export function collectAccessedSources(observer: IObserver<any> | null) {
     return new AccessTracker(observer)
 }
 
-export function sourceWasAccessed(source: ISource<any>) {
+export function trackSourceAccessed(source: ISource<any>): Disposable {
     currentAccessTracker?.addAccessed(source)
-    lastSourceAccessed = source
+    return { [dispose]() { lastSourceAccessed = source } }
 }
 
 export function getUnderlyingSource<T>(value: T): ISource<T> | null {
@@ -198,14 +203,14 @@ export function getPath(node: GraphNode): string {
 }
 
 export class CircularDependencyError extends Error {
-    constructor(path: ISource<any>[]) { super(`Circular dependency detected: ${path.map(s => s.displayName).join(' -> ')}`) }
+    constructor(path: ISource<any>[]) { super(`Circular dependency detected: ${path.map(s => s.displayName).join(' -> ')}.`) }
 }
 
 export class SideEffectDuringReactionError extends Error {
     constructor(
-        public reactingTo: ISource<any>,
-        public causing: ISource<any>
-    ) { super(`Side effect during reaction to ${reactingTo.displayName} in ${causing.displayName}`) }
+        public reactingTo: ISource<any> | Effect<any>,
+        public sideEffect: ISource<any> | Effect<any>
+    ) { super(`${sideEffect.displayName} side effect during reaction to ${reactingTo.displayName}.`) }
 }
 
 export class UntrackedSourceError extends Error {

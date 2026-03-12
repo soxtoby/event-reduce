@@ -3,7 +3,7 @@ import { Effect } from "./effect"
 import { startLogging } from "./logging"
 import { IObserver, ISource, SourceBase } from "./signals"
 import { getState, State } from "./state"
-import { sourceWasAccessed, trackManagedSourceCreation } from "./tracking"
+import { beginTransition, iterationSource, trackManagedSourceCreation, trackSourceAccessed } from "./tracking"
 
 export interface IDerivation<T> extends ISource<T>, IObserver<any> {
     readonly value: T
@@ -23,6 +23,11 @@ export function derive<T>(derive: () => T, displayNameOrSkip?: string | ((a: T, 
         ? [displayNameOrSkip, maybeDisplayName]
         : [Object.is, displayNameOrSkip]
     return new Derivation(displayName ?? nameOfFunction(derive), derive, skipUpdate)
+}
+
+// Must be set here to avoid circular dependency
+SourceBase.bind = function bind(source, transform, skipUpdate, displayName) {
+    return new Derivation(displayName, () => transform(source.value), skipUpdate)
 }
 
 export class Derivation<T> extends SourceBase<T> implements IDerivation<T> {
@@ -66,21 +71,26 @@ export class Derivation<T> extends SourceBase<T> implements IDerivation<T> {
 
     override get value() {
         // Notifying tracker before checking for updates so circular reference is detected early
-        sourceWasAccessed(this)
+        let access = trackSourceAccessed(this)
 
-        if (this._derive.isStale)
-            this.update(undefined, undefined, true)
+        try {
+            if (this._derive.isStale)
+                this.update()
+        } finally {
+            access[dispose]()
+        }
 
         return this._value // Not using super.value to avoid duplicate tracker notification
     }
 
     protected override skipUpdate(nextValue: T) { return this._skipUpdate(this._value, nextValue) }
 
-    update(deriveValue?: () => T, reason?: string, isTriggerEvent = false) {
+    update(deriveValue?: () => T, reason?: string) {
         let previousValue = this._value
         let nextValue!: T
         let trigger = this._derive.invalidatingSource ? new WeakRef(this._derive.invalidatingSource) : undefined
 
+        let transition = beginTransition(this, !iterationSource) // Derivations are always safe to access, and only initiate a transition if necessary
         let sourceCreation = trackManagedSourceCreation()
         let logging = startLogging('🔗 (derivation)', this.displayName, emptyArray, () => ({
             Previous: previousValue,
@@ -92,11 +102,12 @@ export class Derivation<T> extends SourceBase<T> implements IDerivation<T> {
                 : reason
         }))
         try {
-            this.setValue(nextValue = this._derive.run(deriveValue), isTriggerEvent)
+            this.setValue(nextValue = this._derive.run(deriveValue))
             sourceCreation.verifySourceManagement()
         } finally {
-            logging?.[dispose]()
+            logging[dispose]()
             sourceCreation[dispose]()
+            transition[dispose]()
         }
     }
 
