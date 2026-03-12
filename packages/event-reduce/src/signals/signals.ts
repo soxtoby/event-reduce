@@ -1,7 +1,7 @@
 import { dispose, nameOfCallback, nameOfFunction } from "../utils"
 import type { IEventBase } from "./events"
 import { isEventsClass } from "./nodes"
-import { beginTransition, currentIteration, getPath, iterationSource, trackSourceAccessed, updateChildren } from "./tracking"
+import { currentIteration, getPath, iterationSource, trackSourceAccessed, updateChildren } from "./tracking"
 
 /** 
  * NOCOMMIT
@@ -9,20 +9,25 @@ import { beginTransition, currentIteration, getPath, iterationSource, trackSourc
  * - Some way to create top-level reductions - maybe a case for a "createModel" that marks a plain object as a model and adds a dispose
  */
 
-
 export function isSource(value: any): value is ISource<any> {
     return value instanceof SourceBase
 }
+
+export type SourceValue<Source extends ISource<any>> = Source extends ISource<infer T> ? T : never
 
 export interface ISource<T> extends Disposable {
     displayName: string
     readonly path: string
     readonly lastUpdated: number
-    map<Out>(transform: (value: T) => Out, displayName?: string): ISource<Out>
-    filter<Out extends T>(predicate: (value: T) => value is Out, displayName?: string): ISource<Out>
-    filterMap<Out>(transform: (value: T) => Out | undefined, displayName?: string): ISource<Out>
     subscribe(observer: IObserver<T>): void
     unsubscribe(observer: IObserver<T>): void
+}
+
+export interface IValueSource<T> extends ISource<T> {
+    readonly value: T
+    map<Out>(transform: (value: T) => Out, displayName?: string): IValueSource<Out>
+    filter<Out extends T>(predicate: (value: T) => value is Out, displayName?: string): IValueSource<Out>
+    filterMap<Out>(transform: (value: T) => Out | undefined, displayName?: string): IValueSource<Out>
 }
 
 export interface IObserver<T> {
@@ -71,19 +76,24 @@ export abstract class SourceBase<T> implements ISource<T> {
     protected isValidState = true
 
     // NOCOMMIT these shouldn't return IDerivation types for events
-    map<Out>(transform: (value: T) => Out, displayName = `${this.displayName}.map(${nameOfCallback(transform)})`) {
+    map<Source extends SourceBase<any>, Out>(this: Source, transform: (value: T) => Out, displayName = `${this.displayName}.map(${nameOfCallback(transform)})`) {
         return SourceBase.bind(this, v => transform(v), Object.is, displayName)
     }
 
-    filter<Out extends T>(predicate: (value: T) => value is Out, displayName = `${this.displayName}.filter(${nameOfCallback(predicate)})`) {
+    filter<Source extends SourceBase<any>, Out extends T>(this: Source, predicate: (value: T) => value is Out, displayName = `${this.displayName}.filter(${nameOfCallback(predicate)})`) {
         return SourceBase.bind(this, v => v as Out, (_, next) => !predicate(next), displayName)
     }
 
-    filterMap<Out>(transform: (value: T) => Out | undefined, displayName = `${this.displayName}.filterMap(${nameOfCallback(transform)})`) {
+    filterMap<Source extends SourceBase<any>, Out>(this: Source, transform: (value: T) => Out | undefined, displayName = `${this.displayName}.filterMap(${nameOfCallback(transform)})`) {
         return SourceBase.bind(this, v => transform(v)!, (_, next) => next == undefined, displayName)
     }
 
-    static bind: <In, Out>(source: SourceBase<In>, transform: (value: In) => Out, skipUpdate: (previous: Out, next: Out) => boolean, displayName: string) => ISource<Out>
+    static bind: <Source extends SourceBase<any>, Out>(
+        source: Source,
+        transform: (value: SourceValue<Source>) => Out,
+        skipUpdate: (previous: Out, next: Out) => boolean,
+        displayName: string
+    ) => Source extends IValueSource<any> ? IValueSource<Out> : ISource<Out>
 
     subscribe(observer: IObserver<T>) { this._observers.add(observer) }
     unsubscribe(observer: IObserver<T>) { this._observers.delete(observer) }

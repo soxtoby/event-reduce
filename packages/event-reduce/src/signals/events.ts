@@ -132,7 +132,7 @@ class Event<T> extends SourceBase<T> {
     override skipUpdate(nextValue: T) { return false }
     protected override updateChildren(previousValue: T, nextValue: T) { } // Value won't be held onto
 
-    override map<Out>(transform: (value: T) => Out, displayName = `${this.displayName}.map(${nameOfCallback(transform)})`): ISource<Out> {
+    override map<Source extends SourceBase<any>, Out>(this: Source, transform: (value: T) => Out, displayName = `${this.displayName}.map(${nameOfCallback(transform)})`) {
         // Mapped events should always trigger, even if the value is the same
         return SourceBase.bind(this, v => transform(v), () => false, `${displayName}.map(${nameOfCallback(transform)})`)
     }

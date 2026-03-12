@@ -1,10 +1,10 @@
 import { dispose } from "../utils";
 import { derive, IDerivation } from "./derivation";
-import { SourceBase } from "./signals";
+import { IValueSource, SourceBase } from "./signals";
 import { getState, State } from "./state";
 import { beginTransition } from "./tracking";
 
-export class Atom<T> extends SourceBase<T> {
+export class Atom<T> extends SourceBase<T> implements IValueSource<T> {
     private _json: IDerivation<State<T>>
 
     constructor(

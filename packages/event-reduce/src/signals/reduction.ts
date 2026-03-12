@@ -1,12 +1,11 @@
 import { dispose, emptyArray } from "../utils"
 import { derive, IDerivation } from "./derivation"
 import { startLogging } from "./logging"
-import { IObserver, ISource, SourceBase } from "./signals"
+import { IObserver, ISource, IValueSource, SourceBase } from "./signals"
 import { getState, State } from "./state"
 import { currentIteration, managedSourceCreated, trackSourceAccessed, collectAccessedSources, updateChildren } from "./tracking"
 
-export interface IReduction<T, Events = void> extends ISource<T> {
-    readonly value: T
+export interface IReduction<T, Events = void> extends IValueSource<T> {
     on<S>(source: ISource<S>, reduce: Reducer<T, S>): this
     on<S>(getSource: (events: Events) => ISource<S>, reduce: Reducer<T, S>): this
 }
@@ -23,7 +22,7 @@ export function reduce<T, Events>(initialValue: T, eventsOrDisplayName?: Events 
 
 export type Reducer<Result, Source> = (current: Result, next: Source) => Result
 
-export class Reduction<T, Events = void> extends SourceBase<T> implements IObserver<any> {
+export class Reduction<T, Events = void> extends SourceBase<T> implements IReduction<T, Events>, IObserver<any> {
     sources = new Set<ISource<any>>()
     private _reducers = new Map<ISource<any>, (current: T, next: any) => T>()
     private _sourcesLastChecked = -1

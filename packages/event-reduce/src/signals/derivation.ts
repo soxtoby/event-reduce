@@ -1,13 +1,11 @@
 import { dispose, emptyArray, nameOfFunction } from "../utils"
 import { Effect } from "./effect"
 import { startLogging } from "./logging"
-import { IObserver, ISource, SourceBase } from "./signals"
+import { IObserver, ISource, IValueSource, SourceBase } from "./signals"
 import { getState, State } from "./state"
 import { beginTransition, iterationSource, trackManagedSourceCreation, trackSourceAccessed } from "./tracking"
 
-export interface IDerivation<T> extends ISource<T>, IObserver<any> {
-    readonly value: T
-
+export interface IDerivation<T> extends IValueSource<T>, IObserver<any> {
     /** 
      * Forces the value to be re-calculated. 
      * @param deriveValue Optional function to use to derive the value. If not provided, the original derivation function will be used.
