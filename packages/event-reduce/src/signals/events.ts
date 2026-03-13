@@ -1,6 +1,6 @@
-import { dispose } from "../utils"
+import { Scoped } from "../types"
+import { dispose, matchesScope } from "../utils"
 import { startLogging } from "./logging"
-import { applyScope, DeepPartial, matchesScope, Scoped } from "./scoping"
 import { type ISource, SourceBase, SourceValue } from "./signals"
 import { beginTransition } from "./tracking"
 
@@ -9,7 +9,7 @@ export interface IEventFunction<T, Args extends any[], Return = Args[0]> extends
 }
 
 export interface IEvent<In, Out = In> extends IEventFunction<Out, [value: In]> {
-    scope<Scope extends DeepPartial<In>>(scope: Scope): IEvent<Out, [value: Scoped<In, Scope>]>
+    scope<Scope extends Partial<In>>(scope: Scope): IEvent<Scoped<In, Scope>, Out>
 }
 
 export type AdditionalMembersFactory<Source extends ISource<any>, Members extends object> =
@@ -24,14 +24,14 @@ export function event<T = void>(name: string = "(anonymous event)"): IEvent<T> {
             logging?.[dispose]()
         }
         return value
-    }, function eventMembers(e: IEventFunction<T, [T]>) {
+    }, function eventMembers<In>(e: IEventFunction<T, [In]>) {
         return {
-            scope<Scope extends DeepPartial<T>>(scope: Scope) {
+            scope<Scope extends Partial<In>>(scope: Scope): IEvent<Scoped<In, Scope>, T> {
                 return bindEvent(e,
                     `${e.displayName}.scoped(${JSON.stringify(scope)})`,
-                    (value: Scoped<T, Scope>) => e(applyScope(value, scope)),
-                    v => matchesScope(v, scope),
-                    eventMembers)
+                    (value: Scoped<In, Scope>) => e({ ...value, ...scope } as In),
+                    matchesScope(scope),
+                    eventMembers) as IEvent<Scoped<In, Scope>, T>
             }
         }
     }) as IEvent<T>
@@ -41,7 +41,7 @@ export interface IAsyncEvent<Result, Context> extends IEventFunction<AsyncValue<
     started: ISource<AsyncStart<Result, Context>>
     resolved: ISource<AsyncResult<Result, Context>>
     rejected: ISource<AsyncError<Context>>
-    scope<Scope extends DeepPartial<Context>>(scope: Scope): IAsyncEvent<Result, Scoped<Context, Scope>>
+    scope<Scope extends Partial<Context>>(scope: Scope): IAsyncEvent<Result, Scoped<Context, Scope>>
 }
 
 export type AsyncValue<Result, Context> =
@@ -99,11 +99,11 @@ export function asyncEvent<Result = void, Context = void>(name: string = "(anony
             started: e.filter(v => 'promise' in v, `${e.displayName}.started`),
             resolved: e.filter(v => 'result' in v, `${e.displayName}.resolved`),
             rejected: e.filter(v => 'error' in v, `${e.displayName}.rejected`),
-            scope<Scope extends DeepPartial<Context>>(scope: Scope) {
+            scope<Scope extends Partial<Context>>(scope: Scope) {
                 return bindEvent(e,
                     `${e.displayName}.scoped(${JSON.stringify(scope)})`,
-                    (promise: PromiseLike<Result>, context: Scoped<Context, Scope>) => e(promise, applyScope(context, scope)),
-                    v => matchesScope(v.context, scope),
+                    (promise: PromiseLike<Result>, context: Scoped<Context, Scope>) => e(promise, { ...context, ...scope } as Context),
+                    v => matchesScope(scope, v.context),
                     asyncEventMembers)
             }
         }

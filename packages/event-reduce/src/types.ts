@@ -1,6 +1,6 @@
-export type Scoped<T extends Scope, Scope extends object> =
+export type Scoped<T, Scope extends Partial<T>> =
     & Omit<T, keyof Scope>
-    & { [K in keyof Scope]?: T[K]; };
+    & { [K in keyof Scope]?: K extends keyof T ? T[K] : never; };
 
 export type StringKey<T> = Extract<keyof T, string>;
 export type OmitValues<T, Omitted> = FromEntries<Exclude<Entries<T>, [any, Omitted]>>;
