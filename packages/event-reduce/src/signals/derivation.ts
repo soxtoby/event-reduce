@@ -23,11 +23,6 @@ export function derive<T>(derive: () => T, displayNameOrSkip?: string | ((a: T, 
     return new Derivation(displayName ?? nameOfFunction(derive), derive, skipUpdate)
 }
 
-// Must be set here to avoid circular dependency
-SourceBase.bind = function bind(source, transform, skipUpdate, displayName) {
-    return new Derivation(displayName, () => transform(source.value), skipUpdate)
-}
-
 export class Derivation<T> extends SourceBase<T> implements IDerivation<T> {
     private _derive: Effect<T>
     private _json?: IDerivation<State<T>>

@@ -1,39 +1,43 @@
-import { dispose, nameOfCallback } from "../utils"
+import { dispose } from "../utils"
 import { startLogging } from "./logging"
 import { applyScope, DeepPartial, matchesScope, Scoped } from "./scoping"
-import { type ISource, SourceBase } from "./signals"
+import { type ISource, SourceBase, SourceValue } from "./signals"
 import { beginTransition } from "./tracking"
 
-export interface IEventBase<T, Args extends any[]> extends ISource<T> {
-    (...args: Args): Args[0]
-    map<Out>(transform: (value: T) => Out, displayName?: string): ISource<Out>
-    filter<Out extends T>(predicate: (value: T) => value is Out, displayName?: string): ISource<Out>
-    filterMap<Out>(transform: (value: T) => Out | undefined, displayName?: string): ISource<Out>
+export interface IEventFunction<T, Args extends any[], Return = Args[0]> extends ISource<T> {
+    (...args: Args): Return
 }
 
-export interface IEvent<In, Out = In> extends IEventBase<Out, [value: In]> {
+export interface IEvent<In, Out = In> extends IEventFunction<Out, [value: In]> {
     scope<Scope extends DeepPartial<In>>(scope: Scope): IEvent<Out, [value: Scoped<In, Scope>]>
 }
 
+export type AdditionalMembersFactory<Source extends ISource<any>, Members extends object> =
+    (source: Source & IEventFunction<SourceValue<Source>, any>) => Members
+
 export function event<T = void>(name: string = "(anonymous event)"): IEvent<T> {
-    return makeEventFunction(name, (emit: (value: T) => void, event: T) => {
-        let logging = startLogging('⚡ (event)', name, [event]) // NOCOMMIT Container
+    return makeEventFunction(name, (emit: (value: T) => void, value: T) => {
+        let logging = startLogging('⚡ (event)', name, [value]) // NOCOMMIT Container
         try {
-            emit(event)
+            emit(value)
         } finally {
             logging?.[dispose]()
         }
-        return event
-    }, e => ({
-        scope<Scope extends DeepPartial<T>>(scope: Scope) {
-            return Event.bindEvent(e, `${e.displayName}.scoped(${JSON.stringify(scope)})`,
-                (value: Scoped<T, Scope>) => e(applyScope(value, scope)),
-                value => matchesScope(value, scope)) as any as IEvent<T, [value: Scoped<T, Scope>]>
+        return value
+    }, function eventMembers(e: IEventFunction<T, [T]>) {
+        return {
+            scope<Scope extends DeepPartial<T>>(scope: Scope) {
+                return bindEvent(e,
+                    `${e.displayName}.scoped(${JSON.stringify(scope)})`,
+                    (value: Scoped<T, Scope>) => e(applyScope(value, scope)),
+                    v => matchesScope(v, scope),
+                    eventMembers)
+            }
         }
-    }))
+    }) as IEvent<T>
 }
 
-export interface IAsyncEvent<Result, Context> extends IEventBase<AsyncValue<Result, Context>, [promise: PromiseLike<Result>, context: Context]> {
+export interface IAsyncEvent<Result, Context> extends IEventFunction<AsyncValue<Result, Context>, [promise: PromiseLike<Result>, context: Context]> {
     started: ISource<AsyncStart<Result, Context>>
     resolved: ISource<AsyncResult<Result, Context>>
     rejected: ISource<AsyncError<Context>>
@@ -90,32 +94,57 @@ export function asyncEvent<Result = void, Context = void>(name: string = "(anony
             })
 
         return promise
-    }, e => ({
-        started: e.filter(v => 'promise' in v, `${e.displayName}.started`),
-        resolved: e.filter(v => 'result' in v, `${e.displayName}.resolved`),
-        rejected: e.filter(v => 'error' in v, `${e.displayName}.rejected`),
-        scope<Scope extends DeepPartial<Context>>(scope: Scope) {
-            return Event.bindEvent(e, `${e.displayName}.scoped(${JSON.stringify(scope)})`,
-                (promise: PromiseLike<Result>, context: Scoped<Context, Scope>) => e(promise, applyScope(context, scope)),
-                value => matchesScope(value.context, scope)) as IAsyncEvent<Result, Scoped<Context, Scope>>
+    }, function asyncEventMembers(e: IEventFunction<AsyncValue<Result, Context>, [promise: PromiseLike<Result>, context: Context]>) {
+        return {
+            started: e.filter(v => 'promise' in v, `${e.displayName}.started`),
+            resolved: e.filter(v => 'result' in v, `${e.displayName}.resolved`),
+            rejected: e.filter(v => 'error' in v, `${e.displayName}.rejected`),
+            scope<Scope extends DeepPartial<Context>>(scope: Scope) {
+                return bindEvent(e,
+                    `${e.displayName}.scoped(${JSON.stringify(scope)})`,
+                    (promise: PromiseLike<Result>, context: Scoped<Context, Scope>) => e(promise, applyScope(context, scope)),
+                    v => matchesScope(v.context, scope),
+                    asyncEventMembers)
+            }
         }
-    }))
+    }) as IAsyncEvent<Result, Context>
 }
 
-/** Converts an event class into a callable function */
+/** Creates a callable event object. */
 export function makeEventFunction<T, Args extends any[] = [T], Return = Args[0], Members extends object = {}>(
     name: string,
-    fire: (emit: (event: T) => void, ...args: Args) => Return,
-    getMembers?: (event: IEventBase<T, Args>) => Members
-): IEventBase<T, Args> & Members {
-    let eventBase = new Event<T>(name)
-    let eventFn = event as Event<T> & IEventBase<T, Args>
-    Object.setPrototypeOf(eventFn, eventBase);
+    fire: (emit: (value: T) => void, ...args: Args) => Return,
+    getMembers?: AdditionalMembersFactory<ISource<any>, Members>
+): IEventFunction<T, Args, Return> & Members {
+    let eventSource = new Event<T>(name) as Event<T> & IEventFunction<T, Args, Return>
+    return makeSourceFunction(eventSource, event, getMembers)
+
+    function event(...args: Args) { return fire(eventSource.emit.bind(event), ...args) }
+}
+
+/** Wrap an event with input and output filter. Useful for scoping. */
+export function bindEvent<E extends IEventFunction<any, any>, Args extends any[], Return, Members extends object>(
+    event: E,
+    displayName: string,
+    fire: (...args: Args) => Return,
+    predicate: (value: SourceValue<E>) => boolean,
+    getMembers?: AdditionalMembersFactory<ISource<any>, Members>
+) {
+    return makeSourceFunction(event.filter(predicate, displayName), fire, getMembers)
+}
+
+function makeSourceFunction<Source extends ISource<any>, Args extends any[], Return, Members extends object>(
+    innerEvent: Source,
+    fire: (...args: Args) => Return,
+    getMembers?: AdditionalMembersFactory<Source, Members>
+): IEventFunction<SourceValue<Source>, Args, Return> & Members {
+    let eventFn = fire as Source & IEventFunction<SourceValue<Source>, Args, Return>
+    Object.setPrototypeOf(eventFn, innerEvent);
     eventFn.apply = Function.prototype.apply;
     eventFn.call = Function.prototype.call;
-    return Object.assign(eventFn, getMembers?.(eventFn) ?? {} as Members)
-
-    function event(...args: Args) { return fire(eventFn.emit.bind(eventFn), ...args) }
+    return getMembers
+        ? Object.assign(eventFn, getMembers(eventFn))
+        : eventFn as Source & IEventFunction<SourceValue<Source>, Args, Return> & Members
 }
 
 class Event<T> extends SourceBase<T> {
@@ -131,34 +160,9 @@ class Event<T> extends SourceBase<T> {
     override isValidState = false
     override skipUpdate(nextValue: T) { return false }
     protected override updateChildren(previousValue: T, nextValue: T) { } // Value won't be held onto
-
-    override map<Source extends SourceBase<any>, Out>(this: Source, transform: (value: T) => Out, displayName = `${this.displayName}.map(${nameOfCallback(transform)})`) {
-        // Mapped events should always trigger, even if the value is the same
-        return SourceBase.bind(this, v => transform(v), () => false, `${displayName}.map(${nameOfCallback(transform)})`)
-    }
-
-    /** 
-     * Transforms an event by wrapping the function, and filtering the emitted values. 
-     * Useful for scope functions.
-    */
-    static bindEvent<E extends IEventBase<any, any>, ScopedArgs extends any[]>(
-        baseEvent: E,
-        displayName: string,
-        scopedFn: (...args: ScopedArgs) => ReturnType<E>,
-        eventPredicate: (value: EventValue<E>) => boolean
-    ): IEventBase<EventValue<E>, ScopedArgs> {
-        let scopedEvent = scopedFn as IEventBase<EventValue<E>, ScopedArgs>
-        Object.setPrototypeOf(scopedEvent, Object.create(baseEvent, {
-            skipUpdate: { value: (next: EventValue<E>) => (baseEvent as any).skipUpdate(next) || !eventPredicate(next) }
-        }));
-        scopedEvent.displayName = displayName
-        return scopedEvent
-    }
 }
 
-export function isEvent(value: any): value is IEventBase<unknown, unknown[]> {
+export function isEvent(value: any): value is IEventFunction<unknown, unknown[], unknown> {
     return typeof value == 'function'
         && value instanceof Event
 }
-
-type EventValue<Event extends IEventBase<any, any>> = Event extends IEventBase<infer T, any> ? T : never

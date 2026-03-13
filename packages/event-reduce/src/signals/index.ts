@@ -1,7 +1,7 @@
 export { Atom } from "./atom"
 export { derive, type IDerivation } from "./derivation"
 export { Effect } from "./effect"
-export { asyncEvent, event } from "./events"
+export { asyncEvent, event, type AsyncError, type AsyncResult, type AsyncStart, type AsyncValue } from "./events"
 export { log, startLogging } from "./logging"
 export { derived, reduced, state } from "./models"
 export { reduce, type IReduction, type Reducer } from "./reduction"

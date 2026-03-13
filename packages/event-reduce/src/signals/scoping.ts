@@ -17,7 +17,7 @@ export function applyScope<T, S extends DeepPartial<T>>(target: Scoped<T, S>, sc
     }
 }
 
-export function matchesScope(value: unknown, scope: unknown): boolean {
+export function matchesScope<Scope extends object>(value: unknown, scope: Scope): value is Scope {
     if (isObject(scope)) {
         if (Array.isArray(scope))
             return Array.isArray(value)

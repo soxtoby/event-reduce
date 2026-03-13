@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
-import { asyncEvent, event, type AsyncError, type AsyncResult, type AsyncStart } from 'event-reduce';
-import { ChainedEventsError } from "event-reduce/lib/events";
+import { beforeEach, describe, expect, test } from "bun:test";
+import { asyncEvent, event, type AsyncError, type AsyncResult, type AsyncStart } from 'event-reduce/src/signals';
+import { SideEffectDuringReactionError } from "event-reduce/src/signals/tracking";
+import { MockObserver } from "./MockObserver";
 
 describe("event", () => {
     type TestType = { foo: string, bar: number };
@@ -11,10 +12,10 @@ describe("event", () => {
     });
 
     describe("when subscribed to", () => {
-        let subscriber: Mock<(value: TestType) => void>;
+        let subscriber: MockObserver<TestType>;
 
         beforeEach(() => {
-            subscriber = mock();
+            subscriber = new MockObserver()
             sut.subscribe(subscriber);
         });
 
@@ -23,41 +24,43 @@ describe("event", () => {
 
             sut(value);
 
-            expect(subscriber).toHaveBeenCalledWith(value);
+            expect(subscriber.sourceUpdated).toHaveBeenCalledWith(sut, value);
         });
     });
 
     test("when handler calls another event, throws", () => {
         let otherEvent = event<void>('otherEvent');
-        sut.subscribe(() => otherEvent(undefined));
+        let observer = new MockObserver()
+        observer.sourceUpdated = () => otherEvent(undefined)
+        sut.subscribe(observer);
 
         try {
             sut({ foo: 'foo', bar: 1 });
             expect.unreachable("Should have thrown");
         } catch (e) {
-            expect(e).toBeInstanceOf(ChainedEventsError);
-            expect((e as ChainedEventsError).currentEvent).toBe(sut.displayName);
-            expect((e as ChainedEventsError).newEvent).toBe(otherEvent.displayName);
+            expect(e).toBeInstanceOf(SideEffectDuringReactionError);
+            expect((e as SideEffectDuringReactionError).reactingTo).toBe(sut);
+            expect((e as SideEffectDuringReactionError).sideEffect).toBe(otherEvent);
         }
     });
 
     describe("scope", () => {
         let scoped: any;
-        let rootSubscriber: Mock<(value: TestType) => void>;
-        let scopedSubscriber: Mock<(value: TestType) => void>;
+        let rootObserver: MockObserver<TestType>;
+        let scopedObserver: MockObserver<TestType>;
 
         beforeEach(() => {
             scoped = sut.scope({ foo: 'foo' });
-            rootSubscriber = mock();
-            scopedSubscriber = mock();
-            sut.subscribe(rootSubscriber);
-            scoped.subscribe(scopedSubscriber);
+            rootObserver = new MockObserver()
+            scopedObserver = new MockObserver()
+            sut.subscribe(rootObserver);
+            scoped.subscribe(scopedObserver);
         });
 
         test("when non-matching value passed to parent event, scoped event does not pass on value", () => {
             sut({ foo: 'bar', bar: 1 });
 
-            expect(scopedSubscriber).not.toHaveBeenCalled();
+            expect(scopedObserver.sourceUpdated).not.toHaveBeenCalled();
         });
 
         test("when matching value passed to parent event, scoped event passed on value", () => {
@@ -65,14 +68,14 @@ describe("event", () => {
 
             sut(value);
 
-            expect(scopedSubscriber).toHaveBeenCalledWith(value);
+            expect(scopedObserver.sourceUpdated).toHaveBeenCalledWith(scoped, value);
         });
 
         test("when called with partial value, scoped event fills in scope values", () => {
             scoped({ bar: 2 });
 
-            expect(rootSubscriber).toHaveBeenCalledWith(expect.objectContaining({ foo: 'foo', bar: 2 }));
-            expect(scopedSubscriber).toHaveBeenCalledWith(expect.objectContaining({ foo: 'foo', bar: 2 }));
+            expect(rootObserver.sourceUpdated).toHaveBeenCalledWith(sut, expect.objectContaining({ foo: 'foo', bar: 2 }));
+            expect(scopedObserver.sourceUpdated).toHaveBeenCalledWith(scoped, expect.objectContaining({ foo: 'foo', bar: 2 }));
         });
     });
 });
@@ -82,15 +85,15 @@ describe("asyncEvent", () => {
     type Context = { bar: string; };
     let sut: ReturnType<typeof asyncEvent<Result, Context>>;
 
-    let started: Mock<(value: AsyncStart<Result, Context>) => void>;
-    let resolved: Mock<(value: AsyncResult<Result, Context>) => void>;
-    let rejected: Mock<(value: AsyncError<Context>) => void>;
+    let started: MockObserver<AsyncStart<Result, Context>>;
+    let resolved: MockObserver<AsyncResult<Result, Context>>;
+    let rejected: MockObserver<AsyncError<Context>>;
 
     beforeEach(() => {
         sut = asyncEvent<Result, Context>();
-        started = mock();
-        resolved = mock();
-        rejected = mock();
+        started = new MockObserver()
+        resolved = new MockObserver()
+        rejected = new MockObserver()
         sut.started.subscribe(started);
         sut.resolved.subscribe(resolved);
         sut.rejected.subscribe(rejected);
@@ -108,14 +111,14 @@ describe("asyncEvent", () => {
             sut(promise, context);
         });
 
-        test("started event fired", () => expect(started).toHaveBeenCalledWith(expect.objectContaining({ promise, context })));
+        test("started event fired", () => expect(started.sourceUpdated).toHaveBeenCalledWith(sut.started, expect.objectContaining({ promise, context })));
 
         test("when promise resolved, resolved event fired", async () => {
             let result = { foo: 'result' };
             resolve(result);
             await promise;
 
-            expect(resolved).toHaveBeenCalledWith(expect.objectContaining({ result, context }));
+            expect(resolved.sourceUpdated).toHaveBeenCalledWith(sut.resolved, expect.objectContaining({ result, context }));
         });
 
         test("when promise rejected, rejected event fired", async () => {
@@ -123,7 +126,7 @@ describe("asyncEvent", () => {
             reject(error);
             await promise.catch(() => { }); // Catch to prevent unhandled rejection
 
-            expect(rejected).toHaveBeenCalledWith(expect.objectContaining({ error, context }));
+            expect(rejected.sourceUpdated).toHaveBeenCalledWith(sut.rejected, expect.objectContaining({ error, context }));
         });
     });
 });

@@ -1,5 +1,5 @@
-import { dispose, nameOfCallback, nameOfFunction } from "../utils"
-import type { IEventBase } from "./events"
+import { dispose, identity, nameOfCallback, nameOfFunction } from "../utils"
+import type { IEventFunction } from "./events"
 import { isEventsClass } from "./nodes"
 import { currentIteration, getPath, iterationSource, trackSourceAccessed, updateChildren } from "./tracking"
 
@@ -21,18 +21,20 @@ export interface ISource<T> extends Disposable {
     readonly lastUpdated: number
     subscribe(observer: IObserver<T>): void
     unsubscribe(observer: IObserver<T>): void
+
+    map<Out>(transform: (value: T) => Out, displayName?: string): ISource<Out>
+    filter(predicate: (value: T) => boolean, displayName?: string): ISource<T>
+    filter<Out extends T>(predicate: (value: T) => value is Out, displayName?: string): ISource<Out>
+    filterMap<Out>(transform: (value: T) => Out | undefined, displayName?: string): ISource<Out>
 }
 
 export interface IValueSource<T> extends ISource<T> {
     readonly value: T
-    map<Out>(transform: (value: T) => Out, displayName?: string): IValueSource<Out>
-    filter<Out extends T>(predicate: (value: T) => value is Out, displayName?: string): IValueSource<Out>
-    filterMap<Out>(transform: (value: T) => Out | undefined, displayName?: string): IValueSource<Out>
 }
 
 export interface IObserver<T> {
     displayName: string
-    readonly sources: ReadonlySet<ISource<any>>
+    // readonly sources: ReadonlySet<ISource<any>> // NOCOMMIT remove?
     sourceUpdated<S extends T>(source: ISource<S>, value: S): void
 }
 
@@ -75,25 +77,17 @@ export abstract class SourceBase<T> implements ISource<T> {
 
     protected isValidState = true
 
-    // NOCOMMIT these shouldn't return IDerivation types for events
-    map<Source extends SourceBase<any>, Out>(this: Source, transform: (value: T) => Out, displayName = `${this.displayName}.map(${nameOfCallback(transform)})`) {
-        return SourceBase.bind(this, v => transform(v), Object.is, displayName)
+    map<Source extends SourceBase<any>, Out>(this: Source, transform: (value: T) => Out, displayName = `${this.displayName}.map(${nameOfCallback(transform)})`): ISource<Out> {
+        return bind(displayName, this, transform)
     }
 
-    filter<Source extends SourceBase<any>, Out extends T>(this: Source, predicate: (value: T) => value is Out, displayName = `${this.displayName}.filter(${nameOfCallback(predicate)})`) {
-        return SourceBase.bind(this, v => v as Out, (_, next) => !predicate(next), displayName)
+    filter<Source extends SourceBase<any>>(this: Source, predicate: (value: T) => boolean, displayName = `${this.displayName}.filter(${nameOfCallback(predicate)})`): ISource<T> {
+        return bind(displayName, this, identity, predicate)
     }
 
-    filterMap<Source extends SourceBase<any>, Out>(this: Source, transform: (value: T) => Out | undefined, displayName = `${this.displayName}.filterMap(${nameOfCallback(transform)})`) {
-        return SourceBase.bind(this, v => transform(v)!, (_, next) => next == undefined, displayName)
+    filterMap<Source extends SourceBase<any>, Out>(this: Source, transform: (value: T) => Out | undefined, displayName = `${this.displayName}.filterMap(${nameOfCallback(transform)})`): ISource<Out> {
+        return bind(displayName, this, v => transform(v)!, value => value == undefined)
     }
-
-    static bind: <Source extends SourceBase<any>, Out>(
-        source: Source,
-        transform: (value: SourceValue<Source>) => Out,
-        skipUpdate: (previous: Out, next: Out) => boolean,
-        displayName: string
-    ) => Source extends IValueSource<any> ? IValueSource<Out> : ISource<Out>
 
     subscribe(observer: IObserver<T>) { this._observers.add(observer) }
     unsubscribe(observer: IObserver<T>) { this._observers.delete(observer) }
@@ -103,6 +97,46 @@ export abstract class SourceBase<T> implements ISource<T> {
         this._value = undefined!
         this._observers.clear()
     }
+}
+
+export function bind<In, Out>(displayName: string, source: ISource<In>, transform: (value: In) => Out, predicate?: (value: Out) => boolean) {
+    return new BoundSource(displayName, source, transform, predicate)
+}
+
+class BoundSource<In, Out> extends SourceBase<Out> {
+    constructor(
+        displayName: string,
+        private _source: ISource<In>,
+        private _transform: (value: In) => Out,
+        private _predicate?: (value: Out) => boolean
+    ) {
+        super(displayName)
+        _source.subscribe(this)
+    }
+
+    override subscribe(observer: IObserver<Out>): void {
+        if (!this._observers.size)
+            this._source.subscribe(this)
+
+        super.subscribe(observer)
+    }
+
+    override unsubscribe(observer: IObserver<Out>): void {
+        super.unsubscribe(observer)
+
+        if (!this._observers.size)
+            this._source.unsubscribe(this)
+    }
+
+    sourceUpdated(source: ISource<In>, value: In): void {
+        try {
+            this.setValue(this._transform(value))
+        } finally {
+            this._value = undefined! // Bound sources shouldn't hold on to their values
+        }
+    }
+
+    override skipUpdate(value: Out) { return this._predicate?.(value) == false }
 }
 
 export class NotASourceValueError extends Error {
@@ -116,7 +150,7 @@ export class NotASourceValueError extends Error {
 export class InvalidStateError extends Error {
     constructor(
         public source: ISource<any>,
-        public value: IEventBase<unknown, unknown[]> | object
+        public value: IEventFunction<unknown, unknown[]> | object
     ) { super(`Tried to store ${isSource(value) ? value.displayName : value} in ${source.displayName}. ${nameOfFunction(value.constructor)}s cannot be state.`); }
 }
 
