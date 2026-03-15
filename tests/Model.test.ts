@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
-import { asyncEvent, derive, derived, event, events, extend, model, reduce, reduced, state } from "event-reduce";
-import { EventsMarkedAsStateError } from "event-reduce/lib/models";
-import { AccessedValueWithCommonSourceError, valueChanged } from "event-reduce/lib/observableValue";
+import { asyncEvent, derive, event, events, model, reduce, reduced, state } from "event-reduce/src/signals";
+import { Derivation } from "event-reduce/src/signals/derivation";
+import { EventsMarkedAsStateError } from "event-reduce/src/signals/models";
+import { ExtendedModel } from "./classes/ExtendedModel";
+import { TestModel } from "./classes/TestModel";
 
 describe("models", () => {
     let increment: ReturnType<typeof event<void>>;
@@ -13,54 +15,12 @@ describe("models", () => {
     });
 
     describe("basic model tests", () => {
-        @model
-        class TestModel {
-            @reduced
-            get property() {
-                return reduce(1)
-                    .on(increment, c => c + 1)
-                    .value;
-            }
-
-            @reduced
-            get dependentProperty() {
-                return reduce(1)
-                    .on(valueChanged(this.property), (_, p) => p)
-                    .value;
-            }
-
-            @derived
-            get derivedProperty() {
-                return this.property * 2;
-            }
-
-            @derived
-            get bool() { return true; }
-
-            @reduced
-            get basedOnDerivedProperty() {
-                return reduce(0)
-                    .on(valueChanged(this.derivedProperty), (_, d) => d)
-                    .value;
-            }
-        }
-
-        @model
-        class ExtendedModel extends TestModel {
-            @reduced
-            override get property() {
-                return extend(super.property)
-                    .on(decrement, c => c - 1)
-                    .value;
-            }
-        }
-
         let testModel: TestModel;
         let extendedModel: ExtendedModel;
 
         beforeEach(() => {
-            testModel = new TestModel();
-            extendedModel = new ExtendedModel();
+            testModel = new TestModel(increment);
+            extendedModel = new ExtendedModel(increment, decrement);
         });
 
         test("property has initial value", () => expect(testModel.property).toBe(1));
@@ -69,7 +29,7 @@ describe("models", () => {
 
         describe("when reduction updated", () => {
             beforeEach(() => {
-                increment(undefined);
+                increment();
             });
 
             test("property value updated", () => expect(testModel.property).toBe(2));
@@ -85,7 +45,7 @@ describe("models", () => {
 
         describe("when extended reduction updated", () => {
             beforeEach(() => {
-                decrement(undefined);
+                decrement();
             });
 
             test("property value unaffected", () => expect(testModel.property).toBe(1));
@@ -103,7 +63,7 @@ describe("models", () => {
             let derivation = derive(() => new DerivedModel());
             derivation.update();
 
-            expect(derivation.sources.length).toBe(0);
+            expect((derivation as Derivation<DerivedModel>).sources.size).toBe(0);
         });
 
         test("when reducer creates a new model that observes the same event that created it, doesn't throw", () => {
@@ -112,7 +72,7 @@ describe("models", () => {
                 @reduced
                 get child() {
                     return reduce(null as TestModel | null)
-                        .on(increment, () => new TestModel())
+                        .on(increment, () => new TestModel(increment))
                         .value;
                 }
             }
@@ -121,23 +81,6 @@ describe("models", () => {
 
             increment(undefined);
             expect(parentModel.child).toBeInstanceOf(TestModel);
-        });
-
-        test("when initial value of a model's reduced property is derived from the same event that's creating the model, throws", () => {
-            reduce(null as ChildModel | null)
-                .on(increment, () => new ChildModel());
-
-            @model
-            class ChildModel {
-                @reduced
-                get property() {
-                    return reduce(testModel.property)
-                        .on(decrement, c => c - 1)
-                        .value;
-                }
-            }
-
-            expect(() => increment(undefined)).toThrow(AccessedValueWithCommonSourceError);
         });
 
         test("when event is marked as state, throws when constructed", () => {

@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, spyOn, test, type Mock } from "bun:test"
-import { Atom, derive, derived, event, reduce, reduced, state } from "event-reduce/src/signals"
-import { getModelProperties, model } from "event-reduce/src/signals/models"
-import { createModel, isModel } from "event-reduce/src/signals/nodes"
+import { Atom, createModel, derive, derived, event, model, reduce, reduced, state } from "event-reduce/src/signals"
+import { isModel, modelProperties } from "event-reduce/src/signals/nodes"
 import { StringKey } from "event-reduce/src/types"
 import { dispose } from "event-reduce/src/utils"
 
@@ -319,7 +318,7 @@ describe("subscription cleanup", () => {
 
     function spyOnDispose<T>(model: T, property: StringKey<T>) {
         if (isModel(model)) {
-            let observableValue = getModelProperties(model)[property]!
+            let observableValue = model[modelProperties][property]!
             if (dispose in observableValue)
                 return spyOn(observableValue, dispose)
         }

@@ -157,7 +157,7 @@ class Event<T> extends SourceBase<T> {
             transition[dispose]()
         }
     }
-    override isValidState = false
+    override isValidAsState = false
     override skipUpdate(nextValue: T) { return false }
     protected override updateChildren(previousValue: T, nextValue: T) { } // Value won't be held onto
 }

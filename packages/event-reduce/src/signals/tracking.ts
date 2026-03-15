@@ -11,9 +11,9 @@ export let iterationSource: ISource<any> | Effect<any> | null = null
 let currentAccessTracker: AccessTracker | null = null
 let lastSourceAccessed: ISource<any> | null = null
 
-/** Child -> parent, path. */
+/** Child -> parent -> path. */
 let parentRegistry = new WeakMap<GraphNode, Map<GraphNode, string>>()
-/** Value -> node, path. */
+/** Value -> node -> path. */
 let childSnapshots = new WeakMap<object, ReadonlyMap<GraphNode, string>>()
 let garbage = new Set<GraphNode & Disposable>()
 
@@ -106,20 +106,20 @@ function isGraphNode(value: unknown): value is GraphNode {
 }
 
 function addParent(object: GraphNode, owner: GraphNode, path: string) {
-    let owners = parentRegistry.get(object)
+    let parents = parentRegistry.get(object)
 
-    if (!owners)
-        parentRegistry.set(object, owners = new Map())
+    if (!parents)
+        parentRegistry.set(object, parents = new Map())
 
-    owners.set(owner, path)
+    parents.set(owner, path)
 }
 
 function removeParent(node: GraphNode, parent: GraphNode) {
-    let owners = parentRegistry.get(node)
-    if (owners) {
-        owners.delete(parent)
+    let parents = parentRegistry.get(node)
+    if (parents) {
+        parents.delete(parent)
 
-        if (!owners.size && isDisposable(node)) {
+        if (!parents.size && isDisposable(node)) {
             parentRegistry.delete(node)
             garbage.add(node)
         }
@@ -128,7 +128,7 @@ function removeParent(node: GraphNode, parent: GraphNode) {
 
 function disposeGarbage() {
     for (let node of garbage)
-        if (!parentRegistry.has(node)) // In case a new owner was added
+        if (!parentRegistry.has(node)) // In case a new parent was added
             node[dispose]()
     garbage.clear()
 }

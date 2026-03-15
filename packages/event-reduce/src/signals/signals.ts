@@ -54,7 +54,7 @@ export abstract class SourceBase<T> implements ISource<T> {
 
     protected setValue(newValue: T) {
         if (process.env.NODE_ENV !== 'production') {
-            if (isEventsClass(newValue) || newValue instanceof SourceBase && !newValue.isValidState)
+            if (isEventsClass(newValue) || newValue instanceof SourceBase && !newValue.isValidAsState)
                 throw new InvalidStateError(this, newValue)
 
             if (!iterationSource)
@@ -75,7 +75,7 @@ export abstract class SourceBase<T> implements ISource<T> {
 
     protected updateChildren(previousValue: T, nextValue: T) { updateChildren(this, previousValue, nextValue) }
 
-    protected isValidState = true
+    protected isValidAsState = true
 
     map<Source extends SourceBase<any>, Out>(this: Source, transform: (value: T) => Out, displayName = `${this.displayName}.map(${nameOfCallback(transform)})`): ISource<Out> {
         return bind(displayName, this, transform)
@@ -158,7 +158,7 @@ export class StateChangeOutsideTransitionError extends Error {
     constructor(
         public source: ISource<any>
     ) {
-        super(`Tried to change state of ${source.displayName} outside of a transition. '
-        + 'This usually means a bug in event-reduce, or in a custom source implementation.`);
+        super(`Tried to change state of ${source.displayName} outside of a transition. `
+            + 'This usually means a bug in event-reduce, or in a custom source implementation.');
     }
 }

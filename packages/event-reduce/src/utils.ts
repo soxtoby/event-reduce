@@ -94,6 +94,13 @@ export function getOrAdd<T>(target: any, key: string | symbol, create: (base: T 
         : (target[key] = create(target[key]));
 }
 
+export function getOrAddWeakEntry<K extends WeakKey, V>(cache: WeakMap<K, V>, key: K, create: (key: K) => V): V {
+    let cached = cache.get(key);
+    if (!cached)
+        cache.set(key, cached = create(key));
+    return cached;
+}
+
 export function firstIntersection<T>(a: Set<T>, b: Set<T>) {
     for (let item of a)
         if (b.has(item))
@@ -109,6 +116,13 @@ export function getAllPropertyDescriptors(obj: unknown) {
         obj = Object.getPrototypeOf(obj);
     }
     return props;
+}
+
+export function* getPrototypeChain(obj: object) {
+    while (obj != null) {
+        yield obj
+        obj = Object.getPrototypeOf(obj)
+    }
 }
 
 export function unsubscribeAll(unsubscribes: Unsubscribe[]) {

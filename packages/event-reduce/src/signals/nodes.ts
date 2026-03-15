@@ -1,6 +1,6 @@
-import { dispose, isDisposable, isObject } from "../utils"
-import { ISource, isSource } from "./signals"
-import { getChildNodes, collectAccessedSources, trackManagedSourceCreation, updateChildren } from "./tracking"
+import { dispose, isObject } from "../utils"
+import { ISource } from "./signals"
+import { updateChildren } from "./tracking"
 
 export const modelProperties = Symbol('model properties')
 export const eventsBrand = Symbol('events class')
@@ -39,37 +39,5 @@ export class StateProperty implements Disposable {
 
     [dispose]() {
         updateChildren(this._instance, this.value, null)
-    }
-}
-
-export function createModel<T extends object>(create: () => T): T & Model {
-    let sourceCreation = trackManagedSourceCreation()
-    let accesses = collectAccessedSources(null) // Don't want anything accessed during construction to become a source for whatever is creating this
-    try {
-        let instance = create()
-        if (isModel(instance))
-            return instance
-        let model = Object.create(instance, {
-            [modelProperties]: {
-                value: Object.fromEntries(
-                    getChildNodes(instance)
-                        .entries()
-                        .flatMap(([node, path]) => isSource(node) ? [[path, node]] : []))
-            },
-            [dispose]: {
-                value() {
-                    Object.values(this[modelProperties])
-                        .forEach(p => (p as any as Disposable)[dispose]?.())
-                    if (isDisposable(instance))
-                        instance[dispose]()
-                }
-            }
-        })
-        updateChildren(model, null, instance)
-        sourceCreation.verifySourceManagement()
-        return model
-    } finally {
-        accesses[dispose]()
-        sourceCreation[dispose]()
     }
 }

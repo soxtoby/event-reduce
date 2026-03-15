@@ -20,12 +20,13 @@ export function derive<T>(derive: () => T, displayNameOrSkip?: string | ((a: T, 
     let [skipUpdate, displayName] = typeof displayNameOrSkip == 'function'
         ? [displayNameOrSkip, maybeDisplayName]
         : [Object.is, displayNameOrSkip]
-    return new Derivation(displayName ?? nameOfFunction(derive), derive, skipUpdate)
+    return new Derivation((displayName ?? nameOfFunction(derive)) || Derivation.defaultName, derive, skipUpdate)
 }
 
 export class Derivation<T> extends SourceBase<T> implements IDerivation<T> {
     private _derive: Effect<T>
     private _json?: IDerivation<State<T>>
+    static defaultName = "(anonymous derivation)"
 
     constructor(
         displayName: string,
@@ -49,6 +50,9 @@ export class Derivation<T> extends SourceBase<T> implements IDerivation<T> {
     override subscribe(observer: IObserver<T>): void {
         if (!this._observers.size)
             this._derive.attach()
+
+        if (this.lastUpdated < 0)
+            this.update() // Subscriber may never be notified if we don't collect any sources
 
         super.subscribe(observer)
     }
