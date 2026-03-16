@@ -1,4 +1,4 @@
-import { dispose, identity, nameOfCallback, nameOfFunction } from "../utils"
+import { dispose, emptyArray, identity, nameOfCallback, nameOfFunction } from "../utils"
 import type { IEventFunction } from "./events"
 import { isEventsClass } from "./nodes"
 import { currentIteration, getPath, iterationSource, trackSourceAccessed, updateChildren } from "./tracking"
@@ -13,6 +13,7 @@ export interface ISource<T> extends Disposable {
     readonly displayName: string
     setDisplayName(name: string): void
     readonly path: string
+    getSources(): Iterable<ISource<any>>
     readonly lastUpdated: number
     subscribe(observer: IObserver<T>): void
     unsubscribe(observer: IObserver<T>): void
@@ -42,6 +43,8 @@ export abstract class SourceBase<T> implements ISource<T> {
     setDisplayName(name: string) { this.displayName = name }
 
     get path(): string { return getPath(this) }
+
+    getSources() { return emptyArray as Iterable<ISource<any>> }
 
     get value() {
         trackSourceAccessed(this)[dispose]()
@@ -110,6 +113,8 @@ class BoundSource<In, Out> extends SourceBase<Out> {
         _source.subscribe(this)
     }
 
+    override getSources() { return [this._source] }
+
     override subscribe(observer: IObserver<Out>): void {
         if (!this._observers.size)
             this._source.subscribe(this)
@@ -133,6 +138,12 @@ class BoundSource<In, Out> extends SourceBase<Out> {
     }
 
     override skipUpdate(value: Out) { return this._predicate?.(value) == false }
+}
+
+export function* allSources(source: ISource<any>): Generator<ISource<any>> {
+    yield source
+    for (let dependency of source.getSources())
+        yield* allSources(dependency)
 }
 
 export class NotASourceValueError extends Error {

@@ -1,7 +1,7 @@
 import { dispose, emptyArray } from "../utils"
 import { derive, IDerivation } from "./derivation"
 import { startLogging } from "./logging"
-import { IObserver, ISource, isSource, IValueSource, NotASourceValueError, SourceBase } from "./signals"
+import { allSources, IObserver, ISource, isSource, IValueSource, NotASourceValueError, SourceBase } from "./signals"
 import { getState, State } from "./state"
 import { currentIteration, managedSourceCreated, trackSourceAccessed, collectAccessedSources, updateChildren, getUnderlyingSource } from "./tracking"
 
@@ -60,6 +60,11 @@ export class Reduction<T, Events = void> extends SourceBase<T> implements IReduc
         if (!isSource(source))
             source = source(this._events!)
 
+        if (process.env.NODE_ENV !== 'production') {
+            if (allSources(source).find(s => s == this)) 
+                throw new CircularSubscriptionError(this, source);
+        }
+
         source.subscribe(this)
         this.sources.add(source)
         this._reducers.set(source, reduce)
@@ -67,6 +72,8 @@ export class Reduction<T, Events = void> extends SourceBase<T> implements IReduc
 
         return this
     }
+
+    override getSources() { return this.sources }
 
     sourceUpdated<S>(source: ISource<S>, value: S) {
         if (source.lastUpdated > this.lastUpdated) {
@@ -88,7 +95,7 @@ export class Reduction<T, Events = void> extends SourceBase<T> implements IReduc
                     } finally {
                         tracker[dispose]()
                     }
-                    
+
                     this.setValue(nextValue)
                 } finally {
                     logging[dispose]()
@@ -124,5 +131,14 @@ export class Reduction<T, Events = void> extends SourceBase<T> implements IReduc
         for (let source of this.sources)
             source.unsubscribe(this)
         super[dispose]()
+    }
+}
+
+export class CircularSubscriptionError extends Error {
+    constructor(
+        public reduction: IReduction<unknown, unknown>,
+        public source: ISource<unknown>
+    ) {
+        super(`Cannot subscribe to '${source.displayName}', as it depends on this reduction, '${reduction.displayName}'.`);
     }
 }

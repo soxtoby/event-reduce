@@ -14,6 +14,8 @@ export class Effect<T> implements IObserver<any> {
         private _onSourceUpdatedSinceLastRun: (source: ISource<any>) => void
     ) { }
 
+    getSources() { return this.sources }
+
     attach() {
         this._attached = true
         for (let source of this.sources)

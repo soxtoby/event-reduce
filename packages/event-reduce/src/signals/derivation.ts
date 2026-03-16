@@ -64,6 +64,8 @@ export class Derivation<T> extends SourceBase<T> implements IDerivation<T> {
             this._derive.detach()
     }
 
+    override getSources() { return this._derive.getSources()}
+
     sourceUpdated<S>(source: ISource<S>, value: S) { this._derive.sourceUpdated(source, value) }
 
     override get value() {
