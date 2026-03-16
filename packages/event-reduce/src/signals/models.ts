@@ -148,15 +148,16 @@ export function reduced<Value, Target extends Model>(...args:
 ) {
     if (argsAre(args, isClassAccessorDecoratorTarget, isClassAccessorDecoratorContext)) {
         // Auto-accessor property decorator
-        let [_, context] = args
+        let [target, context] = args
 
         return {
             init(this: Target, initial: Value) {
                 let reduction = getUnderlyingReduction(this, context.name, () => initial)
+                getModelGetterCache(this).set(target.get, reduction)
                 getInstancePropertyFactories(this)[context.name] = constant(reduction)
                 return initial
             },
-            get(this: Target) { throw new MissingModelDecoratorError(model, context.name) }
+            get(this: Target) { return (getModelGetterCache(this).get(target.get) as Reduction<Value, any>)!.value },
         }
     } else if (argsAre(args, isFunction, isDecoratorContext)) {
         // Getter property decorator

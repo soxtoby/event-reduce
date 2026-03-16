@@ -1,17 +1,22 @@
-import { derive, derived, IEvent, model, reduce, reduced } from "event-reduce/src/signals";
+import { derive, derived, event, model, reduce, reduced } from "event-reduce/src/signals";
 
 // TODO move back into Model.test.ts after https://github.com/oven-sh/bun/issues/28010 is resolved
 
+export let increment = event('increment')
+
 @model
 export class TestModel {
-    constructor(public increment: IEvent<void>) { }
-
     @reduced
     get property() {
         return reduce(1)
-            .on(this.increment, c => c + 1)
+            .on(increment, c => c + 1)
             .value;
     }
+
+    @reduced
+    accessor accessorProp = reduce(1)
+        .on(increment, c => c + 1)
+        .value;
 
     @reduced
     get dependentProperty() {

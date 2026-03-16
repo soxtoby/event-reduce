@@ -2,30 +2,26 @@ import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
 import { asyncEvent, derive, event, events, model, reduce, reduced, state } from "event-reduce/src/signals";
 import { Derivation } from "event-reduce/src/signals/derivation";
 import { EventsMarkedAsStateError } from "event-reduce/src/signals/models";
-import { ExtendedModel } from "./classes/ExtendedModel";
-import { TestModel } from "./classes/TestModel";
+import { decrement, ExtendedModel } from "./classes/ExtendedModel";
+import { increment, TestModel } from "./classes/TestModel";
 
 describe("models", () => {
-    let increment: ReturnType<typeof event<void>>;
-    let decrement: ReturnType<typeof event<void>>;
-
-    beforeEach(() => {
-        increment = event<void>('increment');
-        decrement = event<void>('decrement');
-    });
-
     describe("basic model tests", () => {
         let testModel: TestModel;
         let extendedModel: ExtendedModel;
 
         beforeEach(() => {
-            testModel = new TestModel(increment);
-            extendedModel = new ExtendedModel(increment, decrement);
+            testModel = new TestModel();
+            extendedModel = new ExtendedModel();
         });
 
         test("property has initial value", () => expect(testModel.property).toBe(1));
 
+        test("accessor property has initial value", () => expect(testModel.accessorProp).toBe(1));
+
         test("extended property has same initial value", () => expect(extendedModel.property).toBe(1));
+
+        test("extended accessor property has same initial value", () => expect(extendedModel.accessorProp).toBe(1));
 
         describe("when reduction updated", () => {
             beforeEach(() => {
@@ -34,9 +30,13 @@ describe("models", () => {
 
             test("property value updated", () => expect(testModel.property).toBe(2));
 
+            test("accessor property value updated", () => expect(testModel.accessorProp).toBe(2));
+
             test("dependent property value updated", () => expect(testModel.dependentProperty).toBe(2));
 
             test("extended property value updated", () => expect(extendedModel.property).toBe(2));
+
+            test("extended accessor property value updated", () => expect(extendedModel.accessorProp).toBe(2));
 
             test("derived property value updated", () => expect(testModel.derivedProperty).toBe(4));
 
@@ -50,7 +50,11 @@ describe("models", () => {
 
             test("property value unaffected", () => expect(testModel.property).toBe(1));
 
+            test("accessor property value unaffected", () => expect(testModel.accessorProp).toBe(1));
+
             test("extended property value updated", () => expect(extendedModel.property).toBe(0));
+
+            test("extended accessor property value updated", () => expect(extendedModel.accessorProp).toBe(0));
         });
 
         test("when derivation creates a new model that accesses an observable value in its constructor, accessed observable value is not counted as a source for the derivation", () => {
@@ -72,7 +76,7 @@ describe("models", () => {
                 @reduced
                 get child() {
                     return reduce(null as TestModel | null)
-                        .on(increment, () => new TestModel(increment))
+                        .on(increment, () => new TestModel())
                         .value;
                 }
             }
