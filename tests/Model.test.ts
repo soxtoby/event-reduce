@@ -136,9 +136,9 @@ describe("events decorator", () => {
         expect(sut.eventGetter.rejected.displayName).toBe('eventGetter.rejected');
     });
 
-    test("sets event container", () => {
-        expect((sut.eventField as any).container).toBe(sut);
-        expect((sut.eventGetter as any).container).toBe(sut);
+    test("sets event parents", () => {
+        expect(sut.eventField.path).toBe('TestEvents.eventField');
+        expect(sut.eventGetter.path).toBe('TestEvents.eventGetter');
     });
 
     test("snapshots getter event", () => {

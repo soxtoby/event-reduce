@@ -107,14 +107,12 @@ export function firstIntersection<T>(a: Set<T>, b: Set<T>) {
             return item;
 }
 
-export function getAllPropertyDescriptors(obj: unknown) {
+export function getAllPropertyDescriptors(obj: object) {
     let props = new Map<string, PropertyDescriptor>();
-    while (obj != Object.prototype) {
-        Object.entries(Object.getOwnPropertyDescriptors(obj))
-            .filter(([key]) => !props.has(key))
-            .forEach(([key, property]) => props.set(key, property));
-        obj = Object.getPrototypeOf(obj);
-    }
+    for (let proto of getPrototypeChain(obj))
+        for (let [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(proto)))
+            if (!props.has(key))
+                props.set(key, descriptor)
     return props;
 }
 

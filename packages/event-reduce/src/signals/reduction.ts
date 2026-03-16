@@ -75,10 +75,10 @@ export class Reduction<T, Events = void> extends SourceBase<T> implements IReduc
                 let previousValue = this._value
                 let nextValue!: T
                 let logging = startLogging('🧪 (reduction)', this.displayName, emptyArray, () => ({
+                    Path: this.path,
+                    Trigger: source.path,
                     Previous: previousValue,
-                    Current: nextValue,
-                    // Container: this.container,
-                    // Sources: sourceTree(this.sources)
+                    Current: nextValue
                 }))
 
                 try {

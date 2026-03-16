@@ -16,8 +16,8 @@ export type AdditionalMembersFactory<Source extends ISource<any>, Members extend
     (source: Source & IEventFunction<SourceValue<Source>, any>) => Members
 
 export function event<T = void>(name: string = "(anonymous event)"): IEvent<T> {
-    return makeEventFunction(name, (emit: (value: T) => void, value: T) => {
-        let logging = startLogging('⚡ (event)', name, [value]) // NOCOMMIT Container
+    return makeEventFunction(name, function event(emit: (value: T) => void, value: T) {
+        let logging = startLogging('⚡ (event)', name, [value], () => ({ Path: this.path }))
         try {
             emit(value)
         } finally {
@@ -65,8 +65,13 @@ export interface AsyncError<Context> {
 }
 
 export function asyncEvent<Result = void, Context = void>(name: string = "(anonymous async event)"): IAsyncEvent<Result, Context> {
-    return makeEventFunction(name, <P extends PromiseLike<Result>>(emit: (value: AsyncValue<Result, Context>) => void, promise: P, context: Context) => {
-        let logging = startLogging('⚡⌚ (async event)', name, [promise, context], () => ({ Promise: promise })) // NOCOMMIT Container
+    return makeEventFunction(name, function asyncEvent<P extends PromiseLike<Result>>(
+        this: IEventFunction<AsyncValue<Result, Context>, [promise: PromiseLike<Result>, context: Context]>,
+        emit: (value: AsyncValue<Result, Context>) => void,
+        promise: P,
+        context: Context
+    ) {
+        let logging = startLogging('⚡⌚ (async event)', name, [promise, context], () => ({ Path: this.path, Promise: promise }))
         try {
             emit({ promise, context })
         } finally {
@@ -76,7 +81,7 @@ export function asyncEvent<Result = void, Context = void>(name: string = "(anony
         promise.then(
             result => {
                 let val = { result, context }
-                let logging = startLogging('⚡✔ (async resolved)', name, [val], () => ({ Promise: promise })) // NOCOMMIT Container
+                let logging = startLogging('⚡✔ (async resolved)', name, [val], () => ({ Path: this.path, Promise: promise }))
                 try {
                     emit(val)
                 } finally {
@@ -85,7 +90,7 @@ export function asyncEvent<Result = void, Context = void>(name: string = "(anony
             },
             error => {
                 let val = { error, context }
-                let logging = startLogging('⚡✘ (async rejected)', name, [val], () => ({ Promise: promise })) // NOCOMMIT Container
+                let logging = startLogging('⚡✘ (async rejected)', name, [val], () => ({ Path: this.path, Promise: promise }))
                 try {
                     emit(val)
                 } finally {
@@ -95,6 +100,7 @@ export function asyncEvent<Result = void, Context = void>(name: string = "(anony
 
         return promise
     }, function asyncEventMembers(e: IEventFunction<AsyncValue<Result, Context>, [promise: PromiseLike<Result>, context: Context]>) {
+        let setBaseDisplayName = e.setDisplayName
         return {
             started: e.filter(v => 'promise' in v, `${e.displayName}.started`),
             resolved: e.filter(v => 'result' in v, `${e.displayName}.resolved`),
@@ -105,6 +111,12 @@ export function asyncEvent<Result = void, Context = void>(name: string = "(anony
                     (promise: PromiseLike<Result>, context: Scoped<Context, Scope>) => e(promise, { ...context, ...scope } as Context),
                     v => matchesScope(scope, v.context),
                     asyncEventMembers)
+            },
+            setDisplayName(name: string) {
+                setBaseDisplayName.call(e, name)
+                this.started.setDisplayName(`${name}.started`)
+                this.resolved.setDisplayName(`${name}.resolved`)
+                this.rejected.setDisplayName(`${name}.rejected`)
             }
         }
     }) as IAsyncEvent<Result, Context>
@@ -113,13 +125,13 @@ export function asyncEvent<Result = void, Context = void>(name: string = "(anony
 /** Creates a callable event object. */
 export function makeEventFunction<T, Args extends any[] = [T], Return = Args[0], Members extends object = {}>(
     name: string,
-    fire: (emit: (value: T) => void, ...args: Args) => Return,
+    fire: (this: IEventFunction<T, Args, Return>, emit: (value: T) => void, ...args: Args) => Return,
     getMembers?: AdditionalMembersFactory<ISource<any>, Members>
 ): IEventFunction<T, Args, Return> & Members {
     let eventSource = new Event<T>(name) as Event<T> & IEventFunction<T, Args, Return>
     return makeSourceFunction(eventSource, event, getMembers)
 
-    function event(...args: Args) { return fire(eventSource.emit.bind(event), ...args) }
+    function event(...args: Args) { return fire.call(event as IEventFunction<T, Args, Return>, eventSource.emit.bind(event), ...args) }
 }
 
 /** Wrap an event with input and output filter. Useful for scoping. */

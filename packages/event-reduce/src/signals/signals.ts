@@ -3,12 +3,6 @@ import type { IEventFunction } from "./events"
 import { isEventsClass } from "./nodes"
 import { currentIteration, getPath, iterationSource, trackSourceAccessed, updateChildren } from "./tracking"
 
-/** 
- * NOCOMMIT
- * - extend
- * - Some way to create top-level reductions - maybe a case for a "createModel" that marks a plain object as a model and adds a dispose
- */
-
 export function isSource(value: any): value is ISource<any> {
     return value instanceof SourceBase
 }
@@ -16,7 +10,8 @@ export function isSource(value: any): value is ISource<any> {
 export type SourceValue<Source extends ISource<any>> = Source extends ISource<infer T> ? T : never
 
 export interface ISource<T> extends Disposable {
-    displayName: string
+    readonly displayName: string
+    setDisplayName(name: string): void
     readonly path: string
     readonly lastUpdated: number
     subscribe(observer: IObserver<T>): void
@@ -33,8 +28,7 @@ export interface IValueSource<T> extends ISource<T> {
 }
 
 export interface IObserver<T> {
-    displayName: string
-    // readonly sources: ReadonlySet<ISource<any>> // NOCOMMIT remove?
+    readonly displayName: string
     sourceUpdated<S extends T>(source: ISource<S>, value: S): void
 }
 
@@ -44,6 +38,8 @@ export abstract class SourceBase<T> implements ISource<T> {
     lastUpdated = -1
 
     constructor(public displayName: string) { }
+
+    setDisplayName(name: string) { this.displayName = name }
 
     get path(): string { return getPath(this) }
 

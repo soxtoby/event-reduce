@@ -55,18 +55,18 @@ export function getUnderlyingSource<T>(value: T): ISource<T> | null {
         : null
 }
 
-export function updateChildren(parent: GraphNode, previousValue: unknown, nextValue: unknown) {
+export function updateChildren(parent: GraphNode, previousValue: unknown, nextValue: unknown, parentPath = '') {
     if (Object.is(previousValue, nextValue))
         return
 
     let previousChildren: ReadonlyMap<GraphNode, string> = emptyMap
-    if (isObject(previousValue)) {
+    if (isObject(previousValue) || previousValue instanceof SourceBase) {
         previousChildren = childSnapshots.get(previousValue) ?? getChildNodes(previousValue)
         childSnapshots.delete(previousValue)
     }
 
     let newChildren: ReadonlyMap<GraphNode, string> = emptyMap
-    if (isObject(nextValue)) {
+    if (isObject(nextValue) || nextValue instanceof SourceBase) {
         newChildren = getChildNodes(nextValue)
         childSnapshots.set(nextValue, newChildren)
     }
@@ -77,7 +77,7 @@ export function updateChildren(parent: GraphNode, previousValue: unknown, nextVa
 
     for (let [added, path] of newChildren)
         if (!previousChildren.has(added))
-            addParent(added, parent, path)
+            addParent(added, parent, parentPath + path)
 }
 
 export function getChildNodes(value: object): ReadonlyMap<GraphNode, string> {

@@ -1,7 +1,7 @@
 import { argsAre, constant, dispose, getAllPropertyDescriptors, getOrAddWeakEntry, getPrototypeChain, isDisposable, isFunction, isObject, isString, isUndefined, nameOfFunction } from "../utils"
 import { Derivation, derive, IDerivation } from "./derivation"
 import { isEvent } from "./events"
-import { eventsBrand, isEventsClass, isModel, Model, modelProperties, ModelProperty, StateProperty } from "./nodes"
+import { eventsBrand, EventsClass, isEventsClass, isModel, Model, modelProperties, ModelProperty, StateProperty } from "./nodes"
 import { IReduction, Reduction } from "./reduction"
 import { ISource, isSource, SourceValue } from "./signals"
 import { getState } from "./state"
@@ -280,7 +280,7 @@ function sourceSetter(key: PropertyKey, sourceType: { new(...args: any[]): ISour
             throw errorFactory()
 
         if (source.displayName == sourceType.defaultName)
-            source.displayName = String(key)
+            source.setDisplayName(String(key))
 
         Object.defineProperty(this, key, {
             get: () => { throw new MissingModelDecoratorError(model, key) },
@@ -345,8 +345,8 @@ export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
                 for (let [key, property] of getAllPropertyDescriptors(this)) {
                     let value = this[key]
                     if (isEvent(value)) {
-                        value.displayName = key
-                        // value.container = this // NOCOMMIT container
+                        value.setDisplayName(key)
+                        updateChildren(this as any as EventsClass, null, value, `.${key}`)
                         if (property.get)
                             Object.defineProperty(this, key, {
                                 value,

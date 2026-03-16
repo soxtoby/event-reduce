@@ -85,18 +85,15 @@ export class Derivation<T> extends SourceBase<T> implements IDerivation<T> {
     update(deriveValue?: () => T, reason?: string) {
         let previousValue = this._value
         let nextValue!: T
-        let trigger = this._derive.invalidatingSource ? new WeakRef(this._derive.invalidatingSource) : undefined
+        let trigger = this._derive.invalidatingSource
 
         let transition = beginTransition(this, !iterationSource) // Derivations are always safe to access, and only initiate a transition if necessary
         let sourceCreation = trackManagedSourceCreation()
         let logging = startLogging('🔗 (derivation)', this.displayName, emptyArray, () => ({
+            Path: this.path,
+            Trigger: trigger?.path ?? '(unknown)',
             Previous: previousValue,
-            Current: nextValue,
-            // Container: this.container,
-            // Sources: sourceTree(this.sources),
-            TriggeredBy: trigger
-                ? { name: trigger.deref()?.displayName ?? "(unknown)", get observable() { return trigger.deref() ?? "No longer in memory"; } }
-                : reason
+            Current: nextValue
         }))
         try {
             this.setValue(nextValue = this._derive.run(deriveValue))

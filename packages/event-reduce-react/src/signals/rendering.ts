@@ -33,12 +33,13 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
 
 class RenderEffect<T> extends Effect<T> {
     private _observers = new Set<() => void>()
-    private _trigger: WeakRef<ISource<any>> | null = null
+    private _trigger: ISource<any> | null = null
+    private _previousValue?: T
 
     constructor(displayName: string) {
         super(displayName, constant(undefined!), (source) => {
             log('⚛️🚩 (render invalidated)', this.displayName, [source])
-            this._trigger = new WeakRef(source)
+            this._trigger = source
             for (let subscriber of this._observers)
                 subscriber()
         })
@@ -50,25 +51,26 @@ class RenderEffect<T> extends Effect<T> {
     }
 
     override run(deriveValue: () => T) {
-        let value!: T
+        let previousValue = this._previousValue
+        let nextValue!: T
         let trigger = this._trigger
+        this._trigger = null
 
         let transition = beginTransition(this, true)
         let logging = startLogging('⚛️ (render)', this.displayName, emptyArray, () => ({
-            // Previous: this.loggedValue(previousValue),
-            Current: loggedReactValue(value),
-            // Container: this.container,
-            // Sources: sourceTree(this.sources),
-            TriggeredBy: trigger
-                ? { name: trigger.deref()?.displayName ?? "(unknown)", get observable() { return trigger.deref() ?? "No longer in memory"; } }
-                : 'render'
+            Trigger: trigger?.path ?? 'render',
+            Previous: loggedReactValue(previousValue),
+            Current: loggedReactValue(nextValue),
         }))
 
         try {
-            return value = super.run(deriveValue)
+            nextValue = super.run(deriveValue)
+            if (process.env.NODE_ENV !== 'production')
+                this._previousValue = nextValue
+            return nextValue
         } finally {
-            transition[dispose]()
             logging[dispose]()
+            transition[dispose]()
         }
     }
 }
