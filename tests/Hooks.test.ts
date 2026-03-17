@@ -1,12 +1,14 @@
-import { renderHook } from "@testing-library/react-hooks";
-import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
-import { event, model, reduce, reduced, type AsyncResult } from "event-reduce";
-import { useAsyncEvent, useDerived, useEvent, useReduced } from "event-reduce-react";
-import { mutable } from "event-reduce/lib/testing";
+import { renderHook, RenderHookResult } from "@testing-library/react-hooks";
+import { beforeEach, describe, expect, test } from "bun:test";
+import { useAsyncEvent, useDerived, useEvent, useReduced } from "event-reduce-react/src/signals";
+import { event, IEvent, model, reduce, reduced, type AsyncResult } from "event-reduce/lib/signals";
+import { IDerivation } from "event-reduce/src/signals";
+import { mutable } from "event-reduce/src/signals/testing";
+import { MockObserver } from "./MockObserver";
 
 describe("useEvent", () => {
     let sut: ReturnType<typeof renderHook<unknown, ReturnType<typeof useEvent<number>>>>;
-    let initialResult: ReturnType<typeof useEvent<number>>;
+    let initialResult: IEvent<number>
 
     beforeEach(() => {
         sut = renderHook(() => useEvent<number>());
@@ -14,12 +16,12 @@ describe("useEvent", () => {
     });
 
     test("returns an event", () => {
-        let eventSpy: Mock<(value: number) => void> = mock();
+        let eventSpy = new MockObserver<number>()
         initialResult.subscribe(eventSpy);
 
         initialResult(3);
 
-        expect(eventSpy).toHaveBeenCalledWith(3);
+        expect(eventSpy.sourceUpdated).toHaveBeenCalledWith(initialResult, 3);
     });
 
     test("when rendered again, returns the same event instance", () => {
@@ -39,14 +41,14 @@ describe("useAsyncEvent", () => {
     });
 
     test("returns an async event", async () => {
-        let eventSpy: Mock<(value: AsyncResult<number, void>) => void> = mock();
+        let eventSpy = new MockObserver<AsyncResult<number>>()
         initialResult.resolved.subscribe(eventSpy);
 
         let promise = Promise.resolve(3);
         initialResult(promise);
         await promise;
 
-        expect(eventSpy).toHaveBeenCalledWith(expect.objectContaining({ result: 3 }));
+        expect(eventSpy.sourceUpdated).toHaveBeenCalledWith(initialResult.resolved, expect.objectContaining({ result: 3 }));
     });
 
     test("when rendered again, returns the same event instance", () => {
@@ -59,11 +61,11 @@ describe("useAsyncEvent", () => {
 describe("useDerived", () => {
     @model class SourceModel { @reduced get value() { return reduce(1).value; } }
     let source: ReturnType<typeof mutable<SourceModel>>;
-    let sut: ReturnType<typeof renderHook<unknown, ReturnType<typeof useDerived<number>>>>;
-    let initialResult: ReturnType<typeof useDerived<number>>;
+    let sut: RenderHookResult<unknown, IDerivation<number>>
+    let initialResult: IDerivation<number>
 
     beforeEach(() => {
-        source = mutable(new SourceModel());
+        source = mutable(new SourceModel()); // NOCOMMIT signals version of testing
         sut = renderHook(() => useDerived(() => source.value * 2));
         initialResult = sut.result.current;
     });

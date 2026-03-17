@@ -27,28 +27,33 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
         : ['ReactiveValue', nameOrDeriveValue]
 
     let renderEffect = useState(() => new RenderEffect<T>(name))[0]
-    useSyncExternalStore(renderEffect.subscribe.bind(renderEffect), () => renderEffect.lastRun)
+    useSyncExternalStore(renderEffect.subscribe, renderEffect.triggerSnapshot)
     return renderEffect.run(deriveValue)
 }
 
 class RenderEffect<T> extends Effect<T> {
     private _observers = new Set<() => void>()
     private _trigger: ISource<any> | null = null
-    private _previousValue?: T
+    private _triggerState = { triggeredBy: "(nothing)" }
+    private _previousValue?: T    
 
     constructor(displayName: string) {
         super(displayName, constant(undefined!), (source) => {
             log('⚛️🚩 (render invalidated)', this.displayName, [source])
             this._trigger = source
+            this._triggerState = { triggeredBy: source.path }
             for (let subscriber of this._observers)
                 subscriber()
         })
+        this.attach()
     }
 
-    subscribe(observer: () => void) {
+    subscribe = (observer: () => void) => {
         this._observers.add(observer)
         return () => this._observers.delete(observer)
     }
+
+    triggerSnapshot = () => this._triggerState
 
     override run(deriveValue: () => T) {
         let previousValue = this._previousValue

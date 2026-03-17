@@ -1,20 +1,20 @@
 import { act, renderHook } from "@testing-library/react-hooks";
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
-import { useReactive } from "event-reduce-react";
-import { ObservableValue } from "event-reduce/lib/observableValue";
+import { useReactive } from "event-reduce-react/src/signals";
+import { Atom } from "event-reduce/lib/signals";
 
 describe('useReactive', () => {
-    let observableValue: ObservableValue<string>;
+    let source: Atom<string>;
     let innerBehaviour: () => void;
     let render: Mock<() => string>;
     let sut: ReturnType<typeof renderHook<unknown, string>>;
 
     beforeEach(() => {
-        observableValue = new ObservableValue(() => 'test value', 'initial value');
+        source = new Atom<string>('test value', 'initial value');
         innerBehaviour = () => { };
         render = mock(() => {
             innerBehaviour();
-            return observableValue.value;
+            return source.value;
         });
         sut = renderHook(() => useReactive(render));
     });
@@ -31,7 +31,7 @@ describe('useReactive', () => {
 
     describe("when accessed observable value changed", () => {
         beforeEach(() => {
-            act(() => observableValue.setValue('new value'));
+            act(() => source.setValue('new value'));
         });
 
         test("render function called again", () => expect(render).toHaveBeenCalledTimes(2));
@@ -40,7 +40,7 @@ describe('useReactive', () => {
     });
 
     test("when accessed observable value is changed during render, doesn't trigger an extra render", () => {
-        innerBehaviour = () => observableValue.setValue('new value');
+        innerBehaviour = () => source.setValue('new value');
         render.mockClear();
         sut.rerender();
 

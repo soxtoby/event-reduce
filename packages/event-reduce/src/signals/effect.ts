@@ -17,15 +17,19 @@ export class Effect<T> implements IObserver<any> {
     getSources() { return this.sources }
 
     attach() {
-        this._attached = true
-        for (let source of this.sources)
-            source.subscribe(this)
+        if (!this._attached) {
+            this._attached = true
+            for (let source of this.sources)
+                source.subscribe(this)
+        }
     }
 
     detach() {
-        this._attached = false
-        for (let source of this.sources)
-            source.unsubscribe(this)
+        if (this._attached) {
+            this._attached = false
+            for (let source of this.sources)
+                source.unsubscribe(this)
+        }
     }
 
     sourceUpdated<S>(source: ISource<S>, value: S): void {

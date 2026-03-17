@@ -24,6 +24,7 @@ export interface ISource<T> extends Disposable {
     filterMap<Out>(transform: (value: T) => Out | undefined, displayName?: string): ISource<Out>
 }
 
+// NOCOMMIT do we actually need this, or could value be pushed down?
 export interface IValueSource<T> extends ISource<T> {
     readonly value: T
 }
@@ -51,7 +52,7 @@ export abstract class SourceBase<T> implements ISource<T> {
         return this._value
     }
 
-    protected setValue(newValue: T) {
+    setValue(newValue: T) {
         if (process.env.NODE_ENV !== 'production') {
             if (isEventsClass(newValue) || newValue instanceof SourceBase && !newValue.isValidAsState)
                 throw new InvalidStateError(this, newValue)

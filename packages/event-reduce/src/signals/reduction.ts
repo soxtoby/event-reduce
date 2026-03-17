@@ -127,9 +127,13 @@ export class Reduction<T, Events = void> extends SourceBase<T> implements IReduc
 
     override skipUpdate(nextValue: T) { return this._isEqual(this._value, nextValue) }
 
-    override[dispose]() {
+    detach() {
         for (let source of this.sources)
             source.unsubscribe(this)
+    }
+
+    override[dispose]() {
+        this.detach()
         super[dispose]()
     }
 }

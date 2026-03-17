@@ -1,4 +1,4 @@
-import { asyncEvent, Atom, derive, event, IReduction, ISource, reduce } from "event-reduce/lib/signals"
+import { asyncEvent, Atom, derive, event, IDerivation, IReduction, ISource, reduce } from "event-reduce/lib/signals"
 import { isModel, Model } from "event-reduce/lib/signals/nodes"
 import { Reduction } from "event-reduce/lib/signals/reduction"
 import { dispose, emptyArray } from "event-reduce/lib/utils"
@@ -28,9 +28,9 @@ export function useAsyncEvent<Result = void, Context = void>(name?: string) {
  * Creates a derived value that persists across renders of the component.
  * @param unobservableDependencies - A list of dependencies that are not observable. The derived value will be updated when any of these change.
  */
-export function useDerived<T>(getValue: () => T, name?: string): ISource<T>
-export function useDerived<T>(getValue: () => T, unobservableDependencies?: DependencyList, name?: string): ISource<T>
-export function useDerived<T>(getValue: () => T, nameOrUnobservableDependencies?: string | DependencyList, name?: string): ISource<T> {
+export function useDerived<T>(getValue: () => T, name?: string): IDerivation<T>
+export function useDerived<T>(getValue: () => T, unobservableDependencies?: DependencyList, name?: string): IDerivation<T>
+export function useDerived<T>(getValue: () => T, nameOrUnobservableDependencies?: string | DependencyList, name?: string): IDerivation<T> {
     let unobservableDependencies: DependencyList | undefined
     [name, unobservableDependencies] = typeof nameOrUnobservableDependencies == 'string'
         ? [nameOrUnobservableDependencies, undefined]

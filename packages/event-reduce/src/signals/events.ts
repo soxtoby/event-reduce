@@ -44,22 +44,22 @@ export interface IAsyncEvent<Result, Context> extends IEventFunction<AsyncValue<
     scope<Scope extends Partial<Context>>(scope: Scope): IAsyncEvent<Result, Scoped<Context, Scope>>
 }
 
-export type AsyncValue<Result, Context> =
+export type AsyncValue<Result, Context = void> =
     | AsyncStart<Result, Context>
     | AsyncResult<Result, Context>
     | AsyncError<Context>
 
-export interface AsyncStart<Result, Context> {
+export interface AsyncStart<Result, Context = void> {
     context: Context
     promise: PromiseLike<Result>
 }
 
-export interface AsyncResult<Result, Context> {
+export interface AsyncResult<Result, Context = void> {
     context: Context
     result: Result
 }
 
-export interface AsyncError<Context> {
+export interface AsyncError<Context = void> {
     context: Context
     error: any
 }
