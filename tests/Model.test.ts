@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
 import { asyncEvent, derive, event, events, model, reduce, reduced, state } from "event-reduce/src/signals";
 import { Derivation } from "event-reduce/src/signals/derivation";
 import { EventsMarkedAsStateError } from "event-reduce/src/signals/models";
-import { decrement, ExtendedModel } from "./classes/ExtendedModel";
-import { increment, TestModel } from "./classes/TestModel";
+import { decrement, ExtendedModel } from "./Model.test/ExtendedModel";
+import { increment, TestModel } from "./Model.test/TestModel";
 
 describe("models", () => {
     describe("basic model tests", () => {

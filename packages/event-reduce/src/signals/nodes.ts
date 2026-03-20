@@ -1,5 +1,6 @@
 import { dispose, isObject } from "../utils"
 import { ISource } from "./signals"
+import { getState } from "./state"
 import { updateChildren } from "./tracking"
 
 export const modelProperties = Symbol('model properties')
@@ -33,7 +34,7 @@ export class StateProperty implements Disposable {
         updateChildren(_instance, null, this.value)
     }
 
-    toJSON() { return this.value }
+    toJSON() { return getState(this.value) }
 
     get value() { return this._instance[this.key] }
 
