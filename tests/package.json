@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "event-reduce": "workspace:*",
-    "event-reduce-react": "workspace:*"
+    "event-reduce-react": "workspace:*",
+    "event-reduce-example": "workspace:*"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.6.2",

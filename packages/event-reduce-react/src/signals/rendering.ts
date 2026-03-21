@@ -3,14 +3,14 @@ import { Effect, log, startLogging } from "event-reduce/lib/signals"
 import { ISource } from "event-reduce/lib/signals/signals"
 import { beginTransition } from "event-reduce/lib/signals/tracking"
 import { constant, dispose, emptyArray, nameOfFunction } from "event-reduce/lib/utils"
-import { Children, ReactNode, isValidElement, useState } from "react"
+import { Children, Fragment, ReactElement, ReactNode, createElement, isValidElement, useState } from "react"
 import { useSyncExternalStore } from "use-sync-external-store/shim"
 
-export function Reactive(props: { name?: string; children: () => ReactNode; }): ReactNode {
-    return useReactive(props.name || 'Derived', () => props.children())
+export function Reactive(props: { name?: string; children: () => ReactNode; }): ReactElement {
+    return useReactive(props.name || 'Derived', () => createElement(Fragment, { children: props.children() }))
 }
 
-export function reactive<Args extends any[]>(component: (...args: Args) => ReactNode | null) {
+export function reactive<Args extends any[]>(component: (...args: Args) => ReactElement | null) {
     let componentName = nameOfFunction(component) || 'ReactiveComponent'
 
     const reactiveComponentName = `reactive(${componentName})`
@@ -35,7 +35,7 @@ class RenderEffect<T> extends Effect<T> {
     private _observers = new Set<() => void>()
     private _trigger: ISource<any> | null = null
     private _triggerState = { triggeredBy: "(nothing)" }
-    private _previousValue?: T    
+    private _previousValue?: T
 
     constructor(displayName: string) {
         super(displayName, constant(undefined!), (source) => {

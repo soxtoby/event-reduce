@@ -1,8 +1,10 @@
 import { fireEvent, render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, test } from "bun:test";
-import { Counter, CounterEvents, CounterModel } from "event-reduce-example/Counter";
-import { CounterList, CounterListEvents, CounterListModel } from "event-reduce-example/CounterList";
-import { eventProxy, mutable } from "event-reduce/lib/testing";
+import { Counter } from "event-reduce-example/Counter";
+import { CounterList } from "event-reduce-example/CounterList";
+import { CounterListEvents, CounterListModel } from "event-reduce-example/CounterListModel";
+import { CounterEvents, CounterModel } from "event-reduce-example/CounterModel";
+import { eventProxy, Mutable, mutable } from "event-reduce/lib/signals/testing";
 
 describe("CounterListModel", () => {
     let events: CounterListEvents;
@@ -73,7 +75,7 @@ describe("CounterModel", () => {
     let initialCount: number;
     let parentEvents: any;
     let events: CounterEvents;
-    let sut: ReturnType<typeof mutable<CounterModel>>;
+    let sut: Mutable<CounterModel>;
 
     beforeEach(() => {
         id = 1;

@@ -37,7 +37,7 @@ export function sendEvent(name: string, arg: any) {
 }
 
 /**
- * redux-devtools-extension options from https://github.com/zalmoxisus/redux-devtools-extension/blob/master/docs/API/Arguments.md
+ * redux-devtools-extension options from https://github.com/reduxjs/redux-devtools/blob/main/extension/docs/API/Arguments.md
  */
 export interface IDevToolsOptions {
     /**

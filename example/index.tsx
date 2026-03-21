@@ -1,17 +1,16 @@
-import { enableDevTools, enableLogging } from "event-reduce";
-import * as React from "react";
-import { StrictMode } from "react";
-import * as ReactDOM from "react-dom/client";
-import { CounterList, CounterListEvents, CounterListModel } from "./CounterList";
+import { enableDevTools, enableLogging } from "event-reduce/lib/signals"
+import { StrictMode } from "react"
+import * as ReactDOM from "react-dom/client"
+import { CounterList, CounterListEvents, CounterListModel } from "./CounterList"
 
-enableLogging();
+enableLogging()
 
-let rootModel = new CounterListModel(new CounterListEvents());
+let rootModel = new CounterListModel(new CounterListEvents())
 
-enableDevTools(rootModel, 'Counter List');
+enableDevTools(rootModel, { name: 'Counter List' })
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <StrictMode>
         <CounterList model={rootModel} />
     </StrictMode>
-);
+)
