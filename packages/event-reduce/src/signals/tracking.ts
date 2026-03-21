@@ -1,5 +1,6 @@
-import { dispose, emptyMap, isDisposable, isObject, nameOfFunction, nullDisposable } from "../utils"
+import { dispose, emptyArray, emptyMap, isDisposable, isObject, nameOfFunction, nullDisposable } from "../utils"
 import { Effect } from "./effect"
+import { log } from "./logging"
 import { type EventsClass, isEventsClass, isModel, type Model, StateProperty } from "./nodes"
 import { type IObserver, type ISource, isSource, SourceBase } from "./signals"
 
@@ -127,9 +128,12 @@ function removeParent(node: GraphNode, parent: GraphNode) {
 }
 
 function disposeGarbage() {
-    for (let node of garbage)
-        if (!parentRegistry.has(node)) // In case a new parent was added
+    for (let node of garbage) {
+        if (!parentRegistry.has(node)) { // In case a new parent was added
+            log('🗑️ (dispose)', getPath(node), emptyArray, undefined)
             node[dispose]()
+        }
+    }
     garbage.clear()
 }
 

@@ -53,6 +53,11 @@ export function createModel<T extends object>(create: () => T): T & Model {
     }
 }
 
+export function disposeModel(model: object) {
+    if (isModel(model))
+        model[dispose]()
+}
+
 /** 
  * Marks a class as a model.
  * Initializes \@{@link reduced} and \@{@link derived} properties.

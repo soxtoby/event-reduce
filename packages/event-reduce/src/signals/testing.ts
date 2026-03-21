@@ -1,10 +1,13 @@
-import { isObject } from "../utils"
+import { dispose, isObject } from "../utils"
 import { Atom } from "./atom"
 import { Derivation } from "./derivation"
 import { event } from "./events"
 import { isModel, modelProperties } from "./nodes"
 import { Reduction } from "./reduction"
 import { isSource, SourceBase } from "./signals"
+import { beginTransition } from "./tracking"
+
+const targetAccessor = Symbol('target')
 
 export function mutable<T>(model: T): Mutable<T> {
     if (isModel(model)) {
@@ -19,14 +22,22 @@ export function mutable<T>(model: T): Mutable<T> {
                         if (property instanceof Reduction || property instanceof Derivation)
                             property.detach()
 
-                        if (property instanceof SourceBase)
-                            property.setValue(value)
+                        if (property instanceof SourceBase) {
+                            let transition = beginTransition(property, true)
+                            try {
+                                property.setValue(value)
+                            } finally {
+                                transition[dispose]()
+                            }
+                        }
                     },
                     enumerable: Object.getOwnPropertyDescriptor(model, key)?.enumerable ?? true,
                     configurable: true
                 })
             }
         }
+
+        (model as any)[targetAccessor] = model
 
         if (!('target' in model))
             Object.defineProperty(model, 'target', { value: model, configurable: true })
@@ -51,8 +62,11 @@ export function modelProxy<T extends object>(model: T = {} as T) {
 
     let proxy: T = new Proxy(model, {
         get(target: T, key: PropertyKey, receiver: T) {
-            if (key == 'target' && !('target' in target))
+            if (key == 'target' && !('target' in target)
+                || key == targetAccessor
+            ) {
                 return proxy
+            }
 
             if (properties.hasOwnProperty(key))
                 return properties[key as string].value
@@ -106,10 +120,23 @@ export function eventProxy(createEvent: () => any = event) {
         get(target: any, key: PropertyKey) {
             if (typeof key == 'string')
                 return target[key] || (target[key] = eventProxy(createEvent))
+            else if (key == targetAccessor)
+                return target
         },
 
         apply(target: any, thisArg: any, argArray?: any) {
             event(...argArray)
         }
     })
+}
+
+export function getTarget<T extends object>(proxy: T): T {
+    let target = (proxy as any)[targetAccessor]
+    if (!target)
+        throw new NotAProxyError()
+    return target
+}
+
+export class NotAProxyError extends Error {
+    constructor() { super('Object is not a proxy created by event-reduce testing utilities.') }
 }
