@@ -1,11 +1,24 @@
 import { argsAre, constant, dispose, getAllPropertyDescriptors, getOrAddWeakEntry, getPrototypeChain, isDisposable, isFunction, isObject, isString, isUndefined, nameOfFunction } from "../utils"
 import { Derivation, derive, IDerivation } from "./derivation"
 import { isEvent } from "./events"
-import { eventsBrand, EventsClass, isEventsClass, isModel, Model, modelProperties, ModelProperty, StateProperty } from "./nodes"
 import { IReduction, Reduction } from "./reduction"
-import { ISource, isSource, SourceValue } from "./signals"
+import { ISource, isSource, SourceValue } from "./sources"
 import { getState } from "./state"
 import { collectAccessedSources, getChildNodes, getUnderlyingSource, trackManagedSourceCreation, updateChildren } from "./tracking"
+
+const modelBrand = Symbol('model class')
+const modelProperties = Symbol('model properties')
+
+export interface Model extends Disposable {
+    [modelProperties]: Record<PropertyKey, ModelProperty>
+}
+
+export type ModelProperty = ISource<any> | StateProperty
+
+export function isModel(value: unknown): value is Model {
+    return isObject(value)
+        && modelProperties in value
+}
 
 /** instance -> key -> factory */
 let instancePropertyFactories = new WeakMap<object, Record<PropertyKey, () => ModelProperty>>()
@@ -17,7 +30,6 @@ let prototypePropertyFactories = new WeakMap<object, Record<PropertyKey, (instan
 */
 let getterCache = new WeakMap<object, Map<Function, ISource<any>>>()
 
-const modelBrand = Symbol('model class')
 
 /** Creates a loose model object. Not required if your model is already decorated with \@{@link model}. */
 export function createModel<T extends object>(create: () => T): T & Model {
@@ -342,6 +354,21 @@ export function state<Model extends object, Value>(...args:
     }
 }
 
+export class StateProperty implements Disposable {
+    constructor(
+        private _instance: any,
+        public readonly key: PropertyKey
+    ) {
+        updateChildren(_instance, null, this.value)
+    }
+
+    toJSON() { return getState(this.value) }
+
+    get value() { return this._instance[this.key] }
+
+    [dispose]() { updateChildren(this._instance, this.value, null) }
+}
+
 /**
  * Marks a class as an events class.
  * Automatically populates the names of event properties.
@@ -370,6 +397,21 @@ export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
             }
         }
     }[className]
+}
+
+const eventsBrand = Symbol('events class')
+
+export interface EventsClass {
+    [eventsBrand]: true
+}
+
+export function isEventsClass(value: unknown): value is EventsClass {
+    return value instanceof Object
+        && eventsBrand in value
+}
+
+export function getModelProperties(model: Model): Record<PropertyKey, ModelProperty> {
+    return model[modelProperties]
 }
 
 function isClassFieldDecoratorContext(context: ClassFieldDecoratorContext<any, any> | unknown): context is ClassFieldDecoratorContext<any, any> {

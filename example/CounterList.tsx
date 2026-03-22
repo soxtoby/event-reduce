@@ -1,6 +1,5 @@
-import { event, events, model, reduce, reduced } from "event-reduce";
-import { reactive } from "event-reduce-react";
-import * as React from "react";
+import { reactive } from "event-reduce-react/lib/signals";
+import { event, events, model, reduce, reduced } from "event-reduce/lib/signals";
 import { Counter, CounterEvents, CounterModel } from "./Counter";
 
 @events
@@ -23,7 +22,6 @@ export class CounterListModel {
         return reduce([] as CounterModel[], this.events)
             .on(e => e.counterAdded, (cs) => cs.concat(this.createCounter({ id: uid++ })))
             .on(e => e.counterRemoved, (cs, { id }) => cs.filter(c => c.id != id))
-            .onRestore((_, counterStates) => counterStates.map(c => this.createCounter(c)))
             .value;
     }
 

@@ -1,13 +1,7 @@
 import { dispose, emptyArray, identity, nameOfCallback, nameOfFunction } from "../utils"
 import type { IEventFunction } from "./events"
-import { isEventsClass } from "./nodes"
+import { isEventsClass } from "./models"
 import { currentIteration, getPath, iterationSource, trackSourceAccessed, updateChildren } from "./tracking"
-
-export function isSource(value: any): value is ISource<any> {
-    return value instanceof SourceBase
-}
-
-export type SourceValue<Source extends ISource<any>> = Source extends ISource<infer T> ? T : never
 
 export interface ISource<T> extends Disposable {
     readonly displayName: string
@@ -24,17 +18,19 @@ export interface ISource<T> extends Disposable {
     filterMap<Out>(transform: (value: T) => Out | undefined, displayName?: string): ISource<Out>
 }
 
-// NOCOMMIT do we actually need this, or could value be pushed down?
-export interface IValueSource<T> extends ISource<T> {
-    readonly value: T
-}
-
+// NOCOMMIT move elsewhere?
 export interface IObserver<T> {
     readonly displayName: string
     sourceUpdated<S extends T>(source: ISource<S>, value: S): void
 }
 
-export abstract class SourceBase<T> implements ISource<T> {
+export function isSource(value: any): value is ISource<any> {
+    return value instanceof Source
+}
+
+export type SourceValue<Source extends ISource<any>> = Source extends ISource<infer T> ? T : never
+
+export abstract class Source<T> implements ISource<T> {
     protected readonly _observers = new Set<IObserver<T>>()
     protected _value!: T
     lastUpdated = -1
@@ -54,7 +50,7 @@ export abstract class SourceBase<T> implements ISource<T> {
 
     setValue(newValue: T) {
         if (process.env.NODE_ENV !== 'production') {
-            if (isEventsClass(newValue) || newValue instanceof SourceBase && !newValue.isValidAsState)
+            if (isEventsClass(newValue) || newValue instanceof Source && !newValue.isValidAsState)
                 throw new InvalidStateError(this, newValue)
 
             if (!iterationSource)
@@ -77,15 +73,15 @@ export abstract class SourceBase<T> implements ISource<T> {
 
     protected isValidAsState = true
 
-    map<Source extends SourceBase<any>, Out>(this: Source, transform: (value: T) => Out, displayName = `${this.displayName}.map(${nameOfCallback(transform)})`): ISource<Out> {
+    map<S extends Source<any>, Out>(this: S, transform: (value: T) => Out, displayName = `${this.displayName}.map(${nameOfCallback(transform)})`): ISource<Out> {
         return bind(displayName, this, transform)
     }
 
-    filter<Source extends SourceBase<any>>(this: Source, predicate: (value: T) => boolean, displayName = `${this.displayName}.filter(${nameOfCallback(predicate)})`): ISource<T> {
+    filter<S extends Source<any>>(this: S, predicate: (value: T) => boolean, displayName = `${this.displayName}.filter(${nameOfCallback(predicate)})`): ISource<T> {
         return bind(displayName, this, identity, predicate)
     }
 
-    filterMap<Source extends SourceBase<any>, Out>(this: Source, transform: (value: T) => Out | undefined, displayName = `${this.displayName}.filterMap(${nameOfCallback(transform)})`): ISource<Out> {
+    filterMap<S extends Source<any>, Out>(this: S, transform: (value: T) => Out | undefined, displayName = `${this.displayName}.filterMap(${nameOfCallback(transform)})`): ISource<Out> {
         return bind(displayName, this, v => transform(v)!, value => value == undefined)
     }
 
@@ -103,7 +99,7 @@ export function bind<In, Out>(displayName: string, source: ISource<In>, transfor
     return new BoundSource(displayName, source, transform, predicate)
 }
 
-class BoundSource<In, Out> extends SourceBase<Out> {
+class BoundSource<In, Out> extends Source<Out> {
     constructor(
         displayName: string,
         private _source: ISource<In>,

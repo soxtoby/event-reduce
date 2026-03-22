@@ -6,5 +6,5 @@ export { asyncEvent, event, type AsyncError, type AsyncResult, type AsyncStart, 
 export { enableLogging, log, startLogging } from "./logging"
 export { createModel, derived, disposeModel, events, model, reduced, state } from "./models"
 export { extendReduce, reduce, type IReduction, type Reducer } from "./reduction"
-export { type IObserver, type ISource } from "./signals"
+export { type IObserver, type ISource } from "./sources"
 export { getState, type State } from "./state"

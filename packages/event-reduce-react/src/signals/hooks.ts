@@ -1,6 +1,7 @@
-import { asyncEvent, Atom, derive, event, IDerivation, IReduction, ISource, reduce } from "event-reduce/lib/signals"
-import { isModel, Model } from "event-reduce/lib/signals/nodes"
+import { asyncEvent, Atom, derive, event, IDerivation, IReduction, reduce } from "event-reduce/lib/signals"
+import { isModel, Model } from "event-reduce/lib/signals/models"
 import { Reduction } from "event-reduce/lib/signals/reduction"
+import { trackManagedSourceCreation, updateChildren } from "event-reduce/lib/signals/tracking"
 import { dispose, emptyArray } from "event-reduce/lib/utils"
 import { DependencyList, useEffect, useMemo, useRef, useState } from "react"
 
@@ -44,7 +45,9 @@ export function useDerived<T>(getValue: () => T, nameOrUnobservableDependencies?
 }
 
 export function useReduced<T>(initial: T, name?: string): IReduction<T> {
+    let sourceCreation = trackManagedSourceCreation() // It's fine for this reduction to be loose, because it will be disposed on unmount
     let reduction = useState(() => reduce(initial, name))[0]
+    sourceCreation[dispose]()
     useEffect(() => () => (reduction as Reduction<T>)[dispose]?.(), [])
     return reduction
 }

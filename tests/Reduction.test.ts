@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
 import { Atom, createModel, event, events, IReduction, reduce } from 'event-reduce/src/signals';
 import { CircularSubscriptionError } from "event-reduce/src/signals/reduction";
-import { InvalidStateError } from "event-reduce/src/signals/signals";
+import { InvalidStateError } from "event-reduce/src/signals/sources";
 import { CircularDependencyError, collectAccessedSources } from "event-reduce/src/signals/tracking";
 import { dispose } from "event-reduce/src/utils";
 import { MockObserver } from "./MockObserver";

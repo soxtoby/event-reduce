@@ -1,11 +1,12 @@
 import { dispose, emptyArray } from "../utils"
 import { derive, IDerivation } from "./derivation"
 import { startLogging } from "./logging"
-import { allSources, IObserver, ISource, isSource, IValueSource, NotASourceValueError, SourceBase } from "./signals"
+import { allSources, IObserver, ISource, isSource, NotASourceValueError, Source } from "./sources"
 import { getState, State } from "./state"
-import { currentIteration, managedSourceCreated, trackSourceAccessed, collectAccessedSources, updateChildren, getUnderlyingSource } from "./tracking"
+import { collectAccessedSources, currentIteration, getUnderlyingSource, managedSourceCreated, trackSourceAccessed, updateChildren } from "./tracking"
 
-export interface IReduction<T, Events = void> extends IValueSource<T> {
+export interface IReduction<T, Events = void> extends ISource<T> {
+    readonly value: T
     on<S>(source: ISource<S>, reduce: Reducer<T, S>): this
     on<S>(getSource: (events: Events) => ISource<S>, reduce: Reducer<T, S>): this
 }
@@ -20,6 +21,7 @@ export function reduce<T, Events>(initialValue: T, eventsOrDisplayName?: Events 
     return new Reduction(displayName ?? Reduction.defaultName, initialValue, Object.is, events)
 }
 
+/** Extends an existing source with reduction capabilities. */
 export function extendReduce<T>(observableValue: T, displayName?: string): IReduction<T, void> {
     let source = getUnderlyingSource(observableValue)
     if (source)
@@ -29,7 +31,7 @@ export function extendReduce<T>(observableValue: T, displayName?: string): IRedu
 
 export type Reducer<Result, Source> = (current: Result, next: Source) => Result
 
-export class Reduction<T, Events = void> extends SourceBase<T> implements IReduction<T, Events>, IObserver<any> {
+export class Reduction<T, Events = void> extends Source<T> implements IReduction<T, Events>, IObserver<any> {
     sources = new Set<ISource<any>>()
     private _reducers = new Map<ISource<any>, (current: T, next: any) => T>()
     private _sourcesLastChecked = -1
@@ -61,7 +63,7 @@ export class Reduction<T, Events = void> extends SourceBase<T> implements IReduc
             source = source(this._events!)
 
         if (process.env.NODE_ENV !== 'production') {
-            if (allSources(source).find(s => s == this)) 
+            if (allSources(source).find(s => s == this))
                 throw new CircularSubscriptionError(this, source);
         }
 
@@ -111,7 +113,7 @@ export class Reduction<T, Events = void> extends SourceBase<T> implements IReduc
             if (this._sourcesLastChecked < currentIteration) {
                 let newerSource = Array.from(this.sources).find(s => s.lastUpdated > this._sourcesLastChecked)
                 if (newerSource)
-                    this.sourceUpdated(newerSource, (newerSource as SourceBase<any>).value)
+                    this.sourceUpdated(newerSource, (newerSource as Source<any>).value)
             }
         } finally {
             access[dispose]()

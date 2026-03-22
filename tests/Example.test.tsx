@@ -1,9 +1,7 @@
 import { fireEvent, render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, test } from "bun:test";
-import { Counter } from "event-reduce-example/Counter";
-import { CounterList } from "event-reduce-example/CounterList";
-import { CounterListEvents, CounterListModel } from "event-reduce-example/CounterListModel";
-import { CounterEvents, CounterModel } from "event-reduce-example/CounterModel";
+import { Counter, CounterEvents, CounterModel } from "event-reduce-example/Counter";
+import { CounterList, CounterListEvents, CounterListModel } from "event-reduce-example/CounterList";
 import { eventProxy, Mutable, mutable } from "event-reduce/lib/signals/testing";
 
 describe("CounterListModel", () => {

@@ -1,19 +1,16 @@
 import { Scoped } from "../types"
 import { dispose, matchesScope } from "../utils"
 import { startLogging } from "./logging"
-import { type ISource, SourceBase, SourceValue } from "./signals"
+import { type ISource, Source, SourceValue } from "./sources"
 import { beginTransition } from "./tracking"
-
-export interface IEventFunction<T, Args extends any[], Return = Args[0]> extends ISource<T> {
-    (...args: Args): Return
-}
 
 export interface IEvent<In, Out = In> extends IEventFunction<Out, [value: In]> {
     scope<Scope extends Partial<In>>(scope: Scope): IEvent<Scoped<In, Scope>, Out>
 }
 
-export type AdditionalMembersFactory<Source extends ISource<any>, Members extends object> =
-    (source: Source & IEventFunction<SourceValue<Source>, any>) => Members
+export interface IEventFunction<T, Args extends any[], Return = Args[0]> extends ISource<T> {
+    (...args: Args): Return
+}
 
 export function event<T = void>(name: string = "(anonymous event)"): IEvent<T> {
     return makeEventFunction(name, function event(emit: (value: T) => void, value: T) {
@@ -159,7 +156,10 @@ function makeSourceFunction<Source extends ISource<any>, Args extends any[], Ret
         : eventFn as Source & IEventFunction<SourceValue<Source>, Args, Return> & Members
 }
 
-class Event<T> extends SourceBase<T> {
+export type AdditionalMembersFactory<Source extends ISource<any>, Members extends object> =
+    (source: Source & IEventFunction<SourceValue<Source>, any>) => Members
+
+class Event<T> extends Source<T> {
     emit(value: T) {
         let transition = beginTransition(this, true)
         try {

@@ -1,6 +1,6 @@
 import { LogValue } from "event-reduce/lib/logging"
 import { Effect, log, startLogging } from "event-reduce/lib/signals"
-import { ISource } from "event-reduce/lib/signals/signals"
+import { ISource } from "event-reduce/lib/signals/sources"
 import { beginTransition } from "event-reduce/lib/signals/tracking"
 import { constant, dispose, emptyArray, nameOfFunction } from "event-reduce/lib/utils"
 import { Children, Fragment, ReactElement, ReactNode, createElement, isValidElement, useState } from "react"

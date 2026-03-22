@@ -1,11 +1,13 @@
 import { dispose, emptyArray, nameOfFunction } from "../utils"
 import { Effect } from "./effect"
 import { startLogging } from "./logging"
-import { IObserver, ISource, IValueSource, SourceBase } from "./signals"
+import { IObserver, ISource, Source } from "./sources"
 import { getState, State } from "./state"
 import { beginTransition, iterationSource, trackManagedSourceCreation, trackSourceAccessed } from "./tracking"
 
-export interface IDerivation<T> extends IValueSource<T>, IObserver<any> {
+export interface IDerivation<T> extends ISource<T>, IObserver<any> {
+    readonly value: T
+
     /** 
      * Forces the value to be re-calculated. 
      * @param deriveValue Optional function to use to derive the value. If not provided, the original derivation function will be used.
@@ -23,7 +25,7 @@ export function derive<T>(derive: () => T, displayNameOrSkip?: string | ((a: T, 
     return new Derivation((displayName ?? nameOfFunction(derive)) || Derivation.defaultName, derive, skipUpdate)
 }
 
-export class Derivation<T> extends SourceBase<T> implements IDerivation<T> {
+export class Derivation<T> extends Source<T> implements IDerivation<T> {
     private _derive: Effect<T>
     private _json?: IDerivation<State<T>>
     static defaultName = "(anonymous derivation)"

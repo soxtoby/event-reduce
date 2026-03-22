@@ -1,10 +1,10 @@
 import { dispose } from "../utils";
 import { derive, IDerivation } from "./derivation";
-import { IValueSource, SourceBase } from "./signals";
+import { ISource, Source } from "./sources";
 import { getState, State } from "./state";
 import { beginTransition } from "./tracking";
 
-export class Atom<T> extends SourceBase<T> implements IValueSource<T> {
+export class Atom<T> extends Source<T> implements ISource<T> {
     private _json: IDerivation<State<T>>
 
     constructor(
@@ -18,6 +18,8 @@ export class Atom<T> extends SourceBase<T> implements IValueSource<T> {
     }
 
     toJSON() { return this._json.value; }
+
+    override get value() { return super.value }
 
     override setValue(value: T) {
         let transition = beginTransition(this, true)

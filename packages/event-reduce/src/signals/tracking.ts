@@ -1,8 +1,8 @@
 import { dispose, emptyArray, emptyMap, isDisposable, isObject, nameOfFunction, nullDisposable } from "../utils"
 import { Effect } from "./effect"
 import { log } from "./logging"
-import { type EventsClass, isEventsClass, isModel, type Model, StateProperty } from "./nodes"
-import { type IObserver, type ISource, isSource, SourceBase } from "./signals"
+import { type EventsClass, isEventsClass, isModel, type Model, StateProperty } from "./models"
+import { type IObserver, type ISource, isSource, Source } from "./sources"
 
 type GraphNode = ISource<any> | Model | EventsClass
 
@@ -50,7 +50,7 @@ export function trackSourceAccessed(source: ISource<any>): Disposable {
 
 export function getUnderlyingSource<T>(value: T): ISource<T> | null {
     return lastSourceAccessed
-        && lastSourceAccessed instanceof SourceBase
+        && lastSourceAccessed instanceof Source
         && Object.is(lastSourceAccessed.value, value)
         ? lastSourceAccessed
         : null
@@ -61,13 +61,13 @@ export function updateChildren(parent: GraphNode, previousValue: unknown, nextVa
         return
 
     let previousChildren: ReadonlyMap<GraphNode, string> = emptyMap
-    if (isObject(previousValue) || previousValue instanceof SourceBase) {
+    if (isObject(previousValue) || previousValue instanceof Source) {
         previousChildren = childSnapshots.get(previousValue) ?? getChildNodes(previousValue)
         childSnapshots.delete(previousValue)
     }
 
     let newChildren: ReadonlyMap<GraphNode, string> = emptyMap
-    if (isObject(nextValue) || nextValue instanceof SourceBase) {
+    if (isObject(nextValue) || nextValue instanceof Source) {
         newChildren = getChildNodes(nextValue)
         childSnapshots.set(nextValue, newChildren)
     }

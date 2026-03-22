@@ -2,8 +2,8 @@ import { renderHook, RenderHookResult } from "@testing-library/react-hooks";
 import { beforeEach, describe, expect, test } from "bun:test";
 import { useAsyncEvent, useDerived, useEvent, useReduced } from "event-reduce-react/src/signals";
 import { event, IEvent, model, reduce, reduced, type AsyncResult } from "event-reduce/lib/signals";
+import { mutable } from "event-reduce/lib/signals/testing";
 import { IDerivation } from "event-reduce/src/signals";
-import { mutable } from "event-reduce/src/signals/testing";
 import { MockObserver } from "./MockObserver";
 
 describe("useEvent", () => {
@@ -65,7 +65,7 @@ describe("useDerived", () => {
     let initialResult: IDerivation<number>
 
     beforeEach(() => {
-        source = mutable(new SourceModel()); // NOCOMMIT signals version of testing
+        source = mutable(new SourceModel());
         sut = renderHook(() => useDerived(() => source.value * 2));
         initialResult = sut.result.current;
     });

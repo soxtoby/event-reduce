@@ -2,27 +2,27 @@ import { dispose, isObject } from "../utils"
 import { Atom } from "./atom"
 import { Derivation } from "./derivation"
 import { event } from "./events"
-import { isModel, modelProperties } from "./nodes"
+import { getModelProperties, isModel } from "./models"
 import { Reduction } from "./reduction"
-import { isSource, SourceBase } from "./signals"
+import { isSource, Source } from "./sources"
 import { beginTransition } from "./tracking"
 
 const targetAccessor = Symbol('target')
 
 export function mutable<T>(model: T): Mutable<T> {
     if (isModel(model)) {
-        let properties = model[modelProperties]
+        let properties = getModelProperties(model)
 
         for (let key in properties) {
             let property = properties[key]
             if (isSource(property)) {
                 Object.defineProperty(model, key, {
-                    get() { return (property as SourceBase<any>).value },
+                    get() { return (property as Source<any>).value },
                     set(value) {
                         if (property instanceof Reduction || property instanceof Derivation)
                             property.detach()
 
-                        if (property instanceof SourceBase) {
+                        if (property instanceof Source) {
                             let transition = beginTransition(property, true)
                             try {
                                 property.setValue(value)

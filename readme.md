@@ -71,7 +71,6 @@ class CounterModel {
     }
 }
 ```
-> **Note:** event-reduce currently relies on `"experimentalDecorators": true` and `"useDefineForClassFields": false` being set in your `tsconfig.json` file. Standard ECMAScript field behaviour and decorator support is coming soon.
 
 Then the model can be used like so:
 ```ts

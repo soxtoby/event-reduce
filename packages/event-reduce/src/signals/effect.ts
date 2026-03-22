@@ -1,5 +1,5 @@
 import { dispose } from "../utils"
-import type { IObserver, ISource } from "./signals"
+import type { IObserver, ISource } from "./sources"
 import { currentIteration, collectAccessedSources } from "./tracking"
 
 export class Effect<T> implements IObserver<any> {
