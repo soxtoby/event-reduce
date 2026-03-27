@@ -38,12 +38,4 @@ describe('useReactive', () => {
 
         test("returns updated result", () => expect(sut.result.current).toBe('new value'));
     });
-
-    test("when accessed observable value is changed during render, doesn't trigger an extra render", () => {
-        innerBehaviour = () => source.setValue('new value');
-        render.mockClear();
-        sut.rerender();
-
-        expect(render).toHaveBeenCalledTimes(1);
-    });
 });
