@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { derived, getState, reduce, reduced, state } from "event-reduce/lib/signals";
+import { derived, getState, reduce, reduced, state } from "event-reduce/signals";
 
 describe("legacy state", () => {
     class BaseModel {

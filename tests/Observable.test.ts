@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
-import { IObservable, IObserver, merge, Subject, Unsubscribe } from 'event-reduce';
-import { ObservableOperation } from 'event-reduce/lib/observable';
+import { IObservable, IObserver, merge } from 'event-reduce/observable';
+import { Subject } from 'event-reduce/subject';
+import { Unsubscribe } from 'event-reduce/types';
+import { ObservableOperation } from 'event-reduce/observable';
 
 describe("ObservableOperation", () => {
     describe("when subscribing", () => {

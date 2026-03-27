@@ -1,9 +1,10 @@
-import { IObservableValue, Observe } from "event-reduce";
-import { Derivation } from "event-reduce/lib/derivation";
-import { LogValue } from "event-reduce/lib/logging";
-import { ObservableValue } from "event-reduce/lib/observableValue";
-import { reactionQueue } from "event-reduce/lib/reactions";
-import { constant, nameOfFunction, unsubscribeAll } from "event-reduce/lib/utils";
+import { Observe } from "event-reduce/observable";
+import { IObservableValue } from "event-reduce/observableValue";
+import { Derivation } from "event-reduce/derivation";
+import { LogValue } from "event-reduce/logging";
+import { ObservableValue } from "event-reduce/observableValue";
+import { reactionQueue } from "event-reduce/reactions";
+import { constant, nameOfFunction, unsubscribeAll } from "event-reduce/utils";
 import { Children, Fragment, ReactElement, ReactNode, createElement, isValidElement, useCallback, useEffect, useState } from "react";
 import { useSyncExternalStore } from "use-sync-external-store/shim";
 

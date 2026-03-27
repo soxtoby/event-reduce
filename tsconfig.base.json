@@ -6,7 +6,7 @@
     "jsx": "react-jsx",
     "strict": true, 
     "noImplicitOverride": true,
-    "inlineSourceMap": true,
+    "sourceMap": true,
     "inlineSources": true,
     "skipLibCheck": true
   }

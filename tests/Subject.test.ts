@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
-import { Subject } from 'event-reduce';
+import { Subject } from 'event-reduce/subject';
 
 describe("Subject", () => {
     let sut: Subject<number>;

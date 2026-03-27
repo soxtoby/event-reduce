@@ -1,4 +1,4 @@
-import { event, extendReduce, model, reduced } from "event-reduce/src/signals";
+import { event, extendReduce, model, reduced } from "event-reduce/signals";
 import { TestModel } from "./TestModel";
 
 // TODO move back into Model.test.ts after https://github.com/oven-sh/bun/issues/28010 is resolved

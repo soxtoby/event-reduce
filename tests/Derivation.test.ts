@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
-import { Atom, derive, event, events, IDerivation } from "event-reduce/src/signals";
-import { InvalidStateError } from "event-reduce/src/signals/sources";
-import { getUnderlyingSource, SideEffectDuringReactionError } from "event-reduce/src/signals/tracking";
+import { Atom, derive, event, events, IDerivation } from "event-reduce/signals";
+import { InvalidStateError } from "event-reduce/signals/sources";
+import { getUnderlyingSource, SideEffectDuringReactionError } from "event-reduce/signals/tracking";
 import { MockObserver } from "./MockObserver";
 
 describe("derive", () => {

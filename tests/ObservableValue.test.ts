@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
-import { ObservableValue, collectAccessedValues, consumeLastAccessed } from "event-reduce/lib/observableValue";
+import { ObservableValue, collectAccessedValues, consumeLastAccessed } from "event-reduce/observableValue";
 
 describe("ObservableValue", () => {
     let sut: ObservableValue<string>;

@@ -1,4 +1,4 @@
-import { cleanupOptions } from "event-reduce/lib/cleanup"
+import { cleanupOptions } from "event-reduce/cleanup"
 
 export * from "./hooks";
 export * from "./rendering";

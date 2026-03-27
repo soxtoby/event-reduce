@@ -10,13 +10,50 @@
     "directory": "packages/event-reduce"
   },
   "license": "MIT",
-  "main": "lib/index",
-  "types": "lib/index",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "bun": "./src/index.ts",
+      "default": "./lib/index.js"
+    },
+    "./signals": {
+      "types": "./lib/signals/index.d.ts",
+      "bun": "./src/signals/index.ts",
+      "default": "./lib/signals/index.js"
+    },
+    "./signals/*": {
+      "types": "./lib/signals/*.d.ts",
+      "bun": "./src/signals/*.ts",
+      "default": "./lib/signals/*.js"
+    },
+    "./*": {
+      "types": "./lib/*.d.ts",
+      "bun": "./src/*.ts",
+      "default": "./lib/*.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "signals": [
+        "lib/signals/index.d.ts"
+      ],
+      "signals/*": [
+        "lib/signals/*"
+      ],
+      "*": [
+        "lib/*"
+      ]
+    }
+  },
   "scripts": {
     "prepack": "cp ../../readme.md . && cp ../../LICENSE ."
   },
   "files": [
-    "lib"
+    "lib",
+    "src"
   ],
   "devDependencies": {
     "@types/node": "*",

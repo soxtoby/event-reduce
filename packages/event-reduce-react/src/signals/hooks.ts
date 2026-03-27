@@ -1,8 +1,8 @@
-import { asyncEvent, Atom, derive, event, IDerivation, IReduction, reduce } from "event-reduce/lib/signals"
-import { isModel, Model } from "event-reduce/lib/signals/models"
-import { Reduction } from "event-reduce/lib/signals/reduction"
-import { trackManagedSourceCreation, updateChildren } from "event-reduce/lib/signals/tracking"
-import { dispose, emptyArray } from "event-reduce/lib/utils"
+import { asyncEvent, Atom, derive, event, IDerivation, IReduction, reduce } from "event-reduce/signals"
+import { isModel, Model } from "event-reduce/signals/models"
+import { Reduction } from "event-reduce/signals/reduction"
+import { trackManagedSourceCreation } from "event-reduce/signals/tracking"
+import { dispose, emptyArray } from "event-reduce/utils"
 import { DependencyList, useEffect, useMemo, useRef, useState } from "react"
 
 /**

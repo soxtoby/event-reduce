@@ -1,5 +1,5 @@
-import { reactive } from "event-reduce-react/lib/signals";
-import { event, events, model, reduce, reduced } from "event-reduce/lib/signals";
+import { reactive } from "event-reduce-react/signals";
+import { event, events, model, reduce, reduced } from "event-reduce/signals";
 import { Counter, CounterEvents, CounterModel } from "./Counter";
 
 @events

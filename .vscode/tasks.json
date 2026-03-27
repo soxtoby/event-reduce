@@ -29,6 +29,20 @@
                 "kind": "test",
                 "isDefault": true
             }
+        },
+        {
+            "type": "bun",
+            "script": "run test:modern",
+            "problemMatcher": [],
+            "label": "Run modern tests",
+            "group": "test"
+        },
+        {
+            "type": "shell",
+            "command": "bun run test:legacy",
+            "problemMatcher": [],
+            "label": "Run legacy tests",
+            "group": "test"
         }
     ]
 }

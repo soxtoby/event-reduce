@@ -1,2 +1,4 @@
 [test]
-preload = ["./tests/dist/setup.js"]
+root = "tests"
+pathIgnorePatterns = ["**/dist/**"]
+preload = ["./tests/setup.ts"]

@@ -1,8 +1,11 @@
-import { IObservableValue, IReduction, asyncEvent, derive, event, reduce } from "event-reduce";
-import { changeOwnedValue } from "event-reduce/lib/cleanup";
-import { ObservableValue } from "event-reduce/lib/observableValue";
-import { ValueOf } from "event-reduce/lib/types";
-import { emptyArray } from "event-reduce/lib/utils";
+import { asyncEvent, event } from "event-reduce/events";
+import { IObservableValue } from "event-reduce/observableValue";
+import { IReduction, reduce } from "event-reduce/reduction";
+import { derive } from "event-reduce/derivation";
+import { changeOwnedValue } from "event-reduce/cleanup";
+import { ObservableValue } from "event-reduce/observableValue";
+import { ValueOf } from "event-reduce/types";
+import { emptyArray } from "event-reduce/utils";
 import { DependencyList, useMemo, useRef, useState } from "react";
 
 /**
