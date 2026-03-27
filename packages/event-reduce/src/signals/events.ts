@@ -96,18 +96,18 @@ export function asyncEvent<Result = void, Context = void>(name: string = "(anony
             })
 
         return promise
-    }, function asyncEventMembers(e: IEventFunction<AsyncValue<Result, Context>, [promise: PromiseLike<Result>, context: Context]>) {
+    }, function asyncEventMembers<CurrentContext>(e: IEventFunction<AsyncValue<Result, CurrentContext>, [promise: PromiseLike<Result>, context: CurrentContext]>) {
         let setBaseDisplayName = e.setDisplayName
         return {
             started: e.filter(v => 'promise' in v, `${e.displayName}.started`),
             resolved: e.filter(v => 'result' in v, `${e.displayName}.resolved`),
             rejected: e.filter(v => 'error' in v, `${e.displayName}.rejected`),
-            scope<Scope extends Partial<Context>>(scope: Scope) {
+            scope<Scope extends Partial<CurrentContext>>(scope: Scope): IAsyncEvent<Result, Scoped<CurrentContext, Scope>> {
                 return bindEvent(e,
                     `${e.displayName}.scoped(${JSON.stringify(scope)})`,
-                    (promise: PromiseLike<Result>, context: Scoped<Context, Scope>) => e(promise, { ...context, ...scope } as Context),
+                    (promise: PromiseLike<Result>, context: Scoped<CurrentContext, Scope>) => e(promise, { ...context, ...scope } as CurrentContext),
                     v => matchesScope(scope, v.context),
-                    asyncEventMembers)
+                    asyncEventMembers) as IAsyncEvent<Result, Scoped<CurrentContext, Scope>>
             },
             setDisplayName(name: string) {
                 setBaseDisplayName.call(e, name)

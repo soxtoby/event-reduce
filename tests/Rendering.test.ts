@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react-hooks/dom";
+import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
 import { useReactive } from "event-reduce-react/signals";
 import { Atom } from "event-reduce/signals";

@@ -39,7 +39,7 @@ export function useDerived<T>(getValue: () => T, nameOrUnobservableDependencies?
 
     let derived = useState(() => derive(getValue, name))[0]
 
-    useMemo(() => derived.update(getValue, 'render'), unobservableDependencies)
+    useMemo(() => derived.update(getValue, 'render'), unobservableDependencies!)
 
     return derived
 }

@@ -8,6 +8,7 @@
     "noImplicitOverride": true,
     "sourceMap": true,
     "inlineSources": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["bun"]
   }
 }

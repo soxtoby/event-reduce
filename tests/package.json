@@ -15,14 +15,13 @@
     "event-reduce-example": "workspace:*"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.6.2",
-    "@testing-library/react": "*",
-    "@testing-library/react-hooks": "*",
-    "@types/react": ">=16.8",
-    "@types/react-dom": ">=16.8",
-    "react": ">=16.8",
-    "react-dom": ">=16.8",
-    "react-test-renderer": ">=16.8",
-    "typescript": "~5"
+    "@happy-dom/global-registrator": "^20.8.9",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-test-renderer": "^19.2.4",
+    "typescript": "~6.0.2"
   }
 }

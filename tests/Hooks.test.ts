@@ -1,4 +1,4 @@
-import { renderHook, RenderHookResult } from "@testing-library/react-hooks/dom";
+import { renderHook, RenderHookResult } from "@testing-library/react";
 import { beforeEach, describe, expect, test } from "bun:test";
 import { useAsyncEvent, useDerived, useEvent, useReduced } from "event-reduce-react/signals";
 import { event, IEvent, model, reduce, reduced, type AsyncResult } from "event-reduce/signals";
@@ -7,7 +7,7 @@ import { IDerivation } from "event-reduce/signals";
 import { MockObserver } from "./MockObserver";
 
 describe("useEvent", () => {
-    let sut: ReturnType<typeof renderHook<unknown, ReturnType<typeof useEvent<number>>>>;
+    let sut: RenderHookResult<ReturnType<typeof useEvent<number>>, unknown>;
     let initialResult: IEvent<number>
 
     beforeEach(() => {
@@ -32,7 +32,7 @@ describe("useEvent", () => {
 });
 
 describe("useAsyncEvent", () => {
-    let sut: ReturnType<typeof renderHook<unknown, ReturnType<typeof useAsyncEvent<number>>>>;
+    let sut: RenderHookResult<ReturnType<typeof useAsyncEvent<number>>, unknown>;
     let initialResult: ReturnType<typeof useAsyncEvent<number>>;
 
     beforeEach(() => {
@@ -61,7 +61,7 @@ describe("useAsyncEvent", () => {
 describe("useDerived", () => {
     @model class SourceModel { @reduced get value() { return reduce(1).value; } }
     let source: ReturnType<typeof mutable<SourceModel>>;
-    let sut: RenderHookResult<unknown, IDerivation<number>>
+    let sut: RenderHookResult<IDerivation<number>, unknown>
     let initialResult: IDerivation<number>
 
     beforeEach(() => {
@@ -87,7 +87,7 @@ describe("useDerived", () => {
 
 describe("useReduced", () => {
     let added: ReturnType<typeof event<number>>;
-    let sut: ReturnType<typeof renderHook<unknown, ReturnType<typeof useReduced<number>>>>;
+    let sut: RenderHookResult<ReturnType<typeof useReduced<number>>, unknown>;
     let initialResult: ReturnType<typeof useReduced<number>>;
 
     beforeEach(() => {
