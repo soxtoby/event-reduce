@@ -1,8 +1,8 @@
-import { dispose, emptyArray, emptyMap, isDisposable, isObject, nameOfFunction, nullDisposable } from "../utils"
 import { Effect } from "./effect"
 import { log } from "./logging"
 import { type EventsClass, isEventsClass, isModel, type Model, StateProperty } from "./models"
 import { type IObserver, type ISource, isSource, Source } from "./sources"
+import { dispose, emptyArray, emptyMap, isDisposable, isObject, nameOfFunction, nullDisposable } from "./utils"
 
 type GraphNode = ISource<any> | Model | EventsClass
 

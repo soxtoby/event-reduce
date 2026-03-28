@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test"
-import { asyncEvent, derive, derived, event, events, extendReduce, model, reduce, reduced, state } from "event-reduce/signals"
-import { EventsMarkedAsStateError } from "event-reduce/signals/models"
+import { asyncEvent, derive, derived, event, events, extendReduce, model, reduce, reduced, state } from "event-reduce"
+import { EventsMarkedAsStateError } from "event-reduce/models"
 
 describe("legacy models", () => {
     let increment: ReturnType<typeof event<void>>

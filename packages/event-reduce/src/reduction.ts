@@ -1,138 +1,150 @@
-import { EventFn, IEventClass, isEvent } from "./events";
-import { log, sourceTree } from "./logging";
-import { isEventsClass } from "./models";
-import { IObservable, allSources, isObservable } from "./observable";
-import { IObservableValue, ObservableValue, protectionAgainstAccessingValueWithCommonSource, valueChanged } from "./observableValue";
-import { State, setState } from "./state";
-import { Subject } from "./subject";
-import { Unsubscribe } from "./types";
-import { emptyArray, isObject, using } from "./utils";
+import { derive, IDerivation } from "./derivation"
+import { startLogging } from "./logging"
+import { allSources, IObserver, ISource, isSource, NotASourceValueError, Source } from "./sources"
+import { getState, State } from "./state"
+import { collectAccessedSources, currentIteration, getUnderlyingSource, managedSourceCreated, trackSourceAccessed, updateChildren } from "./tracking"
+import { dispose, emptyArray } from "./utils"
 
-export function reduce<TValue>(initial: TValue, displayName?: string): IReduction<TValue>;
-export function reduce<TValue, TEvents>(initial: TValue, events: TEvents, displayName?: string): IBoundReduction<TValue, TEvents>;
-export function reduce<TValue, TEvents>(initial: TValue, events?: TEvents | string, displayName: string = '(anonymous reduction)'): IReduction<TValue> {
-    return events && typeof events != 'string' ? new BoundReduction(() => displayName, initial, events)
-        : typeof events == 'string' ? new Reduction(() => events, initial)
-            : new Reduction(() => displayName, initial);
+export interface IReduction<T, Events = void> extends ISource<T> {
+    readonly value: T
+    on<S>(source: ISource<S>, reduce: Reducer<T, S>): this
+    on<S>(getSource: (events: Events) => ISource<S>, reduce: Reducer<T, S>): this
 }
 
-type Reducer<TValue, TEvent> = (previous: TValue, eventValue: TEvent) => TValue;
+export function reduce<T>(initialValue: T, displayName?: string): IReduction<T, void>
+export function reduce<T, Events>(initialValue: T, events: Events, displayName?: string): IReduction<T, Events>
+export function reduce<T, Events>(initialValue: T, eventsOrDisplayName?: Events | string, maybeDisplayName?: string): IReduction<T, Events> {
+    let [events, displayName] = typeof eventsOrDisplayName == 'string'
+        ? [undefined as Events, eventsOrDisplayName]
+        : [eventsOrDisplayName, maybeDisplayName]
 
-export interface IReduction<T> extends IObservableValue<T> {
-    on<TEvent>(observable: IObservable<TEvent>, reduce: Reducer<T, TEvent>): this;
-    /** @deprecated use valueChanged function instead */
-    onValueChanged<TValue>(observableVaue: TValue, reduce: Reducer<T, TValue>): this;
-    onRestore(reduce: Reducer<T, State<T>>): this;
+    return new Reduction(displayName ?? Reduction.defaultName, initialValue, Object.is, events)
 }
 
-export interface IBoundReduction<T, TEvents> extends IReduction<T> {
-    on<TEvent>(observable: ((events: TEvents) => IObservable<TEvent>) | IObservable<TEvent>, reduce: Reducer<T, TEvent>): this;
+/** Extends an existing source with reduction capabilities. */
+export function extendReduce<T>(observableValue: T, displayName?: string): IReduction<T, void> {
+    let source = getUnderlyingSource(observableValue)
+    if (source)
+        return reduce(observableValue, displayName ?? source.displayName).on(source, (_, val) => val)
+    throw new NotASourceValueError(observableValue)
 }
 
-export class Reduction<T> extends ObservableValue<T> implements IReduction<T> {
-    private _sources = new Map<IObservable<any>, Unsubscribe>();
-    private _restore = new RestoreSubject<State<T>>(() => `${this.displayName}.restored`);
+export type Reducer<Result, Source> = (current: Result, next: Source) => Result
 
-    constructor(getDisplayName: () => string, initial: T) {
-        super(getDisplayName, initial);
+export class Reduction<T, Events = void> extends Source<T> implements IReduction<T, Events>, IObserver<any> {
+    sources = new Set<ISource<any>>()
+    private _reducers = new Map<ISource<any>, (current: T, next: any) => T>()
+    private _sourcesLastChecked = -1
+    private _json: IDerivation<State<T>>
+    static defaultName = "(anonymous reduction)"
 
-        this.onRestore((current, state) => {
-            if (isObject(current)) {
-                setState(current, state);
-                return current;
-            }
-            return state as T;
-        });
+    constructor(
+        displayName: string,
+        initialValue: T,
+        private _isEqual = Object.is,
+        private _events?: Events
+    ) {
+        super(displayName)
+
+        this._json = derive(() => getState(this.value), `toJSON(${this.displayName})`)
+
+        managedSourceCreated(this)
+
+        this._value = initialValue
+        updateChildren(this, null, initialValue)
     }
 
-    override get sources() { return Array.from(this._sources.keys()); }
+    toJSON() { return this._json.value; }
 
-    restore(state: State<T>): void {
-        this._restore.next(state);
-    }
+    on<S>(source: ISource<S>, reduce: Reducer<T, S>): this
+    on<S>(getSource: (events: Events) => ISource<S>, reduce: Reducer<T, S>): this
+    on<S>(source: ISource<S> | ((events: Events) => ISource<S>), reduce: Reducer<T, S>) {
+        if (!isSource(source))
+            source = source(this._events!)
 
-    on<TEvent>(observable: IObservable<TEvent>, reduce: Reducer<T, TEvent>) {
         if (process.env.NODE_ENV !== 'production') {
-            if (allSources(observable.sources).has(this))
-                throw new CircularSubscriptionError(this, observable);
+            if (allSources(source).find(s => s == this))
+                throw new CircularSubscriptionError(this, source);
         }
 
-        let unsubscribeExisting = this._sources.get(observable);
-        if (unsubscribeExisting)
-            unsubscribeExisting();
+        source.subscribe(this)
+        this.sources.add(source)
+        this._reducers.set(source, reduce)
+        this._sourcesLastChecked = Math.max(this._sourcesLastChecked, source.lastUpdated) // Avoid firing reduction because of new source
 
-        this._sources.set(observable, observable.subscribe(eventValue => {
-            let previousValue = this._value;
-            let value!: T;
+        return this
+    }
 
-            log('🧪 (reduction)', this.displayName, emptyArray, () => ({
-                Previous: previousValue,
-                Current: value,
-                Container: this.container,
-                Sources: sourceTree(this.sources)
-            }), () => {
-                if (process.env.NODE_ENV !== 'production') {
-                    using(protectionAgainstAccessingValueWithCommonSource(observable), () => {
-                        value = reduce(this._value, eventValue);
-                    });
+    override getSources() { return this.sources }
 
-                    if (isEvent(value) || isEventsClass(value))
-                        throw new ReducedEventsError(this, value);
-                } else {
-                    value = reduce(this._value, eventValue);
+    sourceUpdated<S>(source: ISource<S>, value: S) {
+        if (source.lastUpdated > this.lastUpdated) {
+            let reduce = this._reducers.get(source)
+            if (reduce) {
+                let previousValue = this._value
+                let nextValue!: T
+                let logging = startLogging('🧪 (reduction)', this.displayName, emptyArray, () => ({
+                    Path: this.path,
+                    Trigger: source.path,
+                    Previous: previousValue,
+                    Current: nextValue
+                }))
+
+                try {
+                    let tracker = collectAccessedSources(this) // Required for detecting circular references in reducers
+                    try {
+                        nextValue = reduce(this._value, value)
+                    } finally {
+                        tracker[dispose]()
+                    }
+
+                    this.setValue(nextValue)
+                } finally {
+                    logging[dispose]()
                 }
-
-                this.setValue(value)
-            });
-        }, this.displayNameGetter));
-
-        this.clearSourceInfo();
-
-        return this;
+            }
+        }
     }
 
-    onValueChanged<TValue>(observableValue: TValue, reduce: Reducer<T, TValue>) {
-        return this.on(valueChanged(observableValue), reduce);
+    override get value() {
+        let access = trackSourceAccessed(this) // Notifying tracker before checking for updates so circular reference is detected early
+
+        try {
+            if (this._sourcesLastChecked < currentIteration) {
+                let newerSource = Array.from(this.sources).find(s => s.lastUpdated > this._sourcesLastChecked)
+                if (newerSource)
+                    this.sourceUpdated(newerSource, (newerSource as Source<any>).value)
+            }
+        } finally {
+            access[dispose]()
+        }
+
+        return this._value // Not using super.value to avoid duplicate tracker notification
     }
 
-    onRestore(reduce: Reducer<T, State<T>>): this {
-        return this.on(this._restore, reduce);
+    override setValue(value: T) {
+        this._sourcesLastChecked = currentIteration
+        super.setValue(value)
     }
 
-    override unsubscribeFromSources() {
-        this._sources.forEach(unsub => unsub());
-        this._sources.clear();
+    override skipUpdate(nextValue: T) { return this._isEqual(this._value, nextValue) }
+
+    detach() {
+        for (let source of this.sources)
+            source.unsubscribe(this)
+    }
+
+    override[dispose]() {
+        this.detach()
+        super[dispose]()
     }
 }
-
-class BoundReduction<TValue, TEvents> extends Reduction<TValue> implements IBoundReduction<TValue, TEvents> {
-    constructor(
-        getDisplayName: () => string,
-        initial: TValue,
-        private _events: TEvents = {} as TEvents
-    ) { super(getDisplayName, initial); }
-
-    override on<TEvent>(observable: ((events: TEvents) => IObservable<TEvent>) | IObservable<TEvent>, reduce: Reducer<TValue, TEvent>): this {
-        return super.on(isObservable(observable) ? observable : observable(this._events), reduce);
-    }
-}
-
-export class RestoreSubject<T> extends Subject<T> { }
 
 export class CircularSubscriptionError extends Error {
     constructor(
-        public reduction: IReduction<unknown>,
-        public observable: IObservable<unknown>
+        public reduction: IReduction<unknown, unknown>,
+        public source: ISource<unknown>
     ) {
-        super(`Cannot subscribe to '${observable.displayName}', as it depends on this reduction, '${reduction.displayName}'.`);
-    }
-}
-
-export class ReducedEventsError extends Error {
-    constructor(
-        public reduction: IReduction<unknown>,
-        public value: EventFn<IEventClass> | object
-    ) {
-        super(`Reduction ${reduction.displayName} reduced to event or events class ${isEvent(value) ? value.displayName : value}. Events cannot be state.`);
+        super(`Cannot subscribe to '${source.displayName}', as it depends on this reduction, '${reduction.displayName}'.`);
     }
 }

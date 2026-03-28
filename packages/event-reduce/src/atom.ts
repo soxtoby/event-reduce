@@ -1,8 +1,8 @@
-import { dispose } from "../utils";
 import { derive, IDerivation } from "./derivation";
 import { ISource, Source } from "./sources";
 import { getState, State } from "./state";
 import { beginTransition } from "./tracking";
+import { dispose } from "./utils";
 
 export class Atom<T> extends Source<T> implements ISource<T> {
     private _json: IDerivation<State<T>>

@@ -1,5 +1,5 @@
-import { reactive } from "event-reduce-react/signals";
-import { asyncEvent, derived, events, model, reduce, reduced } from "event-reduce/signals";
+import { reactive } from "event-reduce-react";
+import { asyncEvent, derived, events, model, reduce, reduced } from "event-reduce";
 import { CounterListEvents } from "./CounterList";
 
 @events

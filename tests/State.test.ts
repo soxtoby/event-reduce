@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { getState } from "event-reduce/signals";
+import { getState } from "event-reduce";
 import { TestModel } from "./State.test/TestModel";
 
 describe("state", () => {

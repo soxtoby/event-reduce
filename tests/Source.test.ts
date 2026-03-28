@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { Atom, type ISource } from "event-reduce/signals";
+import { Atom, type ISource } from "event-reduce";
 import { MockObserver } from "./MockObserver";
 
 describe("Source", () => {

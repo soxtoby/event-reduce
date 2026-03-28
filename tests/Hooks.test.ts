@@ -1,9 +1,9 @@
 import { renderHook, RenderHookResult } from "@testing-library/react";
 import { beforeEach, describe, expect, test } from "bun:test";
-import { useAsyncEvent, useDerived, useEvent, useReduced } from "event-reduce-react/signals";
-import { event, IEvent, model, reduce, reduced, type AsyncResult } from "event-reduce/signals";
-import { mutable } from "event-reduce/signals/testing";
-import { IDerivation } from "event-reduce/signals";
+import { useAsyncEvent, useDerived, useEvent, useReduced } from "event-reduce-react";
+import { event, IEvent, model, reduce, reduced, type AsyncResult } from "event-reduce";
+import { mutable } from "event-reduce/testing";
+import { IDerivation } from "event-reduce";
 import { MockObserver } from "./MockObserver";
 
 describe("useEvent", () => {

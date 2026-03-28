@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, spyOn, test, type Mock } from "bun:test"
-import { Atom, createModel, derive, derived, event, model, reduce, reduced, state } from "event-reduce/signals"
-import { getModelProperties, isModel } from "event-reduce/signals/models"
+import { Atom, createModel, derive, derived, event, model, reduce, reduced, state } from "event-reduce"
+import { getModelProperties, isModel } from "event-reduce/models"
 import { StringKey } from "event-reduce/types"
 import { dispose } from "event-reduce/utils"
 

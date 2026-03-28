@@ -1,11 +1,17 @@
-import { sendEvent } from "./devtools";
-import { IObservable, Observable } from "./observable";
-import { RestoreSubject } from "./reduction";
-import { emptyArray } from "./utils";
+import { dispose, nullDisposable } from "./utils";
 
 let loggingEnabled = false;
 
 let logStack = [[]] as LogItem[][];
+
+type LogItem = LogMessage | LogGroup;
+
+type LogMessage = any[];
+
+type LogGroup = {
+    message: LogMessage;
+    children: LogItem[];
+}
 
 /**
  * For logged values that have their own specific log formatting.
@@ -17,90 +23,47 @@ export function enableLogging(enable = true) {
     loggingEnabled = enable;
 }
 
-export function logEvent(type: string, displayName: string, arg: any, getInfo: (() => object) | undefined, runEvent: () => void) {
-    log(type, displayName, [arg || ''], getInfo, runEvent);
-    sendEvent(displayName, arg);
-}
-
-export function log<Info extends object>(type: string, displayName: string, args: readonly any[], getInfo?: () => Info, work?: () => void) {
-    if (process.env.NODE_ENV !== 'production') {
-        if (!loggingEnabled)
-            return void work?.();
-
-        if (work) {
-            logStack.push([]);
-
-            try {
-                work();
-            } finally {
-                logMessage(logStack.pop()!);
-            }
-        } else {
-            logMessage();
-        }
-
-        if (logStack.length == 1) {
-            flushLogs(logStack[0]);
-            logStack = [[]];
-        }
-
-        function logMessage(childLogs: LogItem[] = []) {
-            let group = {
-                message: [`${displayName} %c${type}`, 'color: grey; font-weight: normal;', ...args],
-                children: Object.entries(getInfo?.() ?? {} as Info)
-                    .map(([key, value]) => value instanceof LogValue
-                        ? [`${key}:`, ...value.args]
-                        : [`${key}:`, value])
-                    .concat(childLogs)
-            };
-            logStack.at(-1)!.push(group);
-        }
-
-        function flushLogs(logs: LogItem[]) {
-            for (let log of logs) {
-                if (Array.isArray(log)) {
-                    console.log(...log);
-                } else if (!log.children.length) {
-                    console.log(...log.message);
-                } else {
-                    console.groupCollapsed(...log.message);
-                    flushLogs(log.children);
-                    console.groupEnd();
-                }
-            }
-        }
+export function startLogging<Info extends object>(type: string, displayName: string, args: readonly any[], getInfo?: () => Info): Disposable {
+    if (process.env.NODE_ENV !== 'production' && loggingEnabled) {
+        logStack.push([]);
+        return { [dispose]() { logMessage(type, displayName, args, getInfo, logStack.pop()!); } }
     } else {
-        return void work?.();
+        return nullDisposable
     }
 }
 
-type LogItem = LogMessage | LogGroup;
-
-type LogMessage = any[];
-
-type LogGroup = {
-    message: LogMessage;
-    children: LogItem[];
+export function log<Info extends object>(type: string, displayName: string, args: readonly any[], getInfo?: () => Info) {
+    if (process.env.NODE_ENV !== 'production' && loggingEnabled)
+        logMessage(type, displayName, args, getInfo);
 }
 
-export interface ISourceInfo {
-    readonly name: string;
-    readonly sources: readonly ISourceInfo[];
-    readonly observable: IObservable<any> | string;
+function logMessage<Info extends object>(type: string, displayName: string, args: readonly any[], getInfo?: () => Info, childLogs: LogItem[] = []) {
+    let group = {
+        message: [`${displayName} %c${type}`, 'color: grey; font-weight: normal;', ...args],
+        children: Object.entries(getInfo?.() ?? {} as Info)
+            .map(([key, value]) => value instanceof LogValue
+                ? [`${key}:`, ...value.args]
+                : [`${key}:`, value])
+            .concat(childLogs)
+    };
+    logStack.at(-1)!.push(group);
+
+    if (logStack.length == 1) {
+        flushLogs(logStack[0]);
+        logStack = [[]];
+    }
 }
 
-export function sourceTree(sources: readonly IObservable<any>[]): readonly ISourceInfo[] {
-    if (process.env.NODE_ENV !== 'production')
-        return sources
-            .filter(s => !(s instanceof RestoreSubject)) // Since every reduction has a restore source, this is just noise
-            .map(s => {
-                let source = new WeakRef(s);
-                return {
-                    name: s.displayName,
-                    sources: (s as Observable<any>).sourceInfo,
-                    get observable() { return source.deref() ?? "No longer in memory"; }
-                }
-            });
-    else
-        return emptyArray;
+function flushLogs(logs: LogItem[]) {
+    for (let log of logs) {
+        if (Array.isArray(log)) {
+            console.log(...log);
+        } else if (!log.children.length) {
+            console.log(...log.message);
+        } else {
+            console.groupCollapsed(...log.message);
+            flushLogs(log.children);
+            console.groupEnd();
+        }
+    }
 }

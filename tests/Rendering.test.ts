@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
-import { useReactive } from "event-reduce-react/signals";
-import { Atom } from "event-reduce/signals";
+import { useReactive } from "event-reduce-react";
+import { Atom } from "event-reduce";
 
 describe('useReactive', () => {
     let source: Atom<string>;

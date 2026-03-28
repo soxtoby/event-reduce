@@ -18,35 +18,12 @@
       "bun": "./src/index.ts",
       "default": "./lib/index.js"
     },
-    "./signals": {
-      "types": "./lib/signals/index.d.ts",
-      "bun": "./src/signals/index.ts",
-      "default": "./lib/signals/index.js"
-    },
-    "./signals/*": {
-      "types": "./lib/signals/*.d.ts",
-      "bun": "./src/signals/*.ts",
-      "default": "./lib/signals/*.js"
-    },
     "./*": {
       "types": "./lib/*.d.ts",
       "bun": "./src/*.ts",
       "default": "./lib/*.js"
     },
     "./package.json": "./package.json"
-  },
-  "typesVersions": {
-    "*": {
-      "signals": [
-        "lib/signals/index.d.ts"
-      ],
-      "signals/*": [
-        "lib/signals/*"
-      ],
-      "*": [
-        "lib/*"
-      ]
-    }
   },
   "scripts": {
     "prepack": "cp ../../LICENSE ."

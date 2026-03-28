@@ -1,7 +1,7 @@
-import { dispose, emptyArray, identity, nameOfCallback, nameOfFunction } from "../utils"
 import type { IEventFunction } from "./events"
 import { isEventsClass } from "./models"
 import { currentIteration, getPath, iterationSource, trackSourceAccessed, updateChildren } from "./tracking"
+import { dispose, emptyArray, identity, nameOfCallback, nameOfFunction } from "./utils"
 
 export interface ISource<T> extends Disposable {
     readonly displayName: string

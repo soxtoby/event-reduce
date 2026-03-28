@@ -1,4 +1,4 @@
-import { derived, model, reduce, reduced, state } from "event-reduce/signals";
+import { derived, model, reduce, reduced, state } from "event-reduce";
 import { ChildModel } from "./ChildModel";
 
 // TODO move back into Model.test.ts after https://github.com/oven-sh/bun/issues/28010 is resolved

@@ -1,83 +1,85 @@
-import { asyncEvent, event } from "event-reduce/events";
-import { IObservableValue } from "event-reduce/observableValue";
-import { IReduction, reduce } from "event-reduce/reduction";
-import { derive } from "event-reduce/derivation";
-import { changeOwnedValue } from "event-reduce/cleanup";
-import { ObservableValue } from "event-reduce/observableValue";
-import { ValueOf } from "event-reduce/types";
-import { emptyArray } from "event-reduce/utils";
-import { DependencyList, useMemo, useRef, useState } from "react";
+import { asyncEvent, Atom, derive, event, IDerivation, IReduction, reduce } from "event-reduce"
+import { isModel, Model } from "event-reduce/models"
+import { Reduction } from "event-reduce/reduction"
+import { trackManagedSourceCreation } from "event-reduce/tracking"
+import { dispose, emptyArray } from "event-reduce/utils"
+import { DependencyList, useEffect, useMemo, useRef, useState } from "react"
 
 /**
  * Creates a model that persists across renders of the component.
  * @param unobservableDependencies - A list of dependencies that are not observable. The model will be re-created when any of these change.
 */
 export function useModel<T extends object>(createModel: () => T, unobservableDependencies?: DependencyList) {
-    let modelOwner = useState(() => ({}))[0]; // Effectively makes the component the owner of the model for cleanup purposes
-    return useMemo(() => {
-        let model = createModel();
-        changeOwnedValue(modelOwner, undefined, model);
-        return model;
-    }, unobservableDependencies ?? emptyArray);
+    let model = useMemo(createModel, unobservableDependencies ?? emptyArray) as Model
+    if (!isModel(model))
+        throw new InvalidModelError()
+    useEffect(() => () => model[dispose]?.(), unobservableDependencies ?? emptyArray)
+    return model
 }
 
 export function useEvent<T>(name?: string) {
-    return useState(() => event<T>(name))[0];
+    return useState(() => event<T>(name))[0]
 }
 
 export function useAsyncEvent<Result = void, Context = void>(name?: string) {
-    return useState(() => asyncEvent<Result, Context>(name))[0];
+    return useState(() => asyncEvent<Result, Context>(name))[0]
 }
 
 /**
  * Creates a derived value that persists across renders of the component.
  * @param unobservableDependencies - A list of dependencies that are not observable. The derived value will be updated when any of these change.
- * If not specified, the derived value will be updated every render, but will still only *trigger* a re-render inside a reactive component if the derived value changes.
  */
-export function useDerived<T>(getValue: () => T, name?: string): IObservableValue<T>;
-export function useDerived<T>(getValue: () => T, unobservableDependencies?: DependencyList, name?: string): IObservableValue<T>;
-export function useDerived<T>(getValue: () => T, nameOrUnobservableDependencies?: string | DependencyList, name?: string): IObservableValue<T> {
-    let unobservableDependencies: DependencyList | undefined;
-    [name, unobservableDependencies] = typeof nameOrUnobservableDependencies === 'string'
+export function useDerived<T>(getValue: () => T, name?: string): IDerivation<T>
+export function useDerived<T>(getValue: () => T, unobservableDependencies?: DependencyList, name?: string): IDerivation<T>
+export function useDerived<T>(getValue: () => T, nameOrUnobservableDependencies?: string | DependencyList, name?: string): IDerivation<T> {
+    let unobservableDependencies: DependencyList | undefined
+    [name, unobservableDependencies] = typeof nameOrUnobservableDependencies == 'string'
         ? [nameOrUnobservableDependencies, undefined]
-        : [name, nameOrUnobservableDependencies];
+        : [name, nameOrUnobservableDependencies]
 
-    let derived = useState(() => derive(getValue, name))[0];
+    let derived = useState(() => derive(getValue, name))[0]
 
-    useMemo(() => derived.update(getValue, 'render'), unobservableDependencies!);
+    useMemo(() => derived.update(getValue, 'render'), unobservableDependencies!)
 
-    return derived;
+    return derived
 }
 
 export function useReduced<T>(initial: T, name?: string): IReduction<T> {
-    return useState(() => reduce(initial, name))[0];
+    let sourceCreation = trackManagedSourceCreation() // It's fine for this reduction to be loose, because it will be disposed on unmount
+    let reduction = useState(() => reduce(initial, name))[0]
+    sourceCreation[dispose]()
+    useEffect(() => () => (reduction as Reduction<T>)[dispose]?.(), [])
+    return reduction
 }
 
 export function useObservedProps<T extends object>(values: T, name: string = '(anonymous observed values)') {
-    let observableValues = useModel(() => ({} as Record<keyof T, ObservableValue<ValueOf<T>>>));
-    let nameBase = (name || '') + '.';
+    let observableValues = useState(() => ({} as { [K in keyof T]?: Atom<T[K]> }))[0]
+    let nameBase = (name || '') + '.'
 
     // Update any values that are already being observed
-    for (let [key, observableValue] of Object.entries(observableValues) as [keyof T, ObservableValue<ValueOf<T>>][])
-        observableValue.setValue(values[key as keyof T]);
+    for (let [key, atom] of Object.entries(observableValues) as [keyof T, Atom<T[keyof T]>][])
+        atom.setValue(values[key])
 
-    let latestValues = useRef(values);
-    latestValues.current = values;
+    let latestValues = useRef(values)
+    latestValues.current = values
 
     // Create observable values as properties are accessed
     return new Proxy({} as T, {
         get(_, key) {
             return (observableValues[key as keyof T]
-                ??= new ObservableValue(
-                    () => nameBase + String(key),
+                ??= new Atom(nameBase + String(key),
                     (latestValues.current)[key as keyof T]))
-                .value;
+                .value
         }
-    });
+    })
 }
 
-export function useObserved<T>(value: T, name: string = '(anonymous observed value)') {
-    let observableValue = useModel(() => new ObservableValue(() => name, value));
-    observableValue.setValue(value);
-    return observableValue;
+export function useAtom<T>(value: T, name: string = '(anonymous observed value)') {
+    let observableValue = useState(() => new Atom(name, value))[0]
+    observableValue.setValue(value)
+    return observableValue
+}
+
+class InvalidModelError extends Error {
+    constructor() { super("Invalid model created in useModel. A model must be an instance of a class decorated with @model.") }
 }

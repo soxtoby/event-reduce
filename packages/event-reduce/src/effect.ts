@@ -1,6 +1,6 @@
-import { dispose } from "../utils"
 import type { IObserver, ISource } from "./sources"
-import { currentIteration, collectAccessedSources } from "./tracking"
+import { collectAccessedSources, currentIteration } from "./tracking"
+import { dispose } from "./utils"
 
 export class Effect<T> implements IObserver<any> {
     private _attached = false
