@@ -82,7 +82,7 @@ export abstract class Source<T> implements ISource<T> {
     }
 
     filterMap<S extends Source<any>, Out>(this: S, transform: (value: T) => Out | undefined, displayName = `${this.displayName}.filterMap(${nameOfCallback(transform)})`): ISource<Out> {
-        return bind(displayName, this, v => transform(v)!, value => value == undefined)
+        return bind(displayName, this, v => transform(v)!, value => value != undefined)
     }
 
     subscribe(observer: IObserver<T>) { this._observers.add(observer) }
