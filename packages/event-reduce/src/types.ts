@@ -1,12 +1,14 @@
+import type { ISource } from "./sources";
+
 export type Scoped<T, Scope extends Partial<T>> =
     & Omit<T, keyof Scope>
-    & { [K in keyof Scope]?: K extends keyof T ? T[K] : never; };
+    & { [K in keyof Scope]?: K extends keyof T ? T[K] : never }
 
-export type StringKey<T> = Extract<keyof T, string>;
-export type OmitValues<T, Omitted> = FromEntries<Exclude<Entries<T>, [any, Omitted]>>;
-export type FromEntries<Entries extends [any, any]> = { [Entry in Entries as Entry[0]]: Entry[1]; };
-export type Entries<T> = ValueOf<{ [K in keyof T]: [K, T[K]] }>;
-export type ValueOf<T> = T[keyof T];
+export type MergedSources<Sources extends ISource<any>[]> = ISource<MergedValues<Sources>>
 
-export type Action = () => void;
-export type Unsubscribe = () => void;
+type MergedValues<Sources extends ISource<any>[]> =
+    Sources extends [ISource<infer First>, ...infer Rest extends ISource<any>[]]
+    ? First | MergedValues<Rest>
+    : never
+
+export type SourceValue<Source extends ISource<any>> = Source extends ISource<infer T> ? T : never

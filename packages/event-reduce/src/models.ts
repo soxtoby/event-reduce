@@ -1,9 +1,10 @@
 import { Derivation, derive, IDerivation } from "./derivation"
 import { isEvent } from "./events"
 import { IReduction, Reduction } from "./reduction"
-import { ISource, isSource, SourceValue } from "./sources"
+import { ISource, isSource } from "./sources"
 import { getState } from "./state"
 import { collectAccessedSources, getChildNodes, getUnderlyingSource, trackManagedSourceCreation, updateChildren } from "./tracking"
+import { SourceValue } from "./types"
 import { argsAre, constant, dispose, getAllPropertyDescriptors, getOrAddWeakEntry, getPrototypeChain, isDisposable, isFunction, isObject, isString, isUndefined, nameOfFunction } from "./utils"
 
 const modelBrand = Symbol('model class')

@@ -1,5 +1,3 @@
-import { Unsubscribe } from "./types";
-
 export const emptyArray = Object.freeze([]) as readonly any[];
 
 export const emptySet = Object.freeze(new Set()) as ReadonlySet<any>
@@ -121,11 +119,6 @@ export function* getPrototypeChain(obj: object) {
         yield obj
         obj = Object.getPrototypeOf(obj)
     }
-}
-
-export function unsubscribeAll(unsubscribes: Unsubscribe[]) {
-    for (let unsubscribe of unsubscribes)
-        unsubscribe();
 }
 
 export function isDisposable(value: any): value is Disposable {

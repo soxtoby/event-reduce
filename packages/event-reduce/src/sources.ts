@@ -1,6 +1,7 @@
 import type { IEventFunction } from "./events"
 import { isEventsClass } from "./models"
 import { currentIteration, getPath, iterationSource, trackSourceAccessed, updateChildren } from "./tracking"
+import { MergedSources } from "./types"
 import { dispose, emptyArray, identity, nameOfCallback, nameOfFunction } from "./utils"
 
 export interface ISource<T> extends Disposable {
@@ -27,8 +28,6 @@ export interface IObserver<T> {
 export function isSource(value: any): value is ISource<any> {
     return value instanceof Source
 }
-
-export type SourceValue<Source extends ISource<any>> = Source extends ISource<infer T> ? T : never
 
 export abstract class Source<T> implements ISource<T> {
     protected readonly _observers = new Set<IObserver<T>>()
@@ -96,25 +95,38 @@ export abstract class Source<T> implements ISource<T> {
 }
 
 export function bind<In, Out>(displayName: string, source: ISource<In>, transform: (value: In) => Out, predicate?: (value: Out) => boolean) {
-    return new BoundSource(displayName, source, transform, predicate)
+    return new BoundSource(displayName, [source], transform, predicate)
+}
+
+export function merge<Sources extends ISource<any>[]>(...sources: Sources): MergedSources<Sources>
+export function merge<Sources extends ISource<any>[]>(displayName: string, ...sources: Sources): MergedSources<Sources>
+export function merge<Sources extends ISource<any>[]>(...sources: [string, ...ISource<any>[]] | ISource<any>[]): MergedSources<Sources> {
+    let displayName: string;
+    if (typeof sources[0] == 'string') {
+        displayName = sources[0] as string
+        sources = sources.slice(1) as ISource<any>[]
+    } else {
+        displayName = `merge(${(sources as ISource<any>[]).map(s => s.displayName).join(', ')})`
+    }
+    return new BoundSource(displayName, sources as ISource<any>[], identity)
 }
 
 class BoundSource<In, Out> extends Source<Out> {
     constructor(
         displayName: string,
-        private _source: ISource<In>,
+        private _sources: ISource<In>[],
         private _transform: (value: In) => Out,
         private _predicate?: (value: Out) => boolean
     ) {
         super(displayName)
-        _source.subscribe(this)
+        _sources.forEach(source => source.subscribe(this))
     }
 
-    override getSources() { return [this._source] }
+    override getSources() { return this._sources }
 
     override subscribe(observer: IObserver<Out>): void {
         if (!this._observers.size)
-            this._source.subscribe(this)
+            this._sources.forEach(source => source.subscribe(this))
 
         super.subscribe(observer)
     }
@@ -123,7 +135,7 @@ class BoundSource<In, Out> extends Source<Out> {
         super.unsubscribe(observer)
 
         if (!this._observers.size)
-            this._source.unsubscribe(this)
+            this._sources.forEach(source => source.unsubscribe(this))
     }
 
     sourceUpdated(source: ISource<In>, value: In): void {

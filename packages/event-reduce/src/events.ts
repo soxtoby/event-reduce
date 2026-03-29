@@ -1,7 +1,7 @@
 import { startLogging } from "./logging"
-import { type ISource, Source, SourceValue } from "./sources"
+import { type ISource, Source } from "./sources"
 import { beginTransition } from "./tracking"
-import { Scoped } from "./types"
+import { Scoped, SourceValue } from "./types"
 import { dispose, matchesScope } from "./utils"
 
 export interface IEvent<In, Out = In> extends IEventFunction<Out, [value: In]> {

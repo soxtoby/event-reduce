@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, spyOn, test, type Mock } from "bun:test"
 import { Atom, createModel, derive, derived, event, model, reduce, reduced, state } from "event-reduce"
 import { getModelProperties, isModel } from "event-reduce/models"
-import { StringKey } from "event-reduce/types"
 import { dispose } from "event-reduce/utils"
 
 describe("subscription cleanup", () => {
@@ -316,7 +315,7 @@ describe("subscription cleanup", () => {
         expect(disposeExternallyOwnedPropValue).not.toHaveBeenCalled()
     })
 
-    function spyOnDispose<T>(model: T, property: StringKey<T>) {
+    function spyOnDispose<T>(model: T, property: keyof T) {
         if (isModel(model)) {
             let observableValue = getModelProperties(model)[property]!
             if (dispose in observableValue)
