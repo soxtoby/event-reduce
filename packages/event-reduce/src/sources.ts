@@ -111,16 +111,13 @@ export function merge<Sources extends ISource<any>[]>(...sources: [string, ...IS
     return new BoundSource(displayName, sources as ISource<any>[], identity)
 }
 
-class BoundSource<In, Out> extends Source<Out> {
+export class BoundSource<In, Out> extends Source<Out> {
     constructor(
         displayName: string,
-        private _sources: ISource<In>[],
-        private _transform: (value: In) => Out,
-        private _predicate?: (value: Out) => boolean
-    ) {
-        super(displayName)
-        _sources.forEach(source => source.subscribe(this))
-    }
+        protected _sources: ISource<In>[],
+        protected _transform: (value: In) => Out,
+        protected _predicate?: (value: Out) => boolean
+    ) { super(displayName) }
 
     override getSources() { return this._sources }
 
@@ -146,7 +143,9 @@ class BoundSource<In, Out> extends Source<Out> {
         }
     }
 
-    override skipUpdate(value: Out) { return this._predicate?.(value) == false }
+    protected override updateChildren(previousValue: Out, nextValue: Out) { } // Value won't be held onto
+
+    protected override skipUpdate(value: Out) { return this._predicate?.(value) == false }
 }
 
 export function* allSources(source: ISource<any>): Generator<ISource<any>> {
