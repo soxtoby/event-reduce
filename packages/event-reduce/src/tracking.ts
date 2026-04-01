@@ -220,5 +220,8 @@ export class SideEffectDuringReactionError extends Error {
 }
 
 export class UntrackedSourceError extends Error {
-    constructor(source: ISource<any>) { super(`Leak detected: ${nameOfFunction(source.constructor)} '${source.displayName}' created without an owner.`) } // NOCOMMIT say what to do about it
+    constructor(source: ISource<any>) {
+        super(`Leak detected: ${nameOfFunction(source.constructor)} '${source.displayName}' created without an owner.
+Make sure reductions are defined on a model, and that the model is either a class decorated with @model, or created using createModel().`)
+    }
 }
