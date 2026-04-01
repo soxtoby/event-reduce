@@ -116,12 +116,13 @@ export function model<Class extends new (...args: any[]) => any>(target: Class):
                     if (outerMostModelCtor == thisCtor) {
                         getterCache.delete(model) // Only needed during construction
 
-                        let json = derive(() => {
+                        let json = new Derivation(`toJSON(${className})`, () => {
                             let obj = {} as Record<PropertyKey, ModelProperty>
                             for (let key in model[modelProperties])
                                 obj[key] = model[modelProperties][key]
                             return obj
-                        }, `toJSON(${className})`)
+                        })
+                        json.suppressLogging = true
 
                         Object.assign(this, {
                             toJSON() { return super.toJSON?.() ?? json.value },

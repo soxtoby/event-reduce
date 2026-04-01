@@ -1,4 +1,4 @@
-import { derive, IDerivation } from "./derivation"
+import { Derivation } from "./derivation"
 import { startLogging } from "./logging"
 import { allSources, IObserver, ISource, isSource, NotASourceValueError, Source } from "./sources"
 import { getState, State } from "./state"
@@ -35,7 +35,7 @@ export class Reduction<T, Events = void> extends Source<T> implements IReduction
     sources = new Set<ISource<any>>()
     private _reducers = new Map<ISource<any>, (current: T, next: any) => T>()
     private _sourcesLastChecked = -1
-    private _json: IDerivation<State<T>>
+    private _json: Derivation<State<T>>
     static defaultName = "(anonymous reduction)"
 
     constructor(
@@ -46,7 +46,8 @@ export class Reduction<T, Events = void> extends Source<T> implements IReduction
     ) {
         super(displayName)
 
-        this._json = derive(() => getState(this.value), `toJSON(${this.displayName})`)
+        this._json = new Derivation(`toJSON(${this.displayName})`, () => getState(this.value))
+        this._json.suppressLogging = true
 
         managedSourceCreated(this)
 

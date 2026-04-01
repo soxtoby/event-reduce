@@ -1,11 +1,11 @@
-import { derive, IDerivation } from "./derivation";
+import { Derivation } from "./derivation";
 import { ISource, Source } from "./sources";
 import { getState, State } from "./state";
 import { beginTransition } from "./tracking";
 import { dispose } from "./utils";
 
 export class Atom<T> extends Source<T> implements ISource<T> {
-    private _json: IDerivation<State<T>>
+    private _json: Derivation<State<T>>
 
     constructor(
         displayName: string,
@@ -13,8 +13,9 @@ export class Atom<T> extends Source<T> implements ISource<T> {
         private _isEqual = Object.is
     ) {
         super(displayName);
-        this._json = derive(() => getState(this.value), `toJSON(${this.displayName})`)
         this.setValue(initialValue);
+        this._json = new Derivation(`toJSON(${this.displayName})`, () => getState(this.value))
+        this._json.suppressLogging = true
     }
 
     toJSON() { return this._json.value; }

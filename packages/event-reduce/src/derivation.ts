@@ -3,7 +3,7 @@ import { startLogging } from "./logging"
 import { IObserver, ISource, Source } from "./sources"
 import { getState, State } from "./state"
 import { beginTransition, iterationSource, trackManagedSourceCreation, trackSourceAccessed } from "./tracking"
-import { dispose, emptyArray, nameOfFunction } from "./utils"
+import { dispose, emptyArray, nameOfFunction, nullDisposable } from "./utils"
 
 export interface IDerivation<T> extends ISource<T>, IObserver<any> {
     readonly value: T
@@ -27,8 +27,9 @@ export function derive<T>(derive: () => T, displayNameOrSkip?: string | ((a: T, 
 
 export class Derivation<T> extends Source<T> implements IDerivation<T> {
     private _derive: Effect<T>
-    private _json?: IDerivation<State<T>>
+    private _json?: Derivation<State<T>>
     static defaultName = "(anonymous derivation)"
+    suppressLogging = false
 
     constructor(
         displayName: string,
@@ -44,7 +45,11 @@ export class Derivation<T> extends Source<T> implements IDerivation<T> {
 
     toJSON() {
         // Lazy init to avoid infinite loop in Derivation constructor
-        return (this._json ??= derive(() => getState(this.value), `toJSON(${this.displayName})`)).value
+        if (!this._json){
+            this._json = new Derivation(`toJSON(${this.displayName})`, () => getState(this.value))
+            this._json.suppressLogging = true
+        }
+        return this._json.value
     }
 
     get sources() { return this._derive.sources }
@@ -95,7 +100,7 @@ export class Derivation<T> extends Source<T> implements IDerivation<T> {
 
         let transition = beginTransition(this, !iterationSource) // Derivations are always safe to access, and only initiate a transition if necessary
         let sourceCreation = trackManagedSourceCreation()
-        let logging = startLogging('🔗 (derivation)', this.displayName, emptyArray, () => ({
+        let logging = this.suppressLogging ? nullDisposable : startLogging('🔗 (derivation)', this.displayName, emptyArray, () => ({
             Path: this.path,
             Trigger: trigger?.path ?? '(unknown)',
             Previous: previousValue,
