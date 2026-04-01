@@ -57,8 +57,10 @@ export function useObservedProps<T extends object>(values: T, name: string = '(a
     let nameBase = (name || '') + '.'
 
     // Update any values that are already being observed
-    for (let [key, atom] of Object.entries(observableValues) as [keyof T, Atom<T[keyof T]>][])
-        atom.setValue(values[key])
+    useEffect(() => {
+        for (let [key, atom] of Object.entries(observableValues) as [keyof T, Atom<T[keyof T]>][])
+            atom.setValue(values[key])
+    })
 
     let latestValues = useRef(values)
     latestValues.current = values
