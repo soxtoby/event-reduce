@@ -7,8 +7,8 @@ import { dispose, emptyArray } from "./utils"
 
 export interface IReduction<T, Events = void> extends ISource<T> {
     readonly value: T
-    on<S>(source: ISource<S>, reduce: Reducer<T, S>): this
     on<S>(getSource: (events: Events) => ISource<S>, reduce: Reducer<T, S>): this
+    on<S>(source: ISource<S>, reduce: Reducer<T, S>): this
 }
 
 export function reduce<T>(initialValue: T, displayName?: string): IReduction<T, void>

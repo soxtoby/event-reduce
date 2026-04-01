@@ -14,8 +14,8 @@ export interface ISource<T> extends Disposable {
     unsubscribe(observer: IObserver<T>): void
 
     map<Out>(transform: (value: T) => Out, displayName?: string): ISource<Out>
-    filter(predicate: (value: T) => boolean, displayName?: string): ISource<T>
     filter<Out extends T>(predicate: (value: T) => value is Out, displayName?: string): ISource<Out>
+    filter(predicate: (value: T) => boolean, displayName?: string): ISource<T>
     filterMap<Out>(transform: (value: T) => Out | undefined, displayName?: string): ISource<Out>
 }
 
