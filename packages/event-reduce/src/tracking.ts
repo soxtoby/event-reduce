@@ -86,9 +86,11 @@ export function getChildNodes(value: object): ReadonlyMap<GraphNode, string> {
         return new Map([[value, '']])
 
     if (value instanceof StateProperty)
-        return new Map(getChildNodes(value.value)
-            .entries()
-            .map(([node, path]) => [node, `.${String(value.key)}${path}`]))
+        return isObject(value.value)
+            ? new Map(getChildNodes(value.value)
+                .entries()
+                .map(([node, path]) => [node, `.${String(value.key)}${path}`]))
+            : emptyMap
 
     if (Array.isArray(value))
         return new Map(value
