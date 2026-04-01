@@ -71,9 +71,10 @@ export function asyncEvent<Result = void, Context = void>(name: string = "(anony
         promise: P,
         context: Context
     ) {
-        let logging = startLogging('⚡⌚ (async event)', name, [promise, context], () => ({ Path: this.path, Promise: promise }))
+        let val = { type: 'start', promise, context } satisfies AsyncStart<Result, Context>
+        let logging = startLogging('⚡⌚ (async event)', name, [val], () => ({ Path: this.path, Promise: promise }))
         try {
-            emit({ promise, context })
+            emit(val)
         } finally {
             logging?.[dispose]()
         }
