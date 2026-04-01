@@ -9,8 +9,8 @@ import { DependencyList, useEffect, useMemo, useRef, useState } from "react"
  * Creates a model that persists across renders of the component.
  * @param unobservableDependencies - A list of dependencies that are not observable. The model will be re-created when any of these change.
 */
-export function useModel<T extends object>(createModel: () => T, unobservableDependencies?: DependencyList) {
-    let model = useMemo(createModel, unobservableDependencies ?? emptyArray) as Model
+export function useModel<T extends object>(createModel: () => T, unobservableDependencies?: DependencyList): T {
+    let model = useMemo(createModel, unobservableDependencies ?? emptyArray)
     if (!isModel(model))
         throw new InvalidModelError()
     useEffect(() => () => model[dispose]?.(), unobservableDependencies ?? emptyArray)
