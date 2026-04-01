@@ -1,7 +1,7 @@
 import { Derivation, derive, IDerivation } from "./derivation"
 import { isEvent } from "./events"
 import { IReduction, Reduction } from "./reduction"
-import { ISource, isSource } from "./sources"
+import { ISource, isSource, Source } from "./sources"
 import { getState } from "./state"
 import { collectAccessedSources, getChildNodes, getUnderlyingSource, trackManagedSourceCreation, updateChildren } from "./tracking"
 import { SourceValue } from "./types"
@@ -186,7 +186,10 @@ export function reduced<Value, Target extends Model>(...args:
     } else if (argsAre(args, isFunction, isDecoratorContext)) {
         // Getter property decorator
         let [getter, context] = args
-        return cachedGetter(getter, context, instance => getUnderlyingReduction(instance, context.name, getter))
+        return cachedGetter(
+            getter,
+            factory => addInstancePropertyFactory(context, factory),
+            instance => getUnderlyingReduction(instance, context.name, getter))
 
     } else {
         // Legacy decorator
@@ -196,10 +199,11 @@ export function reduced<Value, Target extends Model>(...args:
         if (property?.get) {
             let getter = property.get
 
-            getPrototypePropertyFactories(prototype)[key] = instance => getUnderlyingReduction(instance, key, getter)
-
             return {
-                get(this: Target) { throw new MissingModelDecoratorError(model, key) },
+                get: cachedGetter(
+                    getter,
+                    factory => addPrototypePropertyFactory(prototype, key, factory),
+                    instance => getUnderlyingReduction(instance, key, getter)),
                 enumerable: true,
                 configurable: true
             }
@@ -249,7 +253,10 @@ export function derived<Target extends Model, Value>(...args:
         if (argsAre(args, isFunction, isDecoratorContext)) {
             // Getter property decorator
             let [getter, context] = args
-            return cachedGetter(getter, context, instance => derive(getter.bind(instance), valuesEqual ?? Object.is, String(context.name)))
+            return cachedGetter(
+                getter,
+                factory => addInstancePropertyFactory(context, factory),
+                instance => derive(getter.bind(instance), valuesEqual ?? Object.is, String(context.name)))
         } else {
             // Legacy decorator
             let [prototype, key] = args
@@ -257,10 +264,11 @@ export function derived<Target extends Model, Value>(...args:
 
             if (property?.get) {
                 let getter = property.get
-                let createDerivation = (instance: any) => derive(getter.bind(instance), valuesEqual ?? Object.is, String(key))
-                getPrototypePropertyFactories(prototype)[key] = createDerivation
                 return {
-                    get(this: Target) { throw new MissingModelDecoratorError(model, key) },
+                    get: cachedGetter(
+                        getter,
+                        factory => addPrototypePropertyFactory(prototype, key, factory),
+                        instance => derive(getter.bind(instance), valuesEqual ?? Object.is, String(key))),
                     enumerable: true,
                     configurable: true
                 }
@@ -273,27 +281,33 @@ export function derived<Target extends Model, Value>(...args:
 
 function cachedGetter<Source extends IDerivation<any> | IReduction<any, any>>(
     getter: () => SourceValue<Source>,
-    context: ClassGetterDecoratorContext<Model, SourceValue<Source>>,
+    addPropertyFactory: (cachedSource: (instance: any) => Source) => void,
     createSource: (instance: Model) => Source
 ) {
-    context.addInitializer(function (this: Model) {
-        getInstancePropertyFactories(this)[context.name] = cachedSource.bind(this)
-    })
-
-    return cachedGetter
+    addPropertyFactory(cachedSource)
 
     /** Ensures source is only created once during model construction. */
-    function cachedGetter(this: Model) {
-        return cachedSource.call(this).value
+    return function cachedGetter(this: Model) {
+        return cachedSource(this).value
     }
 
-    function cachedSource(this: Model) {
-        let cache = getModelGetterCache(this)
+    function cachedSource(instance: Model) {
+        let cache = getModelGetterCache(instance)
         let source = cache.get(getter) as Source
         if (!source)
-            cache.set(getter, source = createSource(this))
+            cache.set(getter, source = createSource(instance))
         return source
     }
+}
+
+function addInstancePropertyFactory(context: ClassGetterDecoratorContext<Model, any>, cachedSource: (instance: any) => ISource<any>) {
+    context.addInitializer(function (this: Model) {
+        getInstancePropertyFactories(this)[context.name] = cachedSource.bind(null, this)
+    })
+}
+
+function addPrototypePropertyFactory(prototype: object, key: PropertyKey, cachedSource: (instance: any) => ISource<any>) {
+    getPrototypePropertyFactories(prototype)[key] = cachedSource
 }
 
 function sourceSetter(key: PropertyKey, sourceType: { new(...args: any[]): ISource<any>; defaultName: string; }, errorFactory: () => Error): PropertyDescriptor {
@@ -307,8 +321,10 @@ function sourceSetter(key: PropertyKey, sourceType: { new(...args: any[]): ISour
         if (source.displayName == sourceType.defaultName)
             source.setDisplayName(String(key))
 
+        getInstancePropertyFactories(this)[key] = constant(source)
+
         Object.defineProperty(this, key, {
-            get: () => { throw new MissingModelDecoratorError(model, key) },
+            get: () => (source as Source<any>).value,
             set,
             enumerable: true,
             configurable: true
@@ -445,15 +461,6 @@ function getPrototypePropertyFactories(prototype: object): Record<PropertyKey, (
 /** For caching getters during model construction, so accessing them doesn't create extra sources. */
 function getModelGetterCache(instance: object): Map<Function, ModelProperty> {
     return getOrAddWeakEntry(getterCache, instance, () => new Map())
-}
-
-export class MissingModelDecoratorError extends Error {
-    constructor(
-        public model: object,
-        public property: PropertyKey
-    ) {
-        super(`${nameOfFunction(model.constructor)} class must be marked as a @model to use @reduced, @derived, or @state properties.`)
-    }
 }
 
 export class InvalidReducedPropertyError extends Error {
