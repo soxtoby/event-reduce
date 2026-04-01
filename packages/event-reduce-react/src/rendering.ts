@@ -91,7 +91,7 @@ function loggedReactValue(value: unknown) {
         function xmlTree(node: unknown): Node {
             if (isValidElement(node)) {
                 let type = reactElementName(node.type)
-                    .split('(').at(-1)!.split(')')[0]  // Unwrap HOC names
+                    ?.split('(').at(-1)!.split(')')[0]  // Unwrap HOC names
                     .replace(/^[0-9-]/, '_$&')  // Escape leading number or dash
                     .replace(/[^a-zA-Z0-9:_.-]/g, '_');  // Escape rest of element name
                 let el = xmlDoc.createElement(type || ':unknown:')
@@ -111,7 +111,7 @@ function loggedReactValue(value: unknown) {
                 case 'symbol':
                     return String(elementType)
                 case 'object':
-                    if ('_context' in elementType) return 'Context.Provider'
+                    if ('_context' in elementType || ('Consumer' in elementType && 'Provider' in elementType)) return 'Context.Provider'
                     if (elementType.displayName) return elementType.displayName
                     if (elementType.type?.displayName) return elementType.type.displayName
             }
