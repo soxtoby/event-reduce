@@ -38,15 +38,19 @@ export function log<Info extends object>(type: string, displayName: string, args
 }
 
 function logMessage<Info extends object>(type: string, displayName: string, args: readonly any[], getInfo?: () => Info, childLogs: LogItem[] = []) {
-    let group = {
-        message: [`${displayName} %c${type}`, 'color: grey; font-weight: normal;', ...args],
-        children: Object.entries(getInfo?.() ?? {} as Info)
-            .map(([key, value]) => value instanceof LogValue
-                ? [`${key}:`, ...value.args]
-                : [`${key}:`, value])
-            .concat(childLogs)
-    };
-    logStack.at(-1)!.push(group);
+    try {
+        let group = {
+            message: [`${displayName} %c${type}`, 'color: grey; font-weight: normal;', ...args],
+            children: Object.entries(getInfo?.() ?? {} as Info)
+                .map(([key, value]) => value instanceof LogValue
+                    ? [`${key}:`, ...value.args]
+                    : [`${key}:`, value])
+                .concat(childLogs)
+        };
+        logStack.at(-1)!.push(group);
+    } catch (e) {
+        logStack.at(-1)!.push([`${displayName} ${type} (logging failed: ${e instanceof Error ? e.message : String(e)})`, ...args]);
+    }
 
     if (logStack.length == 1) {
         flushLogs(logStack[0]);
