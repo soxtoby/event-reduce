@@ -150,7 +150,10 @@ function initializeModelProperty<P extends ModelProperty>(instance: Model, key: 
     if (isSource(property)) { // No need to do this for state properties
         Object.defineProperty(instance, key, {
             // Bind directly to the property for cleaner call stack
-            get: Object.getOwnPropertyDescriptor(Object.getPrototypeOf(property), 'value')!.get!.bind(property),
+            get: getPrototypeChain(property)
+                .map(proto => Object.getOwnPropertyDescriptor(proto, 'value'))
+                .find(value => !!value)!
+                .get!.bind(property),
             enumerable: true,
             configurable: true
         })
