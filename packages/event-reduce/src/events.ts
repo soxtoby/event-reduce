@@ -47,18 +47,21 @@ export type AsyncValue<Result, Context = void> =
     | AsyncError<Context>
 
 export interface AsyncStart<Result, Context = void> {
+    type: 'start'
     context: Context
     promise: PromiseLike<Result>
 }
 
 export interface AsyncResult<Result, Context = void> {
+    type: 'result'
     context: Context
     result: Result
 }
 
 export interface AsyncError<Context = void> {
+    type: 'error'
     context: Context
-    error: any
+    error: unknown
 }
 
 export function asyncEvent<Result = void, Context = void>(name: string = "(anonymous async event)"): IAsyncEvent<Result, Context> {
@@ -77,7 +80,7 @@ export function asyncEvent<Result = void, Context = void>(name: string = "(anony
 
         promise.then(
             result => {
-                let val = { result, context }
+                let val = { type: 'result', result, context } satisfies AsyncResult<Result, Context>
                 let logging = startLogging('⚡✔ (async resolved)', name, [val], () => ({ Path: this.path, Promise: promise }))
                 try {
                     emit(val)
@@ -86,7 +89,7 @@ export function asyncEvent<Result = void, Context = void>(name: string = "(anony
                 }
             },
             error => {
-                let val = { error, context }
+                let val = { type: 'error', error, context } satisfies AsyncError<Context>
                 let logging = startLogging('⚡✘ (async rejected)', name, [val], () => ({ Path: this.path, Promise: promise }))
                 try {
                     emit(val)
@@ -99,9 +102,9 @@ export function asyncEvent<Result = void, Context = void>(name: string = "(anony
     }, function asyncEventMembers<CurrentContext>(e: IEventFunction<AsyncValue<Result, CurrentContext>, [promise: PromiseLike<Result>, context: CurrentContext]>) {
         let setBaseDisplayName = e.setDisplayName
         return {
-            started: e.filter(v => 'promise' in v, `${e.displayName}.started`),
-            resolved: e.filter(v => 'result' in v, `${e.displayName}.resolved`),
-            rejected: e.filter(v => 'error' in v, `${e.displayName}.rejected`),
+            started: e.filter(e => e.type == 'start', `${e.displayName}.started`),
+            resolved: e.filter(e => e.type == 'result', `${e.displayName}.resolved`),
+            rejected: e.filter(e => e.type == 'error', `${e.displayName}.rejected`),
             scope<Scope extends Partial<CurrentContext>>(scope: Scope): IAsyncEvent<Result, Scoped<CurrentContext, Scope>> {
                 return bindEvent(e,
                     `${e.displayName}.scoped(${JSON.stringify(scope)})`,
