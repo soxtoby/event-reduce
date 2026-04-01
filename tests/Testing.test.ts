@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test"
 import { derived, disposeModel, event, events, model, reduce, reduced } from "event-reduce"
-import { eventProxy, getTarget, modelProxy, Mutable, mutable } from "event-reduce/testing"
+import { eventProxy, getTarget, modelProxy, Mutable, mutable } from "event-reduce/lib/testing"
 import { MockObserver } from "./MockObserver"
 
 describe("mutable", () => {

@@ -1,8 +1,8 @@
 import { Effect, log, startLogging } from "event-reduce"
-import { LogValue } from "event-reduce/logging"
-import { ISource } from "event-reduce/sources"
-import { beginTransition } from "event-reduce/tracking"
-import { constant, dispose, emptyArray, nameOfFunction } from "event-reduce/utils"
+import { LogValue } from "event-reduce/lib/logging"
+import { ISource } from "event-reduce/lib/sources"
+import { beginTransition } from "event-reduce/lib/tracking"
+import { constant, dispose, emptyArray, nameOfFunction } from "event-reduce/lib/utils"
 import { Children, Fragment, ReactElement, ReactNode, createElement, isValidElement, useState } from "react"
 import { useSyncExternalStore } from "use-sync-external-store/shim"
 

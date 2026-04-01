@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { Atom } from "event-reduce";
-import { getUnderlyingSource } from "event-reduce/tracking";
+import { getUnderlyingSource } from "event-reduce/lib/tracking";
 import { MockObserver } from "./MockObserver";
 
 describe("Atom", () => {

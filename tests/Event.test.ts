@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { asyncEvent, event, type AsyncError, type AsyncResult, type AsyncStart } from 'event-reduce';
-import { SideEffectDuringReactionError } from "event-reduce/tracking";
+import { SideEffectDuringReactionError } from "event-reduce/lib/tracking";
 import { MockObserver } from "./MockObserver";
 
 describe("event", () => {

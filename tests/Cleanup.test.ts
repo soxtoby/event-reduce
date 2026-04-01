@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, spyOn, test, type Mock } from "bun:test"
 import { Atom, createModel, derive, derived, event, model, reduce, reduced, state } from "event-reduce"
-import { getModelProperties, isModel } from "event-reduce/models"
-import { dispose } from "event-reduce/utils"
+import { getModelProperties, isModel } from "event-reduce/lib/models"
+import { dispose } from "event-reduce/lib/utils"
 
 describe("subscription cleanup", () => {
     @model

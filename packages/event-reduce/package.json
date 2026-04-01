@@ -18,7 +18,7 @@
       "bun": "./src/index.ts",
       "default": "./lib/index.js"
     },
-    "./*": {
+    "./lib/*": {
       "types": "./lib/*.d.ts",
       "bun": "./src/*.ts",
       "default": "./lib/*.js"
