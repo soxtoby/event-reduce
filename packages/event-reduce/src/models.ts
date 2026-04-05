@@ -5,7 +5,7 @@ import { ISource, isSource, Source } from "./sources"
 import { getState } from "./state"
 import { collectAccessedSources, getChildNodes, getUnderlyingSource, trackManagedSourceCreation, updateChildren } from "./tracking"
 import { SourceValue } from "./types"
-import { argsAre, constant, dispose, getAllPropertyDescriptors, getOrAddWeakEntry, getPrototypeChain, isDisposable, isFunction, isObject, isString, isUndefined, nameOfFunction } from "./utils"
+import { argsAre, constant, dispose, emptyArray, getAllPropertyDescriptors, getOrAddWeakEntry, getPrototypeChain, isDisposable, isFunction, isObject, isString, isUndefined, nameOfFunction } from "./utils"
 
 const modelBrand = Symbol('model class')
 const modelProperties = Symbol('model properties')
@@ -21,15 +21,16 @@ export function isModel(value: unknown): value is Model {
         && modelProperties in value
 }
 
-/** instance -> key -> factory */
-let instancePropertyFactories = new WeakMap<object, Record<PropertyKey, () => ModelProperty>>()
-/** prototype -> key -> factory */
-let prototypePropertyFactories = new WeakMap<object, Record<PropertyKey, (instance: any) => ModelProperty>>()
+/** instance -> key -> provider */
+let instancePropertyProviders = new WeakMap<object, Record<PropertyKey, () => ModelProperty>>()
+/** prototype -> key -> provider */
+let prototypePropertyProviders = new WeakMap<object, Record<PropertyKey, (instance: any) => ModelProperty>>()
 /** 
  * instance -> getter -> property source
  * Required for getters to cache their source without being overridden in sub-classes
 */
 let getterCache = new WeakMap<object, Map<Function, ISource<any>>>()
+let registeredInstanceProperties = new WeakMap<object, ModelProperty[]>()
 
 
 /** Creates a loose model object. Not required if your model is already decorated with \@{@link model}. */
@@ -77,65 +78,70 @@ export function disposeModel(model: object) {
  * Observable values accessed during construction will not be tracked.
  * The model instance will take ownership of all observable and state properties.
  **/
-export function model<Class extends new (...args: any[]) => any>(target: Class): Class {
+export function model<Class extends new (...args: any[]) => object>(target: Class): Class {
     const className = nameOfFunction(target)
-    let thisCtor: new (...args: any[]) => any
+    let thisCtor: Class
     return thisCtor = {
         [className]: class extends target {
             static [modelBrand] = true
             constructor(...args: any[]) {
+                // Model decorator is ignored on base classes
+                let outerMostModelCtor = getPrototypeChain(new.target).find(ctor => modelBrand in ctor)
+                if (thisCtor != outerMostModelCtor) {
+                    super(...args)
+                    return
+                }
+
                 let sourceCreation = trackManagedSourceCreation()
                 let accesses = collectAccessedSources(null) // Don't want anything accessed during construction to become a source for whatever is creating this
+                let allProperties: readonly ModelProperty[] = emptyArray
                 try {
                     super(...args)
 
                     let model = this as any as Model
+                    let properties = model[modelProperties] = {} as Record<PropertyKey, ModelProperty>
 
-                    let properties = {} as Record<PropertyKey, ModelProperty>
+                    let instanceProviders = Object.entries(getInstancePropertyProviders(model))
+                    for (let [key, getProperty] of instanceProviders)
+                        properties[key] = getProperty()
 
-                    let prototypeFactories = getPrototypePropertyFactories(target.prototype)
-                    for (let key of Object.keys(prototypeFactories))
-                        properties[key] = initializeModelProperty(model, key, prototypeFactories[key])
+                    let prototypeProviders = getPrototypeChain(target.prototype).flatMap(p => Object.entries(getPrototypePropertyProviders(p)))
+                    for (let [key, getProperty] of prototypeProviders)
+                        properties[key] ??= getProperty(model) // Instance and sub-class properties take precedence over super-class properties
 
-                    let instanceFactories = getInstancePropertyFactories(model)
-                    for (let [key, factory] of Object.entries(instanceFactories))
-                        properties[key] = initializeModelProperty(model, key, factory)
-
-                    updateChildren(model, null, properties) // Sets up children with correct paths
-                    sourceCreation.verifySourceManagement()
-
-                    // Layer this class' properties onto the super class' properties
-                    model[modelProperties] = Object.assign(
-                        Object.create(model[modelProperties] ?? {}),
-                        properties)
-
-                    instancePropertyFactories.delete(model) // No longer needed, and avoids sub-models re-initializing properties
-
-                    // Outer-most constructor setup
-                    let outerMostModelCtor = getPrototypeChain(new.target).find(ctor => modelBrand in ctor)
-                    if (outerMostModelCtor == thisCtor) {
-                        getterCache.delete(model) // Only needed during construction
-
-                        let json = new Derivation(`toJSON(${className})`, () => {
-                            let obj = {} as Record<PropertyKey, ModelProperty>
-                            for (let key in model[modelProperties])
-                                obj[key] = model[modelProperties][key]
-                            return obj
-                        })
-                        json.suppressLogging = true
-
-                        Object.assign(this, {
-                            toJSON() { return super.toJSON?.() ?? json.value },
-                            [dispose]() {
-                                // Make sure to cover all the properties in the prototype chain
-                                for (let layer of getPrototypeChain(model[modelProperties]))
-                                    for (let property of Object.values(layer))
-                                        updateChildren(model, property, null)
-                                json[dispose]()
-                                super[dispose]?.()
-                            }
-                        })
+                    for (let [key, property] of Object.entries(properties)) {
+                        if (isSource(property)) {
+                            Object.defineProperty(model, key, {
+                                // Bind directly to the property for cleaner call stack
+                                get: getPrototypeChain(property)
+                                    .map(proto => Object.getOwnPropertyDescriptor(proto, 'value'))
+                                    .find(value => !!value)!
+                                    .get!.bind(property),
+                                enumerable: true,
+                                configurable: true
+                            })
+                        }
                     }
+
+                    allProperties = registeredInstanceProperties.get(model) ?? [] // Includes overridden super-class properties
+                    if (process.env.NODE_ENV !== 'production' && !allProperties.length)
+                        console.warn(`Model ${className} has no @reduced, @derived, or @state properties. You can remove the @model decorator.`)
+                    
+                    sourceCreation.verifySourceManagement()
+                    
+                    // These are no longer needed
+                    registeredInstanceProperties.delete(model)
+                    instancePropertyProviders.delete(model)
+                    getterCache.delete(model)
+
+                    Object.assign(this, {
+                        toJSON() { return super.toJSON?.() ?? properties },
+                        [dispose]() {
+                            for (let property of allProperties)
+                                updateChildren(model, property, null)
+                            super[dispose]?.()
+                        }
+                    })
                 } finally {
                     accesses[dispose]()
                     sourceCreation[dispose]()
@@ -143,26 +149,6 @@ export function model<Class extends new (...args: any[]) => any>(target: Class):
             }
         }
     }[className]
-}
-
-function initializeModelProperty<P extends ModelProperty>(instance: Model, key: PropertyKey, factory: (instance: any) => P) {
-    let property = factory(instance)
-    if (isSource(property)) { // No need to do this for state properties
-        Object.defineProperty(instance, key, {
-            // Bind directly to the property for cleaner call stack
-            get: getPrototypeChain(property)
-                .map(proto => Object.getOwnPropertyDescriptor(proto, 'value'))
-                .find(value => !!value)!
-                .get!.bind(property),
-            enumerable: true,
-            configurable: true
-        })
-    } else if (process.env.NODE_ENV !== 'production'
-        && (isEvent(property.value) || isEventsClass(property.value))
-    ) {
-        throw new EventsMarkedAsStateError(instance, key)
-    }
-    return property
 }
 
 export function reduced<Model, Value>(accessor: ClassAccessorDecoratorTarget<Model, Value>, context: ClassAccessorDecoratorContext<Model, Value>): ClassAccessorDecoratorResult<unknown, Value>
@@ -179,10 +165,12 @@ export function reduced<Value, Target extends Model>(...args:
 
         return {
             init(this: Target, initial: Value) {
-                let reduction = getUnderlyingReduction(this, context.name, () => initial)
-                getModelGetterCache(this).set(target.get, reduction)
-                getInstancePropertyFactories(this)[context.name] = constant(reduction)
-                return initial
+                return cachedGetter(
+                    context.name,
+                    target.get,
+                    factory => addInstancePropertyFactory(this, context.name, factory),
+                    instance => getUnderlyingReduction(instance, context.name, () => initial)
+                ).call(this)
             },
             get(this: Target) { return (getModelGetterCache(this).get(target.get) as Reduction<Value, any>)!.value },
         }
@@ -190,8 +178,9 @@ export function reduced<Value, Target extends Model>(...args:
         // Getter property decorator
         let [getter, context] = args
         return cachedGetter(
+            context.name,
             getter,
-            factory => addInstancePropertyFactory(context, factory),
+            factory => addInstancePropertyFactoryInitializer(context, factory),
             instance => getUnderlyingReduction(instance, context.name, getter))
 
     } else {
@@ -204,6 +193,7 @@ export function reduced<Value, Target extends Model>(...args:
 
             return {
                 get: cachedGetter(
+                    key,
                     getter,
                     factory => addPrototypePropertyFactory(prototype, key, factory),
                     instance => getUnderlyingReduction(instance, key, getter)),
@@ -257,8 +247,9 @@ export function derived<Target extends Model, Value>(...args:
             // Getter property decorator
             let [getter, context] = args
             return cachedGetter(
+                context.name,
                 getter,
-                factory => addInstancePropertyFactory(context, factory),
+                factory => addInstancePropertyFactoryInitializer(context, factory),
                 instance => derive(getter.bind(instance), valuesEqual ?? Object.is, String(context.name)))
         } else {
             // Legacy decorator
@@ -269,20 +260,22 @@ export function derived<Target extends Model, Value>(...args:
                 let getter = property.get
                 return {
                     get: cachedGetter(
+                        key,
                         getter,
                         factory => addPrototypePropertyFactory(prototype, key, factory),
                         instance => derive(getter.bind(instance), valuesEqual ?? Object.is, String(key))),
                     enumerable: true,
                     configurable: true
                 }
+            } else {
+                return sourceSetter(key, Derivation, () => new InvalidDerivedPropertyError(key))
             }
-
-            return sourceSetter(key, Derivation, () => new InvalidDerivedPropertyError(key))
         }
     }
 }
 
 function cachedGetter<Source extends IDerivation<any> | IReduction<any, any>>(
+    key: PropertyKey,
     getter: () => SourceValue<Source>,
     addPropertyFactory: (cachedSource: (instance: any) => Source) => void,
     createSource: (instance: Model) => Source
@@ -298,19 +291,23 @@ function cachedGetter<Source extends IDerivation<any> | IReduction<any, any>>(
         let cache = getModelGetterCache(instance)
         let source = cache.get(getter) as Source
         if (!source)
-            cache.set(getter, source = createSource(instance))
+            cache.set(getter, source = registerModelProperty<Source>(instance, key, createSource))
         return source
     }
 }
 
-function addInstancePropertyFactory(context: ClassGetterDecoratorContext<Model, any>, cachedSource: (instance: any) => ISource<any>) {
+function addInstancePropertyFactoryInitializer(context: ClassGetterDecoratorContext<Model, any> | ClassAccessorDecoratorContext<Model, any>, cachedSource: (instance: any) => ISource<any>) {
     context.addInitializer(function (this: Model) {
-        getInstancePropertyFactories(this)[context.name] = cachedSource.bind(null, this)
+        addInstancePropertyFactory(this, context.name, cachedSource)
     })
 }
 
+function addInstancePropertyFactory(instance: Model, key: PropertyKey, cachedSource: (instance: any) => ISource<any>) {
+    getInstancePropertyProviders(instance)[key] = cachedSource.bind(null, instance)
+}
+
 function addPrototypePropertyFactory(prototype: object, key: PropertyKey, cachedSource: (instance: any) => ISource<any>) {
-    getPrototypePropertyFactories(prototype)[key] = cachedSource
+    getPrototypePropertyProviders(prototype)[key] = cachedSource
 }
 
 function sourceSetter(key: PropertyKey, sourceType: { new(...args: any[]): ISource<any>; defaultName: string; }, errorFactory: () => Error): PropertyDescriptor {
@@ -324,7 +321,8 @@ function sourceSetter(key: PropertyKey, sourceType: { new(...args: any[]): ISour
         if (source.displayName == sourceType.defaultName)
             source.setDisplayName(String(key))
 
-        getInstancePropertyFactories(this)[key] = constant(source)
+        registerModelProperty(this as Model, key, () => source)
+        getInstancePropertyProviders(this)[key] = constant(source)
 
         Object.defineProperty(this, key, {
             get: () => (source as Source<any>).value,
@@ -353,26 +351,33 @@ export function state<Model extends object, Value>(...args:
     if (argsAre(args, isObject, isString)) {
         // Legacy decorator
         let [prototype, key] = args
-        getPrototypePropertyFactories(prototype)[key] = instance => new StateProperty(instance, key)
+        getPrototypePropertyProviders(prototype)[key] = instance => registerModelProperty(instance, key, () => new StateProperty(instance, key))
     } else if (argsAre(args, isUndefined, isClassFieldDecoratorContext)) {
         // Field decorator
         let [_, context] = args
         context.addInitializer(function (this: Model) {
-            getInstancePropertyFactories(this)[context.name] = constant(new StateProperty(this, context.name))
+            getInstancePropertyProviders(this)[context.name] = () => registerModelProperty(this as any, context.name, () => new StateProperty(this, context.name))
         })
     } else if (argsAre(args, isClassAccessorDecoratorTarget, isClassAccessorDecoratorContext)) {
         // Auto-accessor property decorator
         let [_, context] = args
         context.addInitializer(function (this: Model) {
-            getInstancePropertyFactories(this)[context.name] = constant(new StateProperty(this, context.name))
+            getInstancePropertyProviders(this)[context.name] = () => registerModelProperty(this as any, context.name, () => new StateProperty(this, context.name))
         })
     } else {
         // Class decorator, or legacy constructor parameter decorator
         return function decorate(ctor: new (...ctorArgs: any[]) => any) {
             for (let key of args)
-                getPrototypePropertyFactories(ctor.prototype)[key] = instance => new StateProperty(instance, key)
+                getPrototypePropertyProviders(ctor.prototype)[key] = instance => registerModelProperty(instance, key, () => new StateProperty(instance, key))
         }
     }
+}
+
+function registerModelProperty<Property extends ModelProperty>(model: Model, key: PropertyKey, createProperty: (model: Model) => Property) {
+    let property = createProperty(model)
+    updateChildren(model, null, property, `.${String(key)}`)
+    getOrAddWeakEntry(registeredInstanceProperties, model, () => []).push(property)
+    return property
 }
 
 export class StateProperty implements Disposable {
@@ -380,6 +385,11 @@ export class StateProperty implements Disposable {
         private _instance: any,
         public readonly key: PropertyKey
     ) {
+        if (process.env.NODE_ENV !== 'production') {
+            if (isEvent(this.value) || isEventsClass(this.value))
+                throw new EventsMarkedAsStateError(_instance, this.key)
+        }
+
         updateChildren(_instance, null, this.value)
     }
 
@@ -452,13 +462,13 @@ function isDecoratorContext(context: ClassMemberDecoratorContext | unknown): con
 }
 
 /** For new decorators which have access to the instance. */
-function getInstancePropertyFactories(instance: object): Record<PropertyKey, () => ModelProperty> {
-    return getOrAddWeakEntry(instancePropertyFactories, instance, () => ({}))
+function getInstancePropertyProviders(instance: object): Record<PropertyKey, () => ModelProperty> {
+    return getOrAddWeakEntry(instancePropertyProviders, instance, () => ({}))
 }
 
 /** For class decorators and legacy decorators that don't have access to the instance. */
-function getPrototypePropertyFactories(prototype: object): Record<PropertyKey, (instance: any) => ModelProperty> {
-    return getOrAddWeakEntry(prototypePropertyFactories, prototype, () => ({}))
+function getPrototypePropertyProviders(prototype: object): Record<PropertyKey, (instance: any) => ModelProperty> {
+    return getOrAddWeakEntry(prototypePropertyProviders, prototype, () => ({}))
 }
 
 /** For caching getters during model construction, so accessing them doesn't create extra sources. */
