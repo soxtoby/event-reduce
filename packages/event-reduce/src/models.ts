@@ -86,7 +86,7 @@ export function model<Class extends new (...args: any[]) => object>(target: Clas
             static [modelBrand] = true
             constructor(...args: any[]) {
                 // Model decorator is ignored on base classes
-                let outerMostModelCtor = getPrototypeChain(new.target).find(ctor => modelBrand in ctor)
+                let outerMostModelCtor = getPrototypeChain(new.target).find(ctor => Object.hasOwn(ctor, modelBrand))
                 if (thisCtor != outerMostModelCtor) {
                     super(...args)
                     return
@@ -126,9 +126,9 @@ export function model<Class extends new (...args: any[]) => object>(target: Clas
                     allProperties = registeredInstanceProperties.get(model) ?? [] // Includes overridden super-class properties
                     if (process.env.NODE_ENV !== 'production' && !allProperties.length)
                         console.warn(`Model ${className} has no @reduced, @derived, or @state properties. You can remove the @model decorator.`)
-                    
+
                     sourceCreation.verifySourceManagement()
-                    
+
                     // These are no longer needed
                     registeredInstanceProperties.delete(model)
                     instancePropertyProviders.delete(model)
@@ -170,7 +170,7 @@ export function reduced<Value, Target extends Model>(...args:
                     target.get,
                     factory => addInstancePropertyFactory(this, context.name, factory),
                     instance => getUnderlyingReduction(instance, context.name, () => initial)
-                ).call(this)
+                ).call(assertIsModel(this, context.name))
             },
             get(this: Target) { return (getModelGetterCache(this).get(target.get) as Reduction<Value, any>)!.value },
         }
@@ -196,7 +196,7 @@ export function reduced<Value, Target extends Model>(...args:
                     key,
                     getter,
                     factory => addPrototypePropertyFactory(prototype, key, factory),
-                    instance => getUnderlyingReduction(instance, key, getter)),
+                    instance => getUnderlyingReduction(assertIsModel(instance, key), key, getter)),
                 enumerable: true,
                 configurable: true
             }
@@ -263,7 +263,7 @@ export function derived<Target extends Model, Value>(...args:
                         key,
                         getter,
                         factory => addPrototypePropertyFactory(prototype, key, factory),
-                        instance => derive(getter.bind(instance), valuesEqual ?? Object.is, String(key))),
+                        instance => derive(getter.bind(assertIsModel(instance, key)), valuesEqual ?? Object.is, String(key))),
                     enumerable: true,
                     configurable: true
                 }
@@ -298,6 +298,7 @@ function cachedGetter<Source extends IDerivation<any> | IReduction<any, any>>(
 
 function addInstancePropertyFactoryInitializer(context: ClassGetterDecoratorContext<Model, any> | ClassAccessorDecoratorContext<Model, any>, cachedSource: (instance: any) => ISource<any>) {
     context.addInitializer(function (this: Model) {
+        assertIsModel(this, context.name)
         addInstancePropertyFactory(this, context.name, cachedSource)
     })
 }
@@ -314,6 +315,8 @@ function sourceSetter(key: PropertyKey, sourceType: { new(...args: any[]): ISour
     return { set }
 
     function set(this: object, value: unknown) {
+        assertIsModel(this as Model, key)
+
         let source = getUnderlyingSource(value)
         if (!(source instanceof sourceType))
             throw errorFactory()
@@ -341,10 +344,10 @@ export function state<Model, Value>(accessor: ClassAccessorDecoratorTarget<Model
 export function state<Key extends string>(property: Key): (target: Function, ...rest: any) => void //..rest: any to support both constructor parameters and classes
 /** Mark a property as a state property. */
 export function state(target: object, key: string): void
-export function state<Model extends object, Value>(...args:
+export function state<Target extends Model, Value>(...args:
     | string[]
-    | [undefined, ClassFieldDecoratorContext<Model, Value>]
-    | [ClassAccessorDecoratorTarget<Model, Value>, ClassAccessorDecoratorContext<Model, Value>]
+    | [undefined, ClassFieldDecoratorContext<Target, Value>]
+    | [ClassAccessorDecoratorTarget<Target, Value>, ClassAccessorDecoratorContext<Target, Value>]
     | [string]
     | [object, string]
 ) {
@@ -355,14 +358,16 @@ export function state<Model extends object, Value>(...args:
     } else if (argsAre(args, isUndefined, isClassFieldDecoratorContext)) {
         // Field decorator
         let [_, context] = args
-        context.addInitializer(function (this: Model) {
-            getInstancePropertyProviders(this)[context.name] = () => registerModelProperty(this as any, context.name, () => new StateProperty(this, context.name))
+        context.addInitializer(function (this: Target) {
+            assertIsModel(this, context.name)
+            getInstancePropertyProviders(this)[context.name] = () => registerModelProperty(this, context.name, () => new StateProperty(this, context.name))
         })
     } else if (argsAre(args, isClassAccessorDecoratorTarget, isClassAccessorDecoratorContext)) {
         // Auto-accessor property decorator
         let [_, context] = args
-        context.addInitializer(function (this: Model) {
-            getInstancePropertyProviders(this)[context.name] = () => registerModelProperty(this as any, context.name, () => new StateProperty(this, context.name))
+        context.addInitializer(function (this: Target) {
+            assertIsModel(this, context.name)
+            getInstancePropertyProviders(this)[context.name] = () => registerModelProperty(this, context.name, () => new StateProperty(this, context.name))
         })
     } else {
         // Class decorator, or legacy constructor parameter decorator
@@ -371,6 +376,12 @@ export function state<Model extends object, Value>(...args:
                 getPrototypePropertyProviders(ctor.prototype)[key] = instance => registerModelProperty(instance, key, () => new StateProperty(instance, key))
         }
     }
+}
+
+function assertIsModel<Target extends Model>(model: Target, key: PropertyKey) {
+    if (process.env.NODE_ENV !== 'production' && !getPrototypeChain(model.constructor).some(p => Object.hasOwn(p, modelBrand)))
+        throw new MissingModelDecoratorError(model, key)
+    return model
 }
 
 function registerModelProperty<Property extends ModelProperty>(model: Model, key: PropertyKey, createProperty: (model: Model) => Property) {
@@ -474,6 +485,15 @@ function getPrototypePropertyProviders(prototype: object): Record<PropertyKey, (
 /** For caching getters during model construction, so accessing them doesn't create extra sources. */
 function getModelGetterCache(instance: object): Map<Function, ModelProperty> {
     return getOrAddWeakEntry(getterCache, instance, () => new Map())
+}
+
+export class MissingModelDecoratorError extends Error {
+    constructor(
+        public model: object,
+        public property: PropertyKey
+    ) {
+        super(`${nameOfFunction(model.constructor)} class must be marked as a @model to use @reduced, @derived, or @state properties.`)
+    }
 }
 
 export class InvalidReducedPropertyError extends Error {

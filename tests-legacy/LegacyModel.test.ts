@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test"
-import { asyncEvent, derive, derived, event, events, extendReduce, model, reduce, reduced, state } from "event-reduce"
+import { asyncEvent, derive, derived, disposeModel, event, events, extendReduce, model, reduce, reduced, state } from "event-reduce"
 import { EventsMarkedAsStateError } from "event-reduce/lib/models"
 
 describe("legacy models", () => {
@@ -127,6 +127,7 @@ describe("legacy models", () => {
         })
 
         test("when reducer creates a new model that observes the same event that created it, doesn't throw", () => {
+            @model
             class Parent {
                 @reduced
                 child = reduce(null as TestModel | null)
@@ -140,10 +141,8 @@ describe("legacy models", () => {
             expect(parentModel.child).toBeInstanceOf(TestModel)
         })
 
-        test("when initial value of a model's reduced property is derived from the same event that's creating the model, throws", () => {
-            reduce(null as ChildModel | null)
-                .on(increment, () => new ChildModel())
-
+        test("when reducer creates a nested model on an event, nested model reductions are set up without throwing", () => {
+            @model
             class ChildModel {
                 @reduced
                 property = reduce(testModel.property)
@@ -151,7 +150,21 @@ describe("legacy models", () => {
                     .value
             }
 
-            expect(() => increment(undefined)).toThrow() // NOCOMMIT probably wrong now
+            @model
+            class Registry {
+                @reduced
+                root = reduce(null as ChildModel | null)
+                    .on(increment, () => new ChildModel())
+                    .value
+            }
+
+            let holder = new Registry()
+            try {
+                expect(() => increment(undefined)).not.toThrow()
+                expect(holder.root).toBeInstanceOf(ChildModel)
+            } finally {
+                disposeModel(holder)
+            }
         })
 
         test("when event is marked as state, throws when constructed", () => {
@@ -207,10 +220,10 @@ describe("events decorator", () => {
         expect(sut.eventGetter.rejected.displayName).toBe('eventGetter.rejected')
     })
 
-    test("sets event container", () => {
-        expect((sut.eventField as any).container).toBe(sut)
-        expect((sut.eventGetter as any).container).toBe(sut)
-    })
+    test("sets event parents", () => {
+        expect(sut.eventField.path).toBe('TestEvents.eventField');
+        expect(sut.eventGetter.path).toBe('TestEvents.eventGetter');
+    });
 
     test("snapshots getter event", () => {
         sut.eventGetter

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
-import { asyncEvent, derive, event, events, model, reduce, reduced, state } from "event-reduce";
+import { asyncEvent, derive, derived, event, events, model, reduce, reduced, state } from "event-reduce";
 import { Derivation } from "event-reduce/lib/derivation";
-import { EventsMarkedAsStateError } from "event-reduce/lib/models";
+import { EventsMarkedAsStateError, MissingModelDecoratorError } from "event-reduce/lib/models";
 import { decrement, ExtendedModel } from "./Model.test/ExtendedModel";
 import { increment, TestModel } from "./Model.test/TestModel";
 
@@ -102,6 +102,37 @@ describe("models", () => {
                 expect((e as EventsMarkedAsStateError).model).toBeDefined();
                 expect((e as EventsMarkedAsStateError).property).toBe('event');
             }
+        });
+
+        test("when class is not decorated with model, @reduced throws when constructed", () => {
+            class Bad {
+                @reduced
+                get x() {
+                    return reduce(1).value;
+                }
+            }
+
+            expect(() => new Bad()).toThrow(MissingModelDecoratorError);
+        });
+
+        test("when class is not decorated with model, @derived throws when constructed", () => {
+            class Bad {
+                @derived
+                get x() {
+                    return 1;
+                }
+            }
+
+            expect(() => new Bad()).toThrow(MissingModelDecoratorError);
+        });
+
+        test("when class is not decorated with model, @state throws when constructed", () => {
+            class Bad {
+                @state
+                x = 1;
+            }
+
+            expect(() => new Bad()).toThrow(MissingModelDecoratorError);
         });
     });
 });

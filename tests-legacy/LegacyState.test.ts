@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { derived, getState, reduce, reduced, state } from "event-reduce";
+import { derived, getState, model, reduce, reduced, state } from "event-reduce";
 
 describe("legacy state", () => {
+    @model
     class BaseModel {
         constructor(@state('constructorProperty') public constructorProperty: string) { }
 
@@ -27,11 +28,13 @@ describe("legacy state", () => {
         ignoredValue = 'ignored';
     }
 
+    @model
     class TestModel extends BaseModel {
         @state
         subClassProperty = 'subClass';
     }
 
+    @model
     class ChildModel {
         constructor(private _initialValue: string) { }
 
@@ -39,14 +42,14 @@ describe("legacy state", () => {
         value = reduce(this._initialValue).value;
     }
 
-    let model: TestModel;
+    let sut: TestModel;
 
     beforeEach(() => {
-        model = new TestModel('ctor');
+        sut = new TestModel('ctor');
     });
 
     test("getState copies the correct properties", () => {
-        let result = getState(model);
+        let result = getState(sut);
         expect(JSON.stringify(result)).toBe(JSON.stringify({
             valueProperty: 1,
             reducedModel: { value: 'child' },
@@ -54,9 +57,10 @@ describe("legacy state", () => {
                 { value: 'one' },
                 { value: 'two' }
             ],
+            subClassProperty: 'subClass',
+            valuePlusOne: 2,
             mergedModel: { value: 'merged' },
-            constructorProperty: 'ctor',
-            subClassProperty: 'subClass'
+            constructorProperty: 'ctor'
         }));
     });
 });
