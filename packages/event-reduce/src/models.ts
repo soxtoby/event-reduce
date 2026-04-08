@@ -134,8 +134,10 @@ export function model<Class extends new (...args: any[]) => object>(target: Clas
                     instancePropertyProviders.delete(model)
                     getterCache.delete(model)
 
+                    if (typeof (model as any).toJSON != 'function')
+                        Object.assign(this, { toJSON() { return properties } })
+
                     Object.assign(this, {
-                        toJSON() { return super.toJSON?.() ?? properties },
                         [dispose]() {
                             for (let property of allProperties)
                                 updateChildren(model, property, null)

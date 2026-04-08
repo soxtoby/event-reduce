@@ -134,6 +134,25 @@ describe("models", () => {
 
             expect(() => new Bad()).toThrow(MissingModelDecoratorError);
         });
+
+        test("when base class defines toJSON, model decorator does not override it", () => {
+            class BaseModel {
+                toJSON() {
+                    return { serializedValue: "base serializer" };
+                }
+            }
+
+            @model
+            class DerivedModel extends BaseModel {
+                @state
+                value = 1;
+            }
+
+            let sut = new DerivedModel();
+
+            expect(sut.toJSON()).toEqual({ serializedValue: "base serializer" });
+            expect(JSON.stringify(sut)).toBe(JSON.stringify({ serializedValue: "base serializer" }));
+        });
     });
 });
 
