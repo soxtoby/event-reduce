@@ -2,7 +2,7 @@ import { startLogging } from "./logging"
 import { type ISource, Source } from "./sources"
 import { beginTransition } from "./tracking"
 import { Scoped, SourceValue } from "./types"
-import { dispose, matchesScope } from "./utils"
+import { dispose, matchesScope, nameOfCallback } from "./utils"
 
 export interface IEvent<In, Out = In> extends IEventFunction<Out, [value: In]> {
     scope<Scope extends Partial<In>>(scope: Scope): IEvent<Scoped<In, Scope>, Out>
@@ -34,10 +34,16 @@ export function event<T = void>(name: string = "(anonymous event)"): IEvent<T> {
     }) as IEvent<T>
 }
 
-export interface IAsyncEvent<Result, Context> extends IEventFunction<AsyncValue<Result, Context>, [promise: PromiseLike<Result>, context: Context]> {
+export interface IAsyncSource<Result, Context> extends ISource<AsyncValue<Result, Context>> {
     started: ISource<AsyncStart<Result, Context>>
     resolved: ISource<AsyncResult<Result, Context>>
     rejected: ISource<AsyncError<Context>>
+
+    filterContext<FilteredContext extends Context>(predicate: (context: Context) => context is FilteredContext, displayName?: string): IAsyncSource<Result, FilteredContext>
+    filterContext(predicate: (context: Context) => boolean, displayName?: string): IAsyncSource<Result, Context>
+}
+
+export interface IAsyncEvent<Result, Context> extends IEventFunction<AsyncValue<Result, Context>, [promise: PromiseLike<Result>, context: Context]>, IAsyncSource<Result, Context> {
     scope<Scope extends Partial<Context>>(scope: Scope): IAsyncEvent<Result, Scoped<Context, Scope>>
 }
 
@@ -101,26 +107,37 @@ export function asyncEvent<Result = void, Context = void>(name: string = "(anony
 
         return promise
     }, function asyncEventMembers<CurrentContext>(e: IEventFunction<AsyncValue<Result, CurrentContext>, [promise: PromiseLike<Result>, context: CurrentContext]>) {
-        let setBaseDisplayName = e.setDisplayName
         return {
-            started: e.filter(e => e.type == 'start', `${e.displayName}.started`),
-            resolved: e.filter(e => e.type == 'result', `${e.displayName}.resolved`),
-            rejected: e.filter(e => e.type == 'error', `${e.displayName}.rejected`),
+            ...asyncSourceMembers<Result, CurrentContext>(e),
             scope<Scope extends Partial<CurrentContext>>(scope: Scope): IAsyncEvent<Result, Scoped<CurrentContext, Scope>> {
                 return bindEvent(e,
                     `${e.displayName}.scoped(${JSON.stringify(scope)})`,
                     (promise: PromiseLike<Result>, context: Scoped<CurrentContext, Scope>) => e(promise, { ...context, ...scope } as CurrentContext),
                     v => matchesScope(scope, v.context),
                     asyncEventMembers) as IAsyncEvent<Result, Scoped<CurrentContext, Scope>>
-            },
-            setDisplayName(name: string) {
-                setBaseDisplayName.call(e, name)
-                this.started.setDisplayName(`${name}.started`)
-                this.resolved.setDisplayName(`${name}.resolved`)
-                this.rejected.setDisplayName(`${name}.rejected`)
             }
         }
     }) as IAsyncEvent<Result, Context>
+}
+
+function asyncSourceMembers<Result, Context>(source: ISource<AsyncValue<Result, Context>>) {
+    let setBaseDisplayName = source.setDisplayName
+
+    return {
+        started: source.filter(e => e.type == 'start', `${source.displayName}.started`),
+        resolved: source.filter(e => e.type == 'result', `${source.displayName}.resolved`),
+        rejected: source.filter(e => e.type == 'error', `${source.displayName}.rejected`),
+        filterContext(predicate: (context: Context) => boolean, displayName = `${source.displayName}.filterContext(${nameOfCallback(predicate)})`) {
+            let filtered = source.filter(e => predicate(e.context), displayName)
+            return Object.assign(filtered, asyncSourceMembers(filtered))
+        },
+        setDisplayName(this: IAsyncSource<Result, Context>, name: string) {
+            setBaseDisplayName.call(source, name)
+            this.started.setDisplayName(`${name}.started`)
+            this.resolved.setDisplayName(`${name}.resolved`)
+            this.rejected.setDisplayName(`${name}.rejected`)
+        }
+    }
 }
 
 /** Creates a callable event object. */

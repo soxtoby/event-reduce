@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { asyncEvent, event, type AsyncError, type AsyncResult, type AsyncStart } from 'event-reduce';
+import { asyncEvent, event, type AsyncError, type AsyncResult, type AsyncStart, type IAsyncSource } from 'event-reduce';
 import { SideEffectDuringReactionError } from "event-reduce/lib/tracking";
 import { MockObserver } from "./MockObserver";
 
@@ -127,6 +127,88 @@ describe("asyncEvent", () => {
             await promise.catch(() => { }); // Catch to prevent unhandled rejection
 
             expect(rejected.sourceUpdated).toHaveBeenCalledWith(sut.rejected, expect.objectContaining({ error, context }));
+        });
+    });
+
+    describe("filterContext", () => {
+        let filtered: IAsyncSource<Result, Context>;
+        let filteredStarted: MockObserver<AsyncStart<Result, Context>>;
+        let filteredResolved: MockObserver<AsyncResult<Result, Context>>;
+        let filteredRejected: MockObserver<AsyncError<Context>>;
+
+        beforeEach(() => {
+            filtered = sut.filterContext(context => context.bar == 'match');
+            filteredStarted = new MockObserver();
+            filteredResolved = new MockObserver();
+            filteredRejected = new MockObserver();
+            filtered.started.subscribe(filteredStarted);
+            filtered.resolved.subscribe(filteredResolved);
+            filtered.rejected.subscribe(filteredRejected);
+        });
+
+        test("when context matches, filters all async event phases through", async () => {
+            let resolved = Promise.resolve({ foo: 'result' });
+            let rejected = Promise.reject({ message: 'error' });
+            rejected.catch(() => { }); // Catch to prevent unhandled rejection
+
+            sut(resolved, { bar: 'match' });
+            sut(rejected, { bar: 'match' });
+            await resolved;
+            await rejected.catch(() => { });
+
+            expect(filteredStarted.sourceUpdated).toHaveBeenCalledWith(filtered.started, expect.objectContaining({ context: { bar: 'match' } }));
+            expect(filteredResolved.sourceUpdated).toHaveBeenCalledWith(filtered.resolved, expect.objectContaining({ result: { foo: 'result' }, context: { bar: 'match' } }));
+            expect(filteredRejected.sourceUpdated).toHaveBeenCalledWith(filtered.rejected, expect.objectContaining({ error: { message: 'error' }, context: { bar: 'match' } }));
+        });
+
+        test("when context does not match, filters all async event phases out", async () => {
+            let resolved = Promise.resolve({ foo: 'result' });
+            let rejected = Promise.reject({ message: 'error' });
+            rejected.catch(() => { }); // Catch to prevent unhandled rejection
+
+            sut(resolved, { bar: 'other' });
+            sut(rejected, { bar: 'other' });
+            await resolved;
+            await rejected.catch(() => { });
+
+            expect(filteredStarted.sourceUpdated).not.toHaveBeenCalled();
+            expect(filteredResolved.sourceUpdated).not.toHaveBeenCalled();
+            expect(filteredRejected.sourceUpdated).not.toHaveBeenCalled();
+        });
+
+        test("can chain context filters", async () => {
+            let chained = sut
+                .filterContext(context => context.bar.length > 1)
+                .filterContext(context => context.bar == 'match');
+            let observed = new MockObserver<AsyncResult<Result, Context>>();
+            chained.resolved.subscribe(observed);
+
+            let resolved = Promise.resolve({ foo: 'result' });
+            sut(resolved, { bar: 'match' });
+            await resolved;
+
+            expect(observed.sourceUpdated).toHaveBeenCalledWith(chained.resolved, expect.objectContaining({ result: { foo: 'result' }, context: { bar: 'match' } }));
+        });
+
+        test("sets display names for filtered async sources and their phases", () => {
+            let filtered = sut.filterContext(context => context.bar == 'match', 'matching');
+
+            expect(filtered.displayName).toBe('matching');
+            expect(filtered.started.displayName).toBe('matching.started');
+            expect(filtered.resolved.displayName).toBe('matching.resolved');
+            expect(filtered.rejected.displayName).toBe('matching.rejected');
+        });
+
+        test("supports context type guards", () => {
+            type MixedContext =
+                | { kind: 'matching'; bar: string }
+                | { kind: 'other'; baz: string };
+
+            let mixed = asyncEvent<Result, MixedContext>();
+            let matching = mixed.filterContext((context): context is Extract<MixedContext, { kind: 'matching' }> => context.kind == 'matching');
+            let expected: IAsyncSource<Result, { kind: 'matching'; bar: string }> = matching;
+
+            expected.resolved.subscribe(new MockObserver<AsyncResult<Result, { kind: 'matching'; bar: string }>>());
         });
     });
 });
