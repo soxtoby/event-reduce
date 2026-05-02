@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { asyncEvent, event, type AsyncError, type AsyncResult, type AsyncStart, type IAsyncSource } from 'event-reduce';
+import { makePhasedEvent, type IPhasedSource } from "event-reduce/lib/events";
 import { SideEffectDuringReactionError } from "event-reduce/lib/tracking";
 import { MockObserver } from "./MockObserver";
 
@@ -111,14 +112,14 @@ describe("asyncEvent", () => {
             sut(promise, context);
         });
 
-        test("started event fired", () => expect(started.sourceUpdated).toHaveBeenCalledWith(sut.started, expect.objectContaining({ promise, context })));
+        test("started event fired", () => expect(started.sourceUpdated).toHaveBeenCalledWith(sut.started, expect.objectContaining({ phase: 'started', promise, context })));
 
         test("when promise resolved, resolved event fired", async () => {
             let result = { foo: 'result' };
             resolve(result);
             await promise;
 
-            expect(resolved.sourceUpdated).toHaveBeenCalledWith(sut.resolved, expect.objectContaining({ result, context }));
+            expect(resolved.sourceUpdated).toHaveBeenCalledWith(sut.resolved, expect.objectContaining({ phase: 'resolved', result, context }));
         });
 
         test("when promise rejected, rejected event fired", async () => {
@@ -126,7 +127,7 @@ describe("asyncEvent", () => {
             reject(error);
             await promise.catch(() => { }); // Catch to prevent unhandled rejection
 
-            expect(rejected.sourceUpdated).toHaveBeenCalledWith(sut.rejected, expect.objectContaining({ error, context }));
+            expect(rejected.sourceUpdated).toHaveBeenCalledWith(sut.rejected, expect.objectContaining({ phase: 'rejected', error, context }));
         });
     });
 
@@ -156,9 +157,9 @@ describe("asyncEvent", () => {
             await resolved;
             await rejected.catch(() => { });
 
-            expect(filteredStarted.sourceUpdated).toHaveBeenCalledWith(filtered.started, expect.objectContaining({ context: { bar: 'match' } }));
-            expect(filteredResolved.sourceUpdated).toHaveBeenCalledWith(filtered.resolved, expect.objectContaining({ result: { foo: 'result' }, context: { bar: 'match' } }));
-            expect(filteredRejected.sourceUpdated).toHaveBeenCalledWith(filtered.rejected, expect.objectContaining({ error: { message: 'error' }, context: { bar: 'match' } }));
+            expect(filteredStarted.sourceUpdated).toHaveBeenCalledWith(filtered.started, expect.objectContaining({ phase: 'started', context: { bar: 'match' } }));
+            expect(filteredResolved.sourceUpdated).toHaveBeenCalledWith(filtered.resolved, expect.objectContaining({ phase: 'resolved', result: { foo: 'result' }, context: { bar: 'match' } }));
+            expect(filteredRejected.sourceUpdated).toHaveBeenCalledWith(filtered.rejected, expect.objectContaining({ phase: 'rejected', error: { message: 'error' }, context: { bar: 'match' } }));
         });
 
         test("when context does not match, filters all async event phases out", async () => {
@@ -187,7 +188,7 @@ describe("asyncEvent", () => {
             sut(resolved, { bar: 'match' });
             await resolved;
 
-            expect(observed.sourceUpdated).toHaveBeenCalledWith(chained.resolved, expect.objectContaining({ result: { foo: 'result' }, context: { bar: 'match' } }));
+            expect(observed.sourceUpdated).toHaveBeenCalledWith(chained.resolved, expect.objectContaining({ phase: 'resolved', result: { foo: 'result' }, context: { bar: 'match' } }));
         });
 
         test("sets display names for filtered async sources and their phases", () => {
@@ -210,5 +211,107 @@ describe("asyncEvent", () => {
 
             expected.resolved.subscribe(new MockObserver<AsyncResult<Result, { kind: 'matching'; bar: string }>>());
         });
+    });
+});
+
+describe("makePhasedEvent", () => {
+    type Context = { id: string, group: string };
+    type Value =
+        | { phase: 'started', input: string, context: Context }
+        | { phase: 'next', value: string, context: Context }
+        | { phase: 'completed', context: Context };
+
+    function testPhasedEvent(name = 'test phased') {
+        return makePhasedEvent({
+            name,
+            phases: ['started', 'next', 'completed'],
+            fire(emit: (value: Value) => void, input: string, context: Context) {
+                emit({ phase: 'started', input, context });
+                return () => {
+                    emit({ phase: 'next', value: input.toUpperCase(), context });
+                    emit({ phase: 'completed', context });
+                };
+            }
+        });
+    }
+
+    test("adds phase discriminator and exposes phase sources", () => {
+        let sut = testPhasedEvent();
+        let all = new MockObserver();
+        let started = new MockObserver();
+        let next = new MockObserver();
+        sut.subscribe(all);
+        sut.started.subscribe(started);
+        sut.next.subscribe(next);
+
+        let flush: () => void = sut('value', { id: '1', group: 'a' });
+        flush();
+
+        expect(started.sourceUpdated).toHaveBeenCalledWith(sut.started, expect.objectContaining({ phase: 'started', input: 'value' }));
+        expect(next.sourceUpdated).toHaveBeenCalledWith(sut.next, expect.objectContaining({ phase: 'next', value: 'VALUE' }));
+        expect(all.sourceUpdated).toHaveBeenCalledWith(sut, expect.objectContaining({ phase: 'completed', context: { id: '1', group: 'a' } }));
+    });
+
+    test("filters all phases by context", () => {
+        let sut = testPhasedEvent();
+        let filtered = sut.filterContext(context => context.group == 'a');
+        let next = new MockObserver();
+        filtered.next.subscribe(next);
+
+        sut('skip', { id: '1', group: 'b' })();
+        sut('keep', { id: '2', group: 'a' })();
+
+        expect(next.sourceUpdated).toHaveBeenCalledTimes(1);
+        expect(next.sourceUpdated).toHaveBeenCalledWith(filtered.next, expect.objectContaining({ phase: 'next', value: 'KEEP', context: { id: '2', group: 'a' } }));
+    });
+
+    test("scopes context by merging into last argument", () => {
+        let sut = testPhasedEvent();
+        let scoped = sut.scope({ id: 'scoped' });
+        let expectedScopedSource: IPhasedSource<Value & { context: Context & { id: string } }, Context & { id: string }> = scoped;
+        let root = new MockObserver();
+        let scopedNext = new MockObserver();
+        sut.subscribe(root);
+        expectedScopedSource.next.subscribe(scopedNext);
+
+        scoped('value', { group: 'a' });
+
+        expect(root.sourceUpdated).toHaveBeenCalledWith(sut, expect.objectContaining({ phase: 'started', context: { id: 'scoped', group: 'a' } }));
+        expect(scopedNext.sourceUpdated).not.toHaveBeenCalled();
+
+        sut('other', { id: 'scoped', group: 'a' })();
+
+        expect(scopedNext.sourceUpdated).toHaveBeenCalledWith(scoped.next, expect.objectContaining({ phase: 'next', context: { id: 'scoped', group: 'a' } }));
+    });
+
+    test("sets display names for phases", () => {
+        let sut = testPhasedEvent('custom');
+
+        expect(sut.started.displayName).toBe('custom.started');
+        expect(sut.next.displayName).toBe('custom.next');
+        expect(sut.completed.displayName).toBe('custom.completed');
+
+        sut.setDisplayName('renamed');
+
+        expect(sut.started.displayName).toBe('renamed.started');
+        expect(sut.next.displayName).toBe('renamed.next');
+        expect(sut.completed.displayName).toBe('renamed.completed');
+    });
+
+    test("supports context type guards", () => {
+        type MixedContext =
+            | { kind: 'matching'; id: string }
+            | { kind: 'other'; id: string };
+        type MixedValue = { phase: 'next', value: string, context: MixedContext };
+
+        let sut = makePhasedEvent({
+            name: 'mixed',
+            phases: ['next'],
+            fire: (emit: (value: MixedValue) => void, value: string, context: MixedContext) => emit({ phase: 'next', value, context })
+        });
+        let matching = sut.filterContext((context): context is Extract<MixedContext, { kind: 'matching' }> => context.kind == 'matching');
+        let expected: IPhasedSource<{ phase: 'next', value: string, context: { kind: 'matching', id: string } }, { kind: 'matching', id: string }> = matching;
+
+        expected.next.subscribe(new MockObserver());
     });
 });
