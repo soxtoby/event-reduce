@@ -1,7 +1,8 @@
 import { Derivation } from "./derivation";
+import { updateChildren } from "./ownership";
 import { ISource, Source } from "./sources";
 import { getState, State } from "./state";
-import { beginTransition, updateChildren } from "./tracking";
+import { beginTransition } from "./tracking";
 import { dispose } from "./utils";
 
 export class Atom<T> extends Source<T> implements ISource<T> {

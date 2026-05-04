@@ -1,6 +1,7 @@
 import type { IEventFunction } from "./events"
 import { isEventsClass } from "./models"
-import { currentIteration, getPath, iterationSource, trackSourceAccessed, updateChildren } from "./tracking"
+import { getPath, updateChildren } from "./ownership"
+import { currentIteration, iterationSource, trackSourceAccessed } from "./tracking"
 import { MergedSources } from "./types"
 import { dispose, emptyArray, identity, nameOfCallback, nameOfFunction } from "./utils"
 

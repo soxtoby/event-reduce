@@ -1,8 +1,9 @@
 import { Derivation } from "./derivation"
 import { startLogging } from "./logging"
+import { managedSourceCreated, updateChildren } from "./ownership"
 import { allSources, IObserver, ISource, isSource, NotASourceValueError, Source } from "./sources"
 import { getState, State } from "./state"
-import { collectAccessedSources, currentIteration, getUnderlyingSource, managedSourceCreated, trackSourceAccessed, updateChildren } from "./tracking"
+import { collectAccessedSources, currentIteration, getUnderlyingSource, trackSourceAccessed } from "./tracking"
 import { dispose, emptyArray } from "./utils"
 
 export interface IReduction<T, Events = void> extends ISource<T> {

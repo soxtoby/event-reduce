@@ -1,7 +1,7 @@
 import { asyncEvent, Atom, derive, event, IDerivation, IReduction, reduce } from "event-reduce"
-import { isModel, Model } from "event-reduce/lib/models"
+import { isModel } from "event-reduce/lib/models"
+import { trackManagedSourceCreation } from "event-reduce/lib/ownership"
 import { Reduction } from "event-reduce/lib/reduction"
-import { trackManagedSourceCreation } from "event-reduce/lib/tracking"
 import { dispose, emptyArray } from "event-reduce/lib/utils"
 import { DependencyList, useEffect, useMemo, useRef, useState } from "react"
 
