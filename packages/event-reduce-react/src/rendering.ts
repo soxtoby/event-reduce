@@ -1,6 +1,6 @@
 import { Effect, log, startLogging } from "event-reduce"
 import { LogValue } from "event-reduce/lib/logging"
-import { ISource } from "event-reduce/lib/sources"
+import { IObservable } from "event-reduce/lib/observable"
 import { beginTransition } from "event-reduce/lib/tracking"
 import { constant, dispose, emptyArray, nameOfFunction } from "event-reduce/lib/utils"
 import { Children, Fragment, ReactElement, ReactNode, createElement, isValidElement, useState } from "react"
@@ -33,15 +33,15 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
 
 class RenderEffect<T> extends Effect<T> {
     private _observers = new Set<() => void>()
-    private _trigger: ISource<any> | null = null
+    private _trigger: IObservable<any> | null = null
     private _triggerState = { triggeredBy: "(nothing)" }
     private _previousValue?: T
 
     constructor(displayName: string) {
-        super(displayName, constant(undefined!), (source) => {
-            log('⚛️🚩 (render invalidated)', this.displayName, [source])
-            this._trigger = source
-            this._triggerState = { triggeredBy: source.path }
+        super(displayName, constant(undefined!), (observable) => {
+            log('⚛️🚩 (render invalidated)', this.displayName, [observable])
+            this._trigger = observable
+            this._triggerState = { triggeredBy: observable.path }
             for (let subscriber of this._observers)
                 subscriber()
         })

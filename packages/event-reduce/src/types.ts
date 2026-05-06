@@ -1,14 +1,14 @@
-import type { ISource } from "./sources";
+import type { IObservable } from "./observable";
 
 export type Scoped<T, Scope extends Partial<T>> =
     & Omit<T, keyof Scope>
     & { [K in keyof Scope]?: K extends keyof T ? T[K] : never }
 
-export type MergedSources<Sources extends ISource<any>[]> = ISource<MergedValues<Sources>>
+export type MergedObservables<Sources extends IObservable<any>[]> = IObservable<MergedValues<Sources>>
 
-type MergedValues<Sources extends ISource<any>[]> =
-    Sources extends [ISource<infer First>, ...infer Rest extends ISource<any>[]]
+type MergedValues<Sources extends IObservable<any>[]> =
+    Sources extends [IObservable<infer First>, ...infer Rest extends IObservable<any>[]]
     ? First | MergedValues<Rest>
     : never
 
-export type SourceValue<Source extends ISource<any>> = Source extends ISource<infer T> ? T : never
+export type ObservedValue<Observable extends IObservable<any>> = Observable extends IObservable<infer T> ? T : never

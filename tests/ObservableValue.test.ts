@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { Atom } from "event-reduce";
-import { getUnderlyingSource } from "event-reduce/lib/tracking";
+import { ObservableValue } from "event-reduce";
+import { getUnderlyingObservable } from "event-reduce/lib/tracking";
 import { MockObserver } from "./MockObserver";
 
-describe("Atom", () => {
-    let sut: Atom<string>;
+describe("ObservableValue", () => {
+    let sut: ObservableValue<string>;
     let observer: MockObserver<string>;
 
     beforeEach(() => {
-        sut = new Atom('sut', 'initial');
+        sut = new ObservableValue('sut', 'initial');
         observer = new MockObserver();
         sut.subscribe(observer);
     });
@@ -22,7 +22,7 @@ describe("Atom", () => {
 
         test("returns provided value", () => expect(result).toBe('initial'));
 
-        test("tracks the accessed source", () => expect(getUnderlyingSource(result)).toBe(sut));
+        test("tracks the accessed observable", () => expect(getUnderlyingObservable(result)).toBe(sut));
     });
 
     describe("when value changed", () => {
@@ -42,7 +42,7 @@ describe("Atom", () => {
     });
 
     test("when custom equality treats values as equal, observers are not notified", () => {
-        let custom = new Atom('custom', 'Alpha', (left, right) => left?.toLowerCase() === right?.toLowerCase());
+        let custom = new ObservableValue('custom', 'Alpha', (left, right) => left?.toLowerCase() === right?.toLowerCase());
         let customObserver = new MockObserver<string>();
         custom.subscribe(customObserver);
 

@@ -1,11 +1,11 @@
 import { Derivation } from "./derivation";
 import { updateChildren } from "./ownership";
-import { ISource, Source } from "./sources";
+import { IObservable, Observable } from "./observable";
 import { getState, State } from "./state";
 import { beginTransition } from "./tracking";
 import { dispose } from "./utils";
 
-export class Atom<T> extends Source<T> implements ISource<T> {
+export class ObservableValue<T> extends Observable<T> implements IObservable<T> {
     private _json: Derivation<State<T>>
 
     constructor(

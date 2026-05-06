@@ -1,6 +1,6 @@
-import { asyncEvent, Atom, derive, event, IDerivation, IReduction, reduce } from "event-reduce"
+import { asyncEvent, derive, event, IDerivation, IReduction, ObservableValue, reduce } from "event-reduce"
 import { isModel } from "event-reduce/lib/models"
-import { trackManagedSourceCreation } from "event-reduce/lib/ownership"
+import { trackManagedObservableCreation } from "event-reduce/lib/ownership"
 import { Reduction } from "event-reduce/lib/reduction"
 import { dispose, emptyArray } from "event-reduce/lib/utils"
 import { DependencyList, useEffect, useMemo, useRef, useState } from "react"
@@ -45,7 +45,7 @@ export function useDerived<T>(getValue: () => T, nameOrUnobservableDependencies?
 }
 
 export function useReduced<T>(initial: T, name?: string): IReduction<T> {
-    let sourceCreation = trackManagedSourceCreation() // It's fine for this reduction to be loose, because it will be disposed on unmount
+    let sourceCreation = trackManagedObservableCreation() // It's fine for this reduction to be loose, because it will be disposed on unmount
     let reduction = useState(() => reduce(initial, name))[0]
     sourceCreation[dispose]()
     useEffect(() => () => (reduction as Reduction<T>)[dispose]?.(), [])
@@ -53,13 +53,13 @@ export function useReduced<T>(initial: T, name?: string): IReduction<T> {
 }
 
 export function useObservedProps<T extends object>(values: T, name: string = '(anonymous observed values)') {
-    let observableValues = useState(() => ({} as { [K in keyof T]?: Atom<T[K]> }))[0]
+    let observableValues = useState(() => ({} as { [K in keyof T]?: ObservableValue<T[K]> }))[0]
     let nameBase = (name || '') + '.'
 
     // Update any values that are already being observed
     useEffect(() => {
-        for (let [key, atom] of Object.entries(observableValues) as [keyof T, Atom<T[keyof T]>][])
-            atom.setValue(values[key])
+        for (let [key, observableValue] of Object.entries(observableValues) as [keyof T, ObservableValue<T[keyof T]>][])
+            observableValue.setValue(values[key])
     })
 
     let latestValues = useRef(values)
@@ -69,7 +69,7 @@ export function useObservedProps<T extends object>(values: T, name: string = '(a
     return new Proxy({} as T, {
         get(_, key) {
             return (observableValues[key as keyof T]
-                ??= new Atom(nameBase + String(key),
+                ??= new ObservableValue(nameBase + String(key),
                     (latestValues.current)[key as keyof T]))
                 .value
         }
@@ -77,7 +77,7 @@ export function useObservedProps<T extends object>(values: T, name: string = '(a
 }
 
 export function useAtom<T>(value: T, name: string = '(anonymous observed value)') {
-    let observableValue = useState(() => new Atom(name, value))[0]
+    let observableValue = useState(() => new ObservableValue(name, value))[0]
     observableValue.setValue(value)
     return observableValue
 }

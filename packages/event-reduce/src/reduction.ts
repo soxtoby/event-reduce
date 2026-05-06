@@ -1,15 +1,15 @@
 import { Derivation } from "./derivation"
 import { startLogging } from "./logging"
-import { managedSourceCreated, updateChildren } from "./ownership"
-import { allSources, IObserver, ISource, isSource, NotASourceValueError, Source } from "./sources"
+import { managedObservableCreated, updateChildren } from "./ownership"
+import { allSources, IObserver, IObservable, isObservable, NoUnderlyingObservableError, Observable } from "./observable"
 import { getState, State } from "./state"
-import { collectAccessedSources, currentIteration, getUnderlyingSource, trackSourceAccessed } from "./tracking"
+import { collectAccessedSources, currentIteration, getUnderlyingObservable, trackSourceAccessed } from "./tracking"
 import { dispose, emptyArray } from "./utils"
 
-export interface IReduction<T, Events = void> extends ISource<T> {
+export interface IReduction<T, Events = void> extends IObservable<T> {
     readonly value: T
-    on<S>(getSource: (events: Events) => ISource<S>, reduce: Reducer<T, S>): this
-    on<S>(source: ISource<S>, reduce: Reducer<T, S>): this
+    on<S>(getSource: (events: Events) => IObservable<S>, reduce: Reducer<T, S>): this
+    on<S>(source: IObservable<S>, reduce: Reducer<T, S>): this
 }
 
 export function reduce<T>(initialValue: T, displayName?: string): IReduction<T, void>
@@ -22,19 +22,19 @@ export function reduce<T, Events>(initialValue: T, eventsOrDisplayName?: Events 
     return new Reduction(displayName ?? Reduction.defaultName, initialValue, Object.is, events)
 }
 
-/** Extends an existing source with reduction capabilities. */
+/** Extends an existing Observable with reduction capabilities. */
 export function extendReduce<T>(observableValue: T, displayName?: string): IReduction<T, void> {
-    let source = getUnderlyingSource(observableValue)
-    if (source)
-        return reduce(observableValue, displayName ?? source.displayName).on(source, (_, val) => val)
-    throw new NotASourceValueError(observableValue)
+    let observable = getUnderlyingObservable(observableValue)
+    if (observable)
+        return reduce(observableValue, displayName ?? observable.displayName).on(observable, (_, val) => val)
+    throw new NoUnderlyingObservableError(observableValue)
 }
 
-export type Reducer<Result, Source> = (current: Result, next: Source) => Result
+export type Reducer<Result, Next> = (current: Result, next: Next) => Result
 
-export class Reduction<T, Events = void> extends Source<T> implements IReduction<T, Events>, IObserver<any> {
-    sources = new Set<ISource<any>>()
-    private _reducers = new Map<ISource<any>, (current: T, next: any) => T>()
+export class Reduction<T, Events = void> extends Observable<T> implements IReduction<T, Events>, IObserver<any> {
+    private readonly _sources = new Set<IObservable<any>>()
+    private _reducers = new Map<IObservable<any>, (current: T, next: any) => T>()
     private _sourcesLastChecked = -1
     private _json: Derivation<State<T>>
     static defaultName = "(anonymous reduction)"
@@ -50,7 +50,7 @@ export class Reduction<T, Events = void> extends Source<T> implements IReduction
         this._json = new Derivation(`toJSON(${this.displayName})`, () => getState(this.value))
         this._json.suppressLogging = true
 
-        managedSourceCreated(this)
+        managedObservableCreated(this)
 
         this._value = initialValue
         updateChildren(this, null, initialValue)
@@ -58,10 +58,10 @@ export class Reduction<T, Events = void> extends Source<T> implements IReduction
 
     toJSON() { return this._json.value; }
 
-    on<S>(source: ISource<S>, reduce: Reducer<T, S>): this
-    on<S>(getSource: (events: Events) => ISource<S>, reduce: Reducer<T, S>): this
-    on<S>(source: ISource<S> | ((events: Events) => ISource<S>), reduce: Reducer<T, S>) {
-        if (!isSource(source))
+    on<S>(source: IObservable<S>, reduce: Reducer<T, S>): this
+    on<S>(getSource: (events: Events) => IObservable<S>, reduce: Reducer<T, S>): this
+    on<S>(source: IObservable<S> | ((events: Events) => IObservable<S>), reduce: Reducer<T, S>) {
+        if (!isObservable(source))
             source = source(this._events!)
 
         if (process.env.NODE_ENV !== 'production') {
@@ -70,16 +70,16 @@ export class Reduction<T, Events = void> extends Source<T> implements IReduction
         }
 
         source.subscribe(this)
-        this.sources.add(source)
+        this._sources.add(source)
         this._reducers.set(source, reduce)
         this._sourcesLastChecked = Math.max(this._sourcesLastChecked, source.lastUpdated) // Avoid firing reduction because of new source
 
         return this
     }
 
-    override getSources() { return this.sources }
+    override getSources() { return this._sources }
 
-    sourceUpdated<S>(source: ISource<S>, value: S) {
+    sourceUpdated<S>(source: IObservable<S>, value: S) {
         if (source.lastUpdated > this.lastUpdated) {
             let reduce = this._reducers.get(source)
             if (reduce) {
@@ -113,9 +113,9 @@ export class Reduction<T, Events = void> extends Source<T> implements IReduction
 
         try {
             if (this._sourcesLastChecked < currentIteration) {
-                let newerSource = Array.from(this.sources).find(s => s.lastUpdated > this._sourcesLastChecked)
+                let newerSource = Array.from(this._sources).find(s => s.lastUpdated > this._sourcesLastChecked)
                 if (newerSource)
-                    this.sourceUpdated(newerSource, (newerSource as Source<any>).value)
+                    this.sourceUpdated(newerSource, (newerSource as Observable<any>).value)
             }
         } finally {
             access[dispose]()
@@ -132,7 +132,7 @@ export class Reduction<T, Events = void> extends Source<T> implements IReduction
     override skipUpdate(nextValue: T) { return this._isEqual(this._value, nextValue) }
 
     detach() {
-        for (let source of this.sources)
+        for (let source of this._sources)
             source.unsubscribe(this)
     }
 
@@ -145,7 +145,7 @@ export class Reduction<T, Events = void> extends Source<T> implements IReduction
 export class CircularSubscriptionError extends Error {
     constructor(
         public reduction: IReduction<unknown, unknown>,
-        public source: ISource<unknown>
+        public source: IObservable<unknown>
     ) {
         super(`Cannot subscribe to '${source.displayName}', as it depends on this reduction, '${reduction.displayName}'.`);
     }

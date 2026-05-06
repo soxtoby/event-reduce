@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { Atom, type ISource } from "event-reduce";
+import { ObservableValue, type IObservable } from "event-reduce";
 import { MockObserver } from "./MockObserver";
 
-describe("Source", () => {
-    let sut: Atom<string>;
+describe("Observable", () => {
+    let sut: ObservableValue<string>;
     let observer: MockObserver<string>;
 
     beforeEach(() => {
-        sut = new Atom('sut', 'initial');
+        sut = new ObservableValue('sut', 'initial');
         observer = new MockObserver();
         sut.subscribe(observer);
     });
@@ -58,9 +58,9 @@ describe("Source", () => {
         expect(observed).toEqual([2, 4]);
     });
 
-    function values<T>(source: ISource<T>) {
+    function values<T>(observable: IObservable<T>) {
         let observed: T[] = [];
-        source.subscribe({
+        observable.subscribe({
             displayName: 'value collector',
             sourceUpdated: (_, value) => observed.push(value)
         });

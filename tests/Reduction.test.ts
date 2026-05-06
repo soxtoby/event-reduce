@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
-import { Atom, createModel, event, events, IReduction, reduce } from 'event-reduce';
+import { ObservableValue, createModel, event, events, IReduction, reduce } from 'event-reduce';
 import { CircularSubscriptionError } from "event-reduce/lib/reduction";
-import { InvalidStateError } from "event-reduce/lib/sources";
+import { InvalidStateError } from "event-reduce/lib/observable";
 import { CircularDependencyError, collectAccessedSources } from "event-reduce/lib/tracking";
 import { dispose } from "event-reduce/lib/utils";
 import { MockObserver } from "./MockObserver";
@@ -24,19 +24,19 @@ describe("reduce", () => {
         test("starts with initial value", () => expect(sut.value).toBe(1));
 
         describe("when subscribed to an observable", () => {
-            let atom: Atom<string>;
+            let observableValue: ObservableValue<string>;
             let reducer: Mock<(previous: number, event: string) => number>;
 
             beforeEach(() => {
-                atom = new Atom<string>('test', 'test');
+                observableValue = new ObservableValue<string>('test', 'test');
                 reducer = mock();
-                sut.on(atom, reducer);
+                sut.on(observableValue, reducer);
             });
 
             describe("when observable emits a value", () => {
                 beforeEach(() => {
                     reducer.mockReturnValue(3);
-                    atom.setValue('foo');
+                    observableValue.setValue('foo');
                 });
 
                 test("reducer called with previous value and observable value", () => {
@@ -48,7 +48,7 @@ describe("reduce", () => {
                 describe("when another value is emitted", () => {
                     beforeEach(() => {
                         reducer.mockReturnValue(4);
-                        atom.setValue('bar');
+                        observableValue.setValue('bar');
                     });
 
                     test("reducer called with previous value and observable value", () => {
@@ -62,12 +62,12 @@ describe("reduce", () => {
 
         describe("when a reducer accesses a reduced value", () => {
             let other: ReturnType<typeof reduce<number>>;
-            let source: Atom<number>;
+            let observable: ObservableValue<number>;
 
             beforeEach(() => {
                 other = createModel(() => reduce(0));
-                source = new Atom<number>('test', 0);
-                sut.on(source, () => other.value);
+                observable = new ObservableValue<number>('test', 0);
+                sut.on(observable, () => other.value);
             });
 
             afterEach(() => {
@@ -75,19 +75,19 @@ describe("reduce", () => {
             })
 
             test("when other value based on same source, uses latest value", () => {
-                other.on(source, (_, value) => value);
+                other.on(observable, (_, value) => value);
 
-                source.setValue(3);
+                observable.setValue(3);
 
                 expect(other.value).toBe(3);
                 expect(sut.value).toBe(3);
             });
 
             test("when other value also accesses current reduction, throws", () => {
-                other.on(source, () => sut.value);
+                other.on(observable, () => sut.value);
 
                 try {
-                    source.setValue(1);
+                    observable.setValue(1);
                     expect.unreachable("Should have thrown");
                 } catch (e) {
                     expect(e).toBeInstanceOf(CircularDependencyError);
@@ -95,18 +95,18 @@ describe("reduce", () => {
             });
 
             test("when other value not based on same event, doesn't throw", () => {
-                source.setValue(0);
+                observable.setValue(0);
             });
         });
 
         test("when subscribing to an observable based on itself, throws", () => {
-            let source = sut.filter(n => n > 3);
+            let observable = sut.filter(n => n > 3);
             try {
-                sut.on(source, (_, n) => n);
+                sut.on(observable, (_, n) => n);
                 expect.unreachable("Should have thrown");
             } catch (e) {
                 expect(e).toBeInstanceOf(CircularSubscriptionError);
-                expect((e as CircularSubscriptionError).source).toBe(source);
+                expect((e as CircularSubscriptionError).source).toBe(observable);
                 expect((e as CircularSubscriptionError).reduction).toBe(sut);
             }
         });
@@ -126,13 +126,13 @@ describe("reduce", () => {
         })
 
         describe("when subscribing to an observable", () => {
-            let atom: Atom<string>;
-            let getEvent: Mock<(events: typeof eventsObj) => Atom<string>>;
+            let observableValue: ObservableValue<string>;
+            let getEvent: Mock<(events: typeof eventsObj) => ObservableValue<string>>;
             let reducer: Mock<(previous: number, event: string) => number>;
 
             beforeEach(() => {
-                atom = new Atom<string>('test', 'test');
-                getEvent = mock(() => atom);
+                observableValue = new ObservableValue<string>('test', 'test');
+                getEvent = mock(() => observableValue);
                 reducer = mock();
                 sut.on(getEvent, reducer);
             });
@@ -142,7 +142,7 @@ describe("reduce", () => {
             });
 
             test("reduction subscribed to result of event getter", () => {
-                atom.setValue('foo');
+                observableValue.setValue('foo');
                 expect(reducer).toHaveBeenCalledWith(1, 'foo');
             });
         });
@@ -164,7 +164,7 @@ describe("reduce", () => {
 
     test("when reducer returns an event, throws", () => {
         let eventValue = event('test event');
-        let subject = new Atom<string>('test', 'test');
+        let subject = new ObservableValue<string>('test', 'test');
         using sut = createModel(() => ({
             reduction: reduce(null as any, 'sut')
                 .on(subject, () => eventValue)
@@ -175,7 +175,7 @@ describe("reduce", () => {
             expect.unreachable("Should have thrown");
         } catch (e) {
             expect(e).toBeInstanceOf(InvalidStateError);
-            expect((e as InvalidStateError).source).toBe(sut.reduction);
+            expect((e as InvalidStateError).observable).toBe(sut.reduction);
             expect((e as InvalidStateError).value).toBe(eventValue);
         }
     });
@@ -184,7 +184,7 @@ describe("reduce", () => {
         @events
         class Events { }
         let eventsValue = new Events();
-        let subject = new Atom<string>('test', 'test');
+        let subject = new ObservableValue<string>('test', 'test');
         using sut = createModel(() => ({
             reduction: reduce(null as any, 'sut')
                 .on(subject, () => eventsValue)
@@ -195,7 +195,7 @@ describe("reduce", () => {
             expect.unreachable("Should have thrown");
         } catch (e) {
             expect(e).toBeInstanceOf(InvalidStateError);
-            expect((e as InvalidStateError).source).toBe(sut.reduction);
+            expect((e as InvalidStateError).observable).toBe(sut.reduction);
             expect((e as InvalidStateError).value).toBe(eventsValue);
         }
     });

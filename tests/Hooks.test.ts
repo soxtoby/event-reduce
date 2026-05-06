@@ -60,20 +60,20 @@ describe("useAsyncEvent", () => {
 
 describe("useDerived", () => {
     @model class SourceModel { @reduced get value() { return reduce(1).value; } }
-    let source: ReturnType<typeof mutable<SourceModel>>;
+    let observable: ReturnType<typeof mutable<SourceModel>>;
     let sut: RenderHookResult<IDerivation<number>, unknown>
     let initialResult: IDerivation<number>
 
     beforeEach(() => {
-        source = mutable(new SourceModel());
-        sut = renderHook(() => useDerived(() => source.value * 2));
+        observable = mutable(new SourceModel());
+        sut = renderHook(() => useDerived(() => observable.value * 2));
         initialResult = sut.result.current;
     });
 
     test("returns a derivation", () => {
         expect(initialResult.value).toBe(2);
 
-        source.value = 3;
+        observable.value = 3;
 
         expect(initialResult.value).toBe(6);
     });

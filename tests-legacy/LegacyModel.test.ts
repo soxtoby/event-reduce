@@ -115,7 +115,7 @@ describe("legacy models", () => {
             test("extended legacy field value updated", () => expect(extendedModel.legacyField).toBe(0))
         })
 
-        test("when derivation creates a new model that accesses an observable value in its constructor, accessed observable value is not counted as a source for the derivation", () => {
+        test("when derivation creates a new model that accesses an observable value in its constructor, accessed observable value is not counted as an observable for the derivation", () => {
             @model
             class DerivedModel {
                 property = testModel.property

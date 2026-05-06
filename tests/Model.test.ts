@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
 import { asyncEvent, derive, derived, event, events, model, reduce, reduced, state } from "event-reduce";
-import { Derivation } from "event-reduce/lib/derivation";
 import { EventsMarkedAsStateError, MissingModelDecoratorError } from "event-reduce/lib/models";
 import { decrement, ExtendedModel } from "./Model.test/ExtendedModel";
 import { increment, TestModel } from "./Model.test/TestModel";
@@ -57,7 +56,7 @@ describe("models", () => {
             test("extended accessor property value updated", () => expect(extendedModel.accessorProp).toBe(0));
         });
 
-        test("when derivation creates a new model that accesses an observable value in its constructor, accessed observable value is not counted as a source for the derivation", () => {
+        test("when derivation creates a new model that accesses an observable value in its constructor, accessed observable value is not counted as an observable for the derivation", () => {
             @model
             class DerivedModel {
                 constructor() {
@@ -67,7 +66,7 @@ describe("models", () => {
             let derivation = derive(() => new DerivedModel());
             derivation.update();
 
-            expect((derivation as Derivation<DerivedModel>).sources.size).toBe(0);
+            expect([...derivation.getSources()]).toHaveLength(0);
         });
 
         test("when reducer creates a new model that observes the same event that created it, doesn't throw", () => {

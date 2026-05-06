@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { asyncEvent, event, type AsyncError, type AsyncResult, type AsyncStart, type IAsyncSource } from 'event-reduce';
-import { makePhasedEvent, type IPhasedSource } from "event-reduce/lib/events";
+import { asyncEvent, event, type AsyncError, type AsyncResult, type AsyncStart, type IAsyncObservable } from 'event-reduce';
+import { makePhasedEvent, type IPhasedObservable } from "event-reduce/lib/events";
 import { SideEffectDuringReactionError } from "event-reduce/lib/tracking";
 import { MockObserver } from "./MockObserver";
 
@@ -132,7 +132,7 @@ describe("asyncEvent", () => {
     });
 
     describe("filterContext", () => {
-        let filtered: IAsyncSource<Result, Context>;
+        let filtered: IAsyncObservable<Result, Context>;
         let filteredStarted: MockObserver<AsyncStart<Result, Context>>;
         let filteredResolved: MockObserver<AsyncResult<Result, Context>>;
         let filteredRejected: MockObserver<AsyncError<Context>>;
@@ -191,7 +191,7 @@ describe("asyncEvent", () => {
             expect(observed.sourceUpdated).toHaveBeenCalledWith(chained.resolved, expect.objectContaining({ phase: 'resolved', result: { foo: 'result' }, context: { bar: 'match' } }));
         });
 
-        test("sets display names for filtered async sources and their phases", () => {
+        test("sets display names for filtered async observables and their phases", () => {
             let filtered = sut.filterContext(context => context.bar == 'match', 'matching');
 
             expect(filtered.displayName).toBe('matching');
@@ -207,7 +207,7 @@ describe("asyncEvent", () => {
 
             let mixed = asyncEvent<Result, MixedContext>();
             let matching = mixed.filterContext((context): context is Extract<MixedContext, { kind: 'matching' }> => context.kind == 'matching');
-            let expected: IAsyncSource<Result, { kind: 'matching'; bar: string }> = matching;
+            let expected: IAsyncObservable<Result, { kind: 'matching'; bar: string }> = matching;
 
             expected.resolved.subscribe(new MockObserver<AsyncResult<Result, { kind: 'matching'; bar: string }>>());
         });
@@ -235,7 +235,7 @@ describe("makePhasedEvent", () => {
         });
     }
 
-    test("adds phase discriminator and exposes phase sources", () => {
+    test("adds phase discriminator and exposes phase observables", () => {
         let sut = testPhasedEvent();
         let all = new MockObserver();
         let started = new MockObserver();
@@ -268,7 +268,7 @@ describe("makePhasedEvent", () => {
     test("scopes context by merging into last argument", () => {
         let sut = testPhasedEvent();
         let scoped = sut.scope({ id: 'scoped' });
-        let expectedScopedSource: IPhasedSource<Value & { context: Context & { id: string } }, Context & { id: string }> = scoped;
+        let expectedScopedSource: IPhasedObservable<Value & { context: Context & { id: string } }, Context & { id: string }> = scoped;
         let root = new MockObserver();
         let scopedNext = new MockObserver();
         sut.subscribe(root);
@@ -310,7 +310,7 @@ describe("makePhasedEvent", () => {
             fire: (emit: (value: MixedValue) => void, value: string, context: MixedContext) => emit({ phase: 'next', value, context })
         });
         let matching = sut.filterContext((context): context is Extract<MixedContext, { kind: 'matching' }> => context.kind == 'matching');
-        let expected: IPhasedSource<{ phase: 'next', value: string, context: { kind: 'matching', id: string } }, { kind: 'matching', id: string }> = matching;
+        let expected: IPhasedObservable<{ phase: 'next', value: string, context: { kind: 'matching', id: string } }, { kind: 'matching', id: string }> = matching;
 
         expected.next.subscribe(new MockObserver());
     });

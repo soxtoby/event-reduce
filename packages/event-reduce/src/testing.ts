@@ -1,9 +1,9 @@
-import { Atom } from "./atom"
+import { ObservableValue } from "./observableValue"
 import { Derivation } from "./derivation"
 import { event } from "./events"
 import { getModelProperties, isModel } from "./models"
 import { Reduction } from "./reduction"
-import { isSource, Source } from "./sources"
+import { isObservable, Observable } from "./observable"
 import { beginTransition } from "./tracking"
 import { dispose, isObject } from "./utils"
 
@@ -15,14 +15,14 @@ export function mutable<T>(model: T): Mutable<T> {
 
         for (let key in properties) {
             let property = properties[key]
-            if (isSource(property)) {
+            if (isObservable(property)) {
                 Object.defineProperty(model, key, {
-                    get() { return (property as Source<any>).value },
+                    get() { return (property as Observable<any>).value },
                     set(value) {
                         if (property instanceof Reduction || property instanceof Derivation)
                             property.detach()
 
-                        if (property instanceof Source) {
+                        if (property instanceof Observable) {
                             let transition = beginTransition(property, true)
                             try {
                                 property.setValue(value)
@@ -51,13 +51,13 @@ export function modelProxy<T extends object>(model: T = {} as T) {
     if (!isObject(model) || Array.isArray(model))
         return model
 
-    let properties = {} as Record<PropertyKey, Atom<any>>
+    let properties = {} as Record<PropertyKey, ObservableValue<any>>
 
     // Pre-populate observable values with plain value fields
     Object.entries(Object.getOwnPropertyDescriptors(model))
         .forEach(([key, prop]) => {
             if ('value' in prop)
-                properties[key] = new Atom(String(key), prop.value)
+                properties[key] = new ObservableValue(String(key), prop.value)
         })
 
     let proxy: T = new Proxy(model, {
@@ -97,8 +97,8 @@ export function modelProxy<T extends object>(model: T = {} as T) {
 
     return proxy
 
-    function getOrAddObservableValue(key: PropertyKey): Atom<any> {
-        return properties[String(key)] ??= new Atom(String(key), model[key as keyof T])
+    function getOrAddObservableValue(key: PropertyKey): ObservableValue<any> {
+        return properties[String(key)] ??= new ObservableValue(String(key), model[key as keyof T])
     }
 }
 

@@ -1,18 +1,18 @@
 import { Effect } from "./effect"
 import { startLogging } from "./logging"
-import { trackManagedSourceCreation } from "./ownership"
-import { IObserver, ISource, Source } from "./sources"
+import { IObservable, IObserver, Observable } from "./observable"
+import { trackManagedObservableCreation } from "./ownership"
 import { getState, State } from "./state"
 import { beginTransition, iterationSource, trackSourceAccessed } from "./tracking"
 import { dispose, emptyArray, nameOfFunction, nullDisposable } from "./utils"
 
-export interface IDerivation<T> extends ISource<T>, IObserver<any> {
+export interface IDerivation<T> extends IObservable<T>, IObserver<any> {
     readonly value: T
 
     /** 
      * Forces the value to be re-calculated. 
      * @param deriveValue Optional function to use to derive the value. If not provided, the original derivation function will be used.
-     * @param reason Optional reason for the update. If not invalidated by a source change, this will be used as the reason for the update.
+     * @param reason Optional reason for the update. If not invalidated by an observable change, this will be used as the reason for the update.
      **/
     update(deriveValue?: () => T, reason?: string): void
 }
@@ -26,7 +26,7 @@ export function derive<T>(derive: () => T, displayNameOrSkip?: string | ((a: T, 
     return new Derivation((displayName ?? nameOfFunction(derive)) || Derivation.defaultName, derive, skipUpdate)
 }
 
-export class Derivation<T> extends Source<T> implements IDerivation<T> {
+export class Derivation<T> extends Observable<T> implements IDerivation<T> {
     private _derive: Effect<T>
     private _json?: Derivation<State<T>>
     static defaultName = "(anonymous derivation)"
@@ -53,8 +53,6 @@ export class Derivation<T> extends Source<T> implements IDerivation<T> {
         return this._json.value
     }
 
-    get sources() { return this._derive.sources }
-
     override subscribe(observer: IObserver<T>): void {
         if (!this._observers.size)
             this._derive.attach()
@@ -76,7 +74,7 @@ export class Derivation<T> extends Source<T> implements IDerivation<T> {
 
     override getSources() { return this._derive.getSources() }
 
-    sourceUpdated<S>(source: ISource<S>, value: S) { this._derive.sourceUpdated(source, value) }
+    sourceUpdated<S>(source: IObservable<S>, value: S) { this._derive.sourceUpdated(source, value) }
 
     override get value() {
         // Notifying tracker before checking for updates so circular reference is detected early
@@ -100,7 +98,7 @@ export class Derivation<T> extends Source<T> implements IDerivation<T> {
         let trigger = this._derive.invalidatingSource
 
         let transition = beginTransition(this, !iterationSource) // Derivations are always safe to access, and only initiate a transition if necessary
-        let sourceCreation = trackManagedSourceCreation()
+        let observableCreation = trackManagedObservableCreation()
         let logging = this.suppressLogging ? nullDisposable : startLogging('🔗 (derivation)', this.displayName, emptyArray, () => ({
             Path: this.path,
             Trigger: trigger?.path ?? '(unknown)',
@@ -109,10 +107,10 @@ export class Derivation<T> extends Source<T> implements IDerivation<T> {
         }))
         try {
             this.setValue(nextValue = this._derive.run(deriveValue))
-            sourceCreation.verifySourceManagement()
+            observableCreation.verifyObservableManagement()
         } finally {
             logging[dispose]()
-            sourceCreation[dispose]()
+            observableCreation[dispose]()
             transition[dispose]()
         }
     }

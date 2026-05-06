@@ -1,11 +1,11 @@
 import { Derivation, derive, IDerivation } from "./derivation"
 import { isEvent } from "./events"
-import { getChildNodes, trackManagedSourceCreation, updateChildren } from "./ownership"
+import { IObservable, isObservable, Observable } from "./observable"
+import { getChildNodes, trackManagedObservableCreation, updateChildren } from "./ownership"
 import { IReduction, Reduction } from "./reduction"
-import { ISource, isSource, Source } from "./sources"
 import { getState } from "./state"
-import { collectAccessedSources, getUnderlyingSource } from "./tracking"
-import { SourceValue } from "./types"
+import { collectAccessedSources, getUnderlyingObservable } from "./tracking"
+import { ObservedValue } from "./types"
 import { argsAre, constant, dispose, emptyArray, getAllPropertyDescriptors, getOrAddWeakEntry, getPrototypeChain, isDisposable, isFunction, isObject, isString, isUndefined, nameOfFunction } from "./utils"
 
 const modelBrand = Symbol('model class')
@@ -15,7 +15,7 @@ export interface Model extends Disposable {
     [modelProperties]: Record<PropertyKey, ModelProperty>
 }
 
-export type ModelProperty = ISource<any> | StateProperty
+export type ModelProperty = IObservable<any> | StateProperty
 
 export function isModel(value: unknown): value is Model {
     return isObject(value)
@@ -27,16 +27,16 @@ let instancePropertyProviders = new WeakMap<object, Record<PropertyKey, () => Mo
 /** prototype -> key -> provider */
 let prototypePropertyProviders = new WeakMap<object, Record<PropertyKey, (instance: any) => ModelProperty>>()
 /** 
- * instance -> getter -> property source
- * Required for getters to cache their source without being overridden in sub-classes
+ * instance -> getter -> property observable
+ * Required for getters to cache their Observable without being overridden in sub-classes
 */
-let getterCache = new WeakMap<object, Map<Function, ISource<any>>>()
+let getterCache = new WeakMap<object, Map<Function, IObservable<any>>>()
 let registeredInstanceProperties = new WeakMap<object, ModelProperty[]>()
 
 
 /** Creates a loose model object. Not required if your model is already decorated with \@{@link model}. */
 export function createModel<T extends object>(create: () => T): T & Model {
-    let sourceCreation = trackManagedSourceCreation()
+    let sourceCreation = trackManagedObservableCreation()
     let accesses = collectAccessedSources(null) // Don't want anything accessed during construction to become a source for whatever is creating this
     try {
         let instance = create()
@@ -47,7 +47,7 @@ export function createModel<T extends object>(create: () => T): T & Model {
                 value: Object.fromEntries(
                     getChildNodes(instance)
                         .entries()
-                        .flatMap(([node, path]) => isSource(node) ? [[path, node]] : []))
+                        .flatMap(([node, path]) => isObservable(node) ? [[path, node]] : []))
             },
             [dispose]: {
                 value() {
@@ -60,7 +60,7 @@ export function createModel<T extends object>(create: () => T): T & Model {
             }
         })
         updateChildren(model, null, instance)
-        sourceCreation.verifySourceManagement()
+        sourceCreation.verifyObservableManagement()
         return model
     } finally {
         accesses[dispose]()
@@ -93,7 +93,7 @@ export function model<Class extends new (...args: any[]) => object>(target: Clas
                     return
                 }
 
-                let sourceCreation = trackManagedSourceCreation()
+                let sourceCreation = trackManagedObservableCreation()
                 let accesses = collectAccessedSources(null) // Don't want anything accessed during construction to become a source for whatever is creating this
                 let allProperties: readonly ModelProperty[] = emptyArray
                 try {
@@ -111,7 +111,7 @@ export function model<Class extends new (...args: any[]) => object>(target: Clas
                         properties[key] ??= getProperty(model) // Instance and sub-class properties take precedence over super-class properties
 
                     for (let [key, property] of Object.entries(properties)) {
-                        if (isSource(property)) {
+                        if (isObservable(property)) {
                             Object.defineProperty(model, key, {
                                 // Bind directly to the property for cleaner call stack
                                 get: getPrototypeChain(property)
@@ -128,7 +128,7 @@ export function model<Class extends new (...args: any[]) => object>(target: Clas
                     if (process.env.NODE_ENV !== 'production' && !allProperties.length)
                         console.warn(`Model ${className} has no @reduced, @derived, or @state properties. You can remove the @model decorator.`)
 
-                    sourceCreation.verifySourceManagement()
+                    sourceCreation.verifyObservableManagement()
 
                     // These are no longer needed
                     registeredInstanceProperties.delete(model)
@@ -209,7 +209,7 @@ export function reduced<Value, Target extends Model>(...args:
     }
 
     function getUnderlyingReduction(instance: any, key: PropertyKey, getter: Function) {
-        let reduction = getUnderlyingSource(getter.call(instance))
+        let reduction = getUnderlyingObservable(getter.call(instance))
 
         if (!(reduction instanceof Reduction))
             throw new InvalidReducedPropertyError(key)
@@ -277,61 +277,61 @@ export function derived<Target extends Model, Value>(...args:
     }
 }
 
-function cachedGetter<Source extends IDerivation<any> | IReduction<any, any>>(
+function cachedGetter<Observable extends IDerivation<any> | IReduction<any, any>>(
     key: PropertyKey,
-    getter: () => SourceValue<Source>,
-    addPropertyFactory: (cachedSource: (instance: any) => Source) => void,
-    createSource: (instance: Model) => Source
+    getter: () => ObservedValue<Observable>,
+    addPropertyFactory: (cachedSource: (instance: any) => Observable) => void,
+    createSource: (instance: Model) => Observable
 ) {
     addPropertyFactory(cachedSource)
 
-    /** Ensures source is only created once during model construction. */
+    /** Ensures observable is only created once during model construction. */
     return function cachedGetter(this: Model) {
         return cachedSource(this).value
     }
 
     function cachedSource(instance: Model) {
         let cache = getModelGetterCache(instance)
-        let source = cache.get(getter) as Source
-        if (!source)
-            cache.set(getter, source = registerModelProperty<Source>(instance, key, createSource))
-        return source
+        let observable = cache.get(getter) as Observable
+        if (!observable)
+            cache.set(getter, observable = registerModelProperty<Observable>(instance, key, createSource))
+        return observable
     }
 }
 
-function addInstancePropertyFactoryInitializer(context: ClassGetterDecoratorContext<Model, any> | ClassAccessorDecoratorContext<Model, any>, cachedSource: (instance: any) => ISource<any>) {
+function addInstancePropertyFactoryInitializer(context: ClassGetterDecoratorContext<Model, any> | ClassAccessorDecoratorContext<Model, any>, cachedSource: (instance: any) => IObservable<any>) {
     context.addInitializer(function (this: Model) {
         assertIsModel(this, context.name)
         addInstancePropertyFactory(this, context.name, cachedSource)
     })
 }
 
-function addInstancePropertyFactory(instance: Model, key: PropertyKey, cachedSource: (instance: any) => ISource<any>) {
+function addInstancePropertyFactory(instance: Model, key: PropertyKey, cachedSource: (instance: any) => IObservable<any>) {
     getInstancePropertyProviders(instance)[key] = cachedSource.bind(null, instance)
 }
 
-function addPrototypePropertyFactory(prototype: object, key: PropertyKey, cachedSource: (instance: any) => ISource<any>) {
+function addPrototypePropertyFactory(prototype: object, key: PropertyKey, cachedSource: (instance: any) => IObservable<any>) {
     getPrototypePropertyProviders(prototype)[key] = cachedSource
 }
 
-function sourceSetter(key: PropertyKey, sourceType: { new(...args: any[]): ISource<any>; defaultName: string; }, errorFactory: () => Error): PropertyDescriptor {
+function sourceSetter(key: PropertyKey, sourceType: { new(...args: any[]): IObservable<any>; defaultName: string; }, errorFactory: () => Error): PropertyDescriptor {
     return { set }
 
     function set(this: object, value: unknown) {
         assertIsModel(this as Model, key)
 
-        let source = getUnderlyingSource(value)
-        if (!(source instanceof sourceType))
+        let observable = getUnderlyingObservable(value)
+        if (!(observable instanceof sourceType))
             throw errorFactory()
 
-        if (source.displayName == sourceType.defaultName)
-            source.setDisplayName(String(key))
+        if (observable.displayName == sourceType.defaultName)
+            observable.setDisplayName(String(key))
 
-        registerModelProperty(this as Model, key, () => source)
-        getInstancePropertyProviders(this)[key] = constant(source)
+        registerModelProperty(this as Model, key, () => observable)
+        getInstancePropertyProviders(this)[key] = constant(observable)
 
         Object.defineProperty(this, key, {
-            get: () => (source as Source<any>).value,
+            get: () => (observable as Observable<any>).value,
             set,
             enumerable: true,
             configurable: true

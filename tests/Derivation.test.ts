@@ -1,18 +1,18 @@
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
-import { Atom, derive, event, events, IDerivation } from "event-reduce";
-import { InvalidStateError } from "event-reduce/lib/sources";
-import { getUnderlyingSource, SideEffectDuringReactionError } from "event-reduce/lib/tracking";
+import { derive, event, events, IDerivation, ObservableValue } from "event-reduce";
+import { InvalidStateError } from "event-reduce/lib/observable";
+import { getUnderlyingObservable, SideEffectDuringReactionError } from "event-reduce/lib/tracking";
 import { MockObserver } from "./MockObserver";
 
 describe("derive", () => {
-    let sourceA: Atom<string>;
-    let sourceB: Atom<string>;
+    let sourceA: ObservableValue<string>;
+    let sourceB: ObservableValue<string>;
     let calculation: Mock<() => string>;
     let sut: IDerivation<string>;
 
     beforeEach(() => {
-        sourceA = new Atom('a', 'a');
-        sourceB = new Atom('b', 'b');
+        sourceA = new ObservableValue('a', 'a');
+        sourceB = new ObservableValue('b', 'b');
         calculation = mock(() => sourceA.value + sourceB.value);
         sut = derive(calculation, 'sut');
     });
@@ -28,7 +28,7 @@ describe("derive", () => {
 
         test("returns result of calculation", () => expect(result).toBe('ab'));
 
-        test("derivation is last accessed value", () => expect(getUnderlyingSource(result)!).toBe(sut));
+        test("derivation is last accessed value", () => expect(getUnderlyingObservable(result)!).toBe(sut));
 
         test("when accessed again, returns same value and doesn't re-compute the value", () => {
             let result2 = sut.value;
@@ -37,7 +37,7 @@ describe("derive", () => {
             expect(calculation).toHaveBeenCalledTimes(1);
         });
 
-        test("when a source value changed then accessed again, returns updated value", () => {
+        test("when an observable value changed then accessed again, returns updated value", () => {
             sourceB.setValue('B');
 
             let result2 = sut.value;
@@ -45,7 +45,7 @@ describe("derive", () => {
             expect(result2).toBe('aB');
         });
 
-        test("when multiple source values changed then accessed again, returns updated value and re-computes only once", () => {
+        test("when multiple observable values changed then accessed again, returns updated value and re-computes only once", () => {
             calculation.mockClear();
             sourceA.setValue('A');
             sourceB.setValue('B');
@@ -66,7 +66,7 @@ describe("derive", () => {
 
             test("doesn't notify immediately", () => expect(observer.sourceUpdated).not.toHaveBeenCalled());
 
-            test("when a source value changed, notifies observer", () => {
+            test("when an observable value changed, notifies observer", () => {
                 sourceA.setValue('A');
 
                 expect(observer.sourceUpdated).toHaveBeenCalled();
@@ -97,7 +97,7 @@ describe("derive", () => {
             expect.unreachable("Should have thrown");
         } catch (e) {
             expect(e).toBeInstanceOf(InvalidStateError);
-            expect((e as InvalidStateError).source).toBe(derivation);
+            expect((e as InvalidStateError).observable).toBe(derivation);
             expect((e as InvalidStateError).value).toBe(eventValue);
         }
     });
@@ -113,16 +113,16 @@ describe("derive", () => {
             expect.unreachable("Should have thrown");
         } catch (e) {
             expect(e).toBeInstanceOf(InvalidStateError);
-            expect((e as InvalidStateError).source).toBe(derivation);
+            expect((e as InvalidStateError).observable).toBe(derivation);
             expect((e as InvalidStateError).value).toBe(eventsValue);
         }
     });
 });
 
 test("derivation that depends on other derivations only updates once", () => {
-    let source = new Atom("source", "a");
-    let inner1 = derive(() => source.value + "_inner1");
-    let inner2 = derive(() => source.value + "_inner2");
+    let observable = new ObservableValue("Observable", "a");
+    let inner1 = derive(() => observable.value + "_inner1");
+    let inner2 = derive(() => observable.value + "_inner2");
     let outerCalc = mock(() => inner1.value + inner2.value);
     let outer = derive(outerCalc);
     outer.subscribe(new MockObserver()); // Outer must be observed for sources to trigger an update
@@ -132,7 +132,7 @@ test("derivation that depends on other derivations only updates once", () => {
     expect(outerCalc).toHaveBeenCalledTimes(1);
 
     // This should trigger updates to inner1 and inner2, but outer should only re-calculate once
-    source.setValue("b");
+    observable.setValue("b");
     outer.value;
     expect(outerCalc).toHaveBeenCalledTimes(2);
 });

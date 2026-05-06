@@ -1,9 +1,9 @@
 import { log } from "./logging"
 import { type EventsClass, isEventsClass, isModel, type Model, StateProperty } from "./models"
-import { type ISource, isSource, Source } from "./sources"
+import { type IObservable, isObservable, Observable } from "./observable"
 import { dispose, emptyArray, emptyMap, isDisposable, isObject, nameOfFunction } from "./utils"
 
-type GraphNode = ISource<any> | Model | EventsClass
+type GraphNode = IObservable<any> | Model | EventsClass
 
 /** Child -> parent -> path. */
 let parentRegistry = new WeakMap<GraphNode, Map<GraphNode, string>>()
@@ -11,20 +11,20 @@ let parentRegistry = new WeakMap<GraphNode, Map<GraphNode, string>>()
 let childSnapshots = new WeakMap<object, ReadonlyMap<GraphNode, string>>()
 let garbage = new Set<GraphNode & Disposable>()
 
-let currentCreationScope: Set<GraphNode & ISource<any>> | null = null
+let currentCreationScope: Set<GraphNode & IObservable<any>> | null = null
 
 export function updateChildren(parent: GraphNode, previousValue: unknown, nextValue: unknown, parentPath = '') {
     if (Object.is(previousValue, nextValue))
         return
 
     let previousChildren: ReadonlyMap<GraphNode, string> = emptyMap
-    if (isObject(previousValue) || previousValue instanceof Source) {
+    if (isObject(previousValue) || previousValue instanceof Observable) {
         previousChildren = childSnapshots.get(previousValue) ?? getChildNodes(previousValue)
         childSnapshots.delete(previousValue)
     }
 
     let newChildren: ReadonlyMap<GraphNode, string> = emptyMap
-    if (isObject(nextValue) || nextValue instanceof Source) {
+    if (isObject(nextValue) || nextValue instanceof Observable) {
         newChildren = getChildNodes(nextValue)
         childSnapshots.set(nextValue, newChildren)
     }
@@ -60,7 +60,7 @@ export function getChildNodes(value: object): ReadonlyMap<GraphNode, string> {
 }
 
 function isGraphNode(value: unknown): value is GraphNode {
-    return isSource(value)
+    return isObservable(value)
         || isModel(value)
         || isEventsClass(value)
 }
@@ -96,41 +96,41 @@ export function disposeGarbage() {
     garbage.clear()
 }
 
-export interface IManagedSourceTracker extends Disposable {
-    verifySourceManagement(): void
+export interface IManagedObservableTracker extends Disposable {
+    verifyObservableManagement(): void
 }
 
-export function trackManagedSourceCreation(): IManagedSourceTracker {
+export function trackManagedObservableCreation(): IManagedObservableTracker {
     let previousScope = currentCreationScope
     let currentScope = currentCreationScope = new Set()
     return {
-        verifySourceManagement() {
+        verifyObservableManagement() {
             for (let object of currentScope)
                 if (!parentRegistry.has(object))
-                    throw new UntrackedSourceError(object)
+                    throw new UntrackedObservableError(object)
         },
         [dispose]() { currentCreationScope = previousScope }
     }
 }
 
-export function managedSourceCreated(source: GraphNode & ISource<any>) {
+export function managedObservableCreated(observable: GraphNode & IObservable<any>) {
     if (!currentCreationScope)
-        throw new UntrackedSourceError(source)
-    currentCreationScope.add(source)
+        throw new UntrackedObservableError(observable)
+    currentCreationScope.add(observable)
 }
 
 export function getPath(node: GraphNode): string {
     let primaryOwner = parentRegistry.get(node)?.entries().next().value
     return primaryOwner
         ? getPath(primaryOwner[0]) + primaryOwner[1]
-        : isSource(node) ? node.displayName
+        : isObservable(node) ? node.displayName
             : isObject(node) ? nameOfFunction(node.constructor) || '$'
                 : '$'
 }
 
-export class UntrackedSourceError extends Error {
-    constructor(source: ISource<any>) {
-        super(`Leak detected: ${nameOfFunction(source.constructor)} '${source.displayName}' created without an owner.
+export class UntrackedObservableError extends Error {
+    constructor(observable: IObservable<any>) {
+        super(`Leak detected: ${nameOfFunction(observable.constructor)} '${observable.displayName}' created without an owner.
 Make sure reductions are defined on a model, and that the model is either a class decorated with @model, or created using createModel().`)
     }
 }

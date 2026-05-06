@@ -1,20 +1,20 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
+import { ObservableValue } from "event-reduce";
 import { useReactive } from "event-reduce-react";
-import { Atom } from "event-reduce";
 
 describe('useReactive', () => {
-    let source: Atom<string>;
+    let observable: ObservableValue<string>;
     let innerBehaviour: () => void;
     let render: Mock<() => string>;
     let sut: ReturnType<typeof renderHook<unknown, string>>;
 
     beforeEach(() => {
-        source = new Atom<string>('test value', 'initial value');
+        observable = new ObservableValue<string>('test value', 'initial value');
         innerBehaviour = () => { };
         render = mock(() => {
             innerBehaviour();
-            return source.value;
+            return observable.value;
         });
         sut = renderHook(() => useReactive(render));
     });
@@ -31,7 +31,7 @@ describe('useReactive', () => {
 
     describe("when accessed observable value changed", () => {
         beforeEach(() => {
-            act(() => source.setValue('new value'));
+            act(() => observable.setValue('new value'));
         });
 
         test("render function called again", () => expect(render).toHaveBeenCalledTimes(2));

@@ -1,7 +1,7 @@
 import { startLogging } from "./logging"
-import { type ISource, Source } from "./sources"
+import { type IObservable, Observable } from "./observable"
 import { beginTransition } from "./tracking"
-import { Scoped, SourceValue } from "./types"
+import { ObservedValue, Scoped } from "./types"
 import { dispose, matchesScope, nameOfCallback } from "./utils"
 
 export function event<T = void>(name: string = "(anonymous event)"): IEvent<T> {
@@ -70,12 +70,12 @@ export function asyncEvent<Result = void, Context = void>(name: string = "(anony
 }
 
 /**
- * Creates a callable event with named phase sources.
+ * Creates a callable event with named phase observables.
  *
  * Use this to build custom async-style events, such as observable or stream events. The `fire`
  * callback receives an `emit` function; emit values must include a `phase` matching one of
  * `phases` and a `context` matching the last argument passed to the event. The returned event
- * exposes a source for each phase, plus `filterContext` and `scope`.
+ * exposes an observable for each phase, plus `filterContext` and `scope`.
  */
 export function makePhasedEvent<
     const Phases extends readonly string[],
@@ -91,14 +91,14 @@ export function makePhasedEvent<
         name: string,
         phases: Phases,
         fire: (emit: (value: Value) => void, ...args: Args) => Return
-    } & ThisType<ISource<Value>>
+    } & ThisType<IObservable<Value>>
 ): IPhasedEvent<Value, Args, Return> {
     return makeEvent({
         name,
         fire,
         additionalMembers: <CurrentContext>(e: IEventFunction<NarrowContext<Value, CurrentContext>, ScopedArgs<Args, CurrentContext>, Return>) => ({
-            ...phasedSourceMembers<NarrowContext<Value, CurrentContext>, CurrentContext>(
-                e as unknown as ISource<NarrowContext<Value, CurrentContext>>,
+            ...phasedObservableMembers<NarrowContext<Value, CurrentContext>, CurrentContext>(
+                e as unknown as IObservable<NarrowContext<Value, CurrentContext>>,
                 phases as readonly (NarrowContext<Value, CurrentContext>['phase'] & string)[]
             ),
             scope<Scope extends CurrentContext extends object ? Partial<CurrentContext> : never>(scope: Scope): IPhasedEvent<NarrowContext<Value, CurrentContext & Scope>, ScopedArgs<Args, Scoped<CurrentContext, Scope>>, Return, CurrentContext & Scope> {
@@ -125,11 +125,11 @@ export function makeEvent<T, Args extends any[] = [T], Return = Args[0], Members
     }: {
         name: string,
         fire: (this: IEventFunction<T, Args, Return>, emit: (value: T) => void, ...args: Args) => Return,
-        additionalMembers?: AdditionalMembersFactory<ISource<any>, Members>
+        additionalMembers?: AdditionalMembersFactory<IObservable<any>, Members>
     } & ThisType<IEventFunction<T, Args, Return>>
 ): IEventFunction<T, Args, Return> & Members {
     let eventSource = new Event<T>(name) as Event<T> & IEventFunction<T, Args, Return>
-    return makeSourceFunction(eventSource, event, additionalMembers)
+    return makeObservableFunction(eventSource, event, additionalMembers)
 
     function event(...args: Args) { return fire.call(event as IEventFunction<T, Args, Return>, eventSource.emit.bind(event), ...args) }
 }
@@ -139,44 +139,44 @@ export function bindEvent<E extends IEventFunction<any, any>, Args extends any[]
     event: E,
     displayName: string,
     fire: (...args: Args) => Return,
-    predicate: (value: SourceValue<E>) => boolean
+    predicate: (value: ObservedValue<E>) => boolean
 ) {
-    return makeSourceFunction(event.filter(predicate, displayName), fire, (event as EventWithAdditionalMembers)[membersFactory])
+    return makeObservableFunction(event.filter(predicate, displayName), fire, (event as EventWithAdditionalMembers)[membersFactory])
 }
 
-function phasedSourceMembers<Value extends { phase: string, context: Context }, Context>(source: ISource<Value>, phases: readonly (Value['phase'] & string)[]) {
-    let setBaseDisplayName = source.setDisplayName
+function phasedObservableMembers<Value extends { phase: string, context: Context }, Context>(observable: IObservable<Value>, phases: readonly (Value['phase'] & string)[]) {
+    let setBaseDisplayName = observable.setDisplayName
     let phaseMembers = Object.fromEntries(phases.map(phase => [
         phase,
-        source.filter(e => e.phase == phase, `${source.displayName}.${phase}`)
+        observable.filter(e => e.phase == phase, `${observable.displayName}.${phase}`)
     ]))
 
     return {
         ...phaseMembers,
-        filterContext(predicate: (context: Context) => boolean, displayName = `${source.displayName}.filterContext(${nameOfCallback(predicate)})`) {
-            let filtered = source.filter(e => predicate(e.context), displayName)
-            return Object.assign(filtered, phasedSourceMembers(filtered, phases))
+        filterContext(predicate: (context: Context) => boolean, displayName = `${observable.displayName}.filterContext(${nameOfCallback(predicate)})`) {
+            let filtered = observable.filter(e => predicate(e.context), displayName)
+            return Object.assign(filtered, phasedObservableMembers(filtered, phases))
         },
-        setDisplayName(this: IPhasedSource<Value, Context>, name: string) {
-            setBaseDisplayName.call(source, name)
+        setDisplayName(this: IPhasedObservable<Value, Context>, name: string) {
+            setBaseDisplayName.call(observable, name)
             for (let phase of phases)
                 this[phase].setDisplayName(`${name}.${phase}`)
         }
     }
 }
 
-function makeSourceFunction<Source extends ISource<any>, Args extends any[], Return, Members extends object>(
-    innerEvent: Source,
+function makeObservableFunction<Observable extends IObservable<any>, Args extends any[], Return, Members extends object>(
+    innerEvent: Observable,
     fire: (...args: Args) => Return,
-    additionalMembers?: AdditionalMembersFactory<Source, Members>
-): IEventFunction<SourceValue<Source>, Args, Return> & Members {
-    let eventFn = fire as Source & IEventFunction<SourceValue<Source>, Args, Return>
+    additionalMembers?: AdditionalMembersFactory<Observable, Members>
+): IEventFunction<ObservedValue<Observable>, Args, Return> & Members {
+    let eventFn = fire as Observable & IEventFunction<ObservedValue<Observable>, Args, Return>
     Object.setPrototypeOf(eventFn, innerEvent);
     eventFn.apply = Function.prototype.apply;
     eventFn.call = Function.prototype.call;
     return additionalMembers
-        ? Object.assign(eventFn, additionalMembers(eventFn), { [membersFactory]: additionalMembers as AdditionalMembersFactory<ISource<any>, any> })
-        : eventFn as Source & IEventFunction<SourceValue<Source>, Args, Return> & Members
+        ? Object.assign(eventFn, additionalMembers(eventFn), { [membersFactory]: additionalMembers as AdditionalMembersFactory<IObservable<any>, any> })
+        : eventFn as Observable & IEventFunction<ObservedValue<Observable>, Args, Return> & Members
 }
 
 export function isEvent(value: any): value is IEventFunction<unknown, unknown[], unknown> {
@@ -188,20 +188,20 @@ export interface IEvent<In, Out = In> extends IEventFunction<Out, [value: In]> {
     scope<Scope extends Partial<In>>(scope: Scope): IEvent<Scoped<In, Scope>, Out>
 }
 
-export interface IEventFunction<T, Args extends any[], Return = Args[0]> extends ISource<T> {
+export interface IEventFunction<T, Args extends any[], Return = Args[0]> extends IObservable<T> {
     (...args: Args): Return
 }
 
-export interface IAsyncSource<Result, Context> extends ISource<AsyncValue<Result, Context>> {
-    started: ISource<AsyncStart<Result, Context>>
-    resolved: ISource<AsyncResult<Result, Context>>
-    rejected: ISource<AsyncError<Context>>
+export interface IAsyncObservable<Result, Context> extends IObservable<AsyncValue<Result, Context>> {
+    started: IObservable<AsyncStart<Result, Context>>
+    resolved: IObservable<AsyncResult<Result, Context>>
+    rejected: IObservable<AsyncError<Context>>
 
-    filterContext<FilteredContext extends Context>(predicate: (context: Context) => context is FilteredContext, displayName?: string): IAsyncSource<Result, FilteredContext>
-    filterContext(predicate: (context: Context) => boolean, displayName?: string): IAsyncSource<Result, Context>
+    filterContext<FilteredContext extends Context>(predicate: (context: Context) => context is FilteredContext, displayName?: string): IAsyncObservable<Result, FilteredContext>
+    filterContext(predicate: (context: Context) => boolean, displayName?: string): IAsyncObservable<Result, Context>
 }
 
-export interface IAsyncEvent<Result, Context> extends IEventFunction<AsyncValue<Result, Context>, [promise: PromiseLike<Result>, context: Context]>, IAsyncSource<Result, Context> {
+export interface IAsyncEvent<Result, Context> extends IEventFunction<AsyncValue<Result, Context>, [promise: PromiseLike<Result>, context: Context]>, IAsyncObservable<Result, Context> {
     scope<Scope extends Partial<Context>>(scope: Scope): IAsyncEvent<Result, Scoped<Context, Scope>>
 }
 
@@ -228,27 +228,27 @@ export interface AsyncError<Context = void> {
     error: unknown
 }
 
-export type IPhasedSource<Value extends { phase: string, context: any }, Context> =
-    ISource<Value>
-    & { [Phase in Value['phase'] & string]: ISource<Extract<Value, { phase: Phase }>> }
+export type IPhasedObservable<Value extends { phase: string, context: any }, Context> =
+    IObservable<Value>
+    & { [Phase in Value['phase'] & string]: IObservable<Extract<Value, { phase: Phase }>> }
     & {
-        filterContext<FilteredContext extends Context>(predicate: (context: Context) => context is FilteredContext, displayName?: string): IPhasedSource<NarrowContext<Value, FilteredContext>, FilteredContext>
-        filterContext(predicate: (context: Context) => boolean, displayName?: string): IPhasedSource<Value, Context>
+        filterContext<FilteredContext extends Context>(predicate: (context: Context) => context is FilteredContext, displayName?: string): IPhasedObservable<NarrowContext<Value, FilteredContext>, FilteredContext>
+        filterContext(predicate: (context: Context) => boolean, displayName?: string): IPhasedObservable<Value, Context>
     }
 
 export type IPhasedEvent<Value extends { phase: string, context: any }, Args extends any[], Return, Context = ContextArg<Args>> =
     IEventFunction<Value, Args, Return>
-    & IPhasedSource<Value, Context>
+    & IPhasedObservable<Value, Context>
     & {
         scope<Scope extends Context extends object ? Partial<Context> : never>(
             scope: Scope
         ): IPhasedEvent<NarrowContext<Value, Context & Scope>, ScopedArgs<Args, Scoped<Context, Scope>>, Return, Context & Scope>
     }
 
-export type AdditionalMembersFactory<Source extends ISource<any>, Members extends object> =
-    (source: Source & IEventFunction<SourceValue<Source>, any>) => Members
+export type AdditionalMembersFactory<Observable extends IObservable<any>, Members extends object> =
+    (observable: Observable & IEventFunction<ObservedValue<Observable>, any>) => Members
 
-class Event<T> extends Source<T> {
+class Event<T> extends Observable<T> {
     emit(value: T) {
         let transition = beginTransition(this, true)
         try {
@@ -272,4 +272,4 @@ type ScopedArgs<Args extends any[], Context> =
     ? [...Rest, Context]
     : never
 
-type EventWithAdditionalMembers = { [membersFactory]?: AdditionalMembersFactory<ISource<any>, any> }
+type EventWithAdditionalMembers = { [membersFactory]?: AdditionalMembersFactory<IObservable<any>, any> }

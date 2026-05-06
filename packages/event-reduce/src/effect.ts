@@ -1,25 +1,25 @@
-import type { IObserver, ISource } from "./sources"
+import type { IObservable, IObserver } from "./observable"
 import { collectAccessedSources, currentIteration } from "./tracking"
 import { dispose } from "./utils"
 
 export class Effect<T> implements IObserver<any> {
     private _attached = false
-    readonly sources = new Set<ISource<any>>()
-    invalidatingSource?: ISource<any>
+    private readonly _sources = new Set<IObservable<any>>()
+    invalidatingSource?: IObservable<any>
     lastRun = -2 // Stale from the start
 
     constructor(
         public readonly displayName: string,
         private _effect: () => T,
-        private _onSourceUpdatedSinceLastRun: (source: ISource<any>) => void
+        private _onSourceUpdatedSinceLastRun: (source: IObservable<any>) => void
     ) { }
 
-    getSources() { return this.sources }
+    getSources() { return this._sources }
 
     attach() {
         if (!this._attached) {
             this._attached = true
-            for (let source of this.sources)
+            for (let source of this._sources)
                 source.subscribe(this)
         }
     }
@@ -27,12 +27,12 @@ export class Effect<T> implements IObserver<any> {
     detach() {
         if (this._attached) {
             this._attached = false
-            for (let source of this.sources)
+            for (let source of this._sources)
                 source.unsubscribe(this)
         }
     }
 
-    sourceUpdated<S>(source: ISource<S>, value: S): void {
+    sourceUpdated<S>(source: IObservable<S>, value: S): void {
         if (source.lastUpdated > this.lastRun) {
             this.invalidatingSource = source
             this._onSourceUpdatedSinceLastRun(source)
@@ -41,7 +41,7 @@ export class Effect<T> implements IObserver<any> {
 
     get isStale() { return this.sourceLastUpdated > this.lastRun }
 
-    get sourceLastUpdated() { return Math.max(-1, ...[...this.sources].map(s => s.lastUpdated)) }
+    get sourceLastUpdated() { return Math.max(-1, ...[...this._sources].map(s => s.lastUpdated)) }
 
     /** 
      * Forces the effect to run.
@@ -60,13 +60,13 @@ export class Effect<T> implements IObserver<any> {
             tracker[dispose]()
         }
 
-        for (let oldSource of this.sources.difference(tracker.accessed)) {
-            this.sources.delete(oldSource)
+        for (let oldSource of this._sources.difference(tracker.accessed)) {
+            this._sources.delete(oldSource)
             oldSource.unsubscribe(this)
         }
 
-        for (let newSource of tracker.accessed.difference(this.sources)) {
-            this.sources.add(newSource)
+        for (let newSource of tracker.accessed.difference(this._sources)) {
+            this._sources.add(newSource)
             if (this._attached)
                 newSource.subscribe(this)
         }
@@ -76,6 +76,6 @@ export class Effect<T> implements IObserver<any> {
 
     [dispose]() {
         this.detach()
-        this.sources.clear()
+        this._sources.clear()
     }
 }
