@@ -1,26 +1,18 @@
 import { Derivation, derive, IDerivation } from "./derivation"
-import { isEvent } from "./events"
 import { IObservable, isObservable, Observable } from "./observable"
 import { getChildNodes, trackManagedObservableCreation, updateChildren } from "./ownership"
 import { IReduction, Reduction } from "./reduction"
 import { getState } from "./state"
+import { EventsClass, isEvent, isEventsClass, isModel, markEventsClass, modelBrand, modelProperties, statePropertyBrand } from "./symbols"
 import { collectAccessedSources, getUnderlyingObservable } from "./tracking"
 import { ObservedValue } from "./types"
 import { argsAre, constant, dispose, emptyArray, getAllPropertyDescriptors, getOrAddWeakEntry, getPrototypeChain, isDisposable, isFunction, isObject, isString, isUndefined, nameOfFunction } from "./utils"
-
-const modelBrand = Symbol('model class')
-const modelProperties = Symbol('model properties')
 
 export interface Model extends Disposable {
     [modelProperties]: Record<PropertyKey, ModelProperty>
 }
 
 export type ModelProperty = IObservable<any> | StateProperty
-
-export function isModel(value: unknown): value is Model {
-    return isObject(value)
-        && modelProperties in value
-}
 
 /** instance -> key -> provider */
 let instancePropertyProviders = new WeakMap<object, Record<PropertyKey, () => ModelProperty>>()
@@ -395,6 +387,8 @@ function registerModelProperty<Property extends ModelProperty>(model: Model, key
 }
 
 export class StateProperty implements Disposable {
+    readonly [statePropertyBrand] = true
+
     constructor(
         private _instance: any,
         public readonly key: PropertyKey
@@ -438,21 +432,10 @@ export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
                             })
                     }
                 }
-                (this as any)[eventsBrand] = true
+                markEventsClass(this)
             }
         }
     }[className]
-}
-
-const eventsBrand = Symbol('events class')
-
-export interface EventsClass {
-    [eventsBrand]: true
-}
-
-export function isEventsClass(value: unknown): value is EventsClass {
-    return value instanceof Object
-        && eventsBrand in value
 }
 
 export function getModelProperties(model: Model): Record<PropertyKey, ModelProperty> {

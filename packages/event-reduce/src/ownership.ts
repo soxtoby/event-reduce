@@ -1,6 +1,6 @@
 import { log } from "./logging"
-import { type EventsClass, isEventsClass, isModel, type Model, StateProperty } from "./models"
 import { type IObservable, isObservable, Observable } from "./observable"
+import { type EventsClass, isEventsClass, isModel, isStateProperty, type Model } from "./symbols"
 import { dispose, emptyArray, emptyMap, isDisposable, isObject, nameOfFunction } from "./utils"
 
 type GraphNode = IObservable<any> | Model | EventsClass
@@ -42,7 +42,7 @@ export function getChildNodes(value: object): ReadonlyMap<GraphNode, string> {
     if (isGraphNode(value))
         return new Map([[value, '']])
 
-    if (value instanceof StateProperty)
+    if (isStateProperty(value))
         return isObject(value.value)
             ? new Map(getChildNodes(value.value)
                 .entries()

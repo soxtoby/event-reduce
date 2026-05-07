@@ -1,9 +1,10 @@
-import { ObservableValue } from "./observableValue"
+import { isModel } from "./symbols"
 import { Derivation } from "./derivation"
 import { event } from "./events"
-import { getModelProperties, isModel } from "./models"
-import { Reduction } from "./reduction"
+import { getModelProperties } from "./models"
 import { isObservable, Observable } from "./observable"
+import { ObservableValue } from "./observableValue"
+import { Reduction } from "./reduction"
 import { beginTransition } from "./tracking"
 import { dispose, isObject } from "./utils"
 

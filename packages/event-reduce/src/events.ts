@@ -1,5 +1,6 @@
 import { startLogging } from "./logging"
 import { type IObservable, Observable } from "./observable"
+import { markEvent } from "./symbols"
 import { beginTransition } from "./tracking"
 import { ObservedValue, Scoped } from "./types"
 import { dispose, matchesScope, nameOfCallback } from "./utils"
@@ -171,17 +172,13 @@ function makeObservableFunction<Observable extends IObservable<any>, Args extend
     additionalMembers?: AdditionalMembersFactory<Observable, Members>
 ): IEventFunction<ObservedValue<Observable>, Args, Return> & Members {
     let eventFn = fire as Observable & IEventFunction<ObservedValue<Observable>, Args, Return>
+    markEvent(eventFn)
     Object.setPrototypeOf(eventFn, innerEvent);
     eventFn.apply = Function.prototype.apply;
     eventFn.call = Function.prototype.call;
     return additionalMembers
         ? Object.assign(eventFn, additionalMembers(eventFn), { [membersFactory]: additionalMembers as AdditionalMembersFactory<IObservable<any>, any> })
         : eventFn as Observable & IEventFunction<ObservedValue<Observable>, Args, Return> & Members
-}
-
-export function isEvent(value: any): value is IEventFunction<unknown, unknown[], unknown> {
-    return typeof value == 'function'
-        && value instanceof Event
 }
 
 export interface IEvent<In, Out = In> extends IEventFunction<Out, [value: In]> {

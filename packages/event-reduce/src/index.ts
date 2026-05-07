@@ -8,4 +8,3 @@ export { merge, type IObservable, type IObserver } from "./observable"
 export { ObservableValue } from "./observableValue"
 export { extendReduce, reduce, type IReduction, type Reducer } from "./reduction"
 export { getState, type State } from "./state"
-
