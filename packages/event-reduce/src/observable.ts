@@ -1,7 +1,7 @@
 import type { IEventFunction } from "./events"
 import { getPath, updateChildren } from "./ownership"
 import { isEventsClass } from "./symbols"
-import { currentIteration, iterationSource, trackSourceAccessed } from "./tracking"
+import { currentIteration, endSourceAccessed, iterationSource, startSourceAccessed } from "./tracking"
 import { MergedObservables } from "./types"
 import { dispose, emptyArray, identity, nameOfCallback, nameOfFunction } from "./utils"
 
@@ -43,7 +43,8 @@ export abstract class Observable<T> implements IObservable<T> {
     getSources() { return emptyArray as Iterable<IObservable<any>> }
 
     get value() {
-        trackSourceAccessed(this)[dispose]()
+        startSourceAccessed(this)
+        endSourceAccessed(this)
         return this._value
     }
 

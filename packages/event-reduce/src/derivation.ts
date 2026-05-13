@@ -3,7 +3,7 @@ import { startLogging } from "./logging"
 import { IObservable, IObserver, Observable } from "./observable"
 import { trackManagedObservableCreation } from "./ownership"
 import { getState, State } from "./state"
-import { beginTransition, iterationSource, trackSourceAccessed } from "./tracking"
+import { beginTransition, endSourceAccessed, iterationSource, startSourceAccessed } from "./tracking"
 import { dispose, emptyArray, nameOfFunction, nullDisposable } from "./utils"
 
 export interface IDerivation<T> extends IObservable<T>, IObserver<any> {
@@ -46,7 +46,7 @@ export class Derivation<T> extends Observable<T> implements IDerivation<T> {
 
     toJSON() {
         // Lazy init to avoid infinite loop in Derivation constructor
-        if (!this._json){
+        if (!this._json) {
             this._json = new Derivation(`toJSON(${this.displayName})`, () => getState(this.value))
             this._json.suppressLogging = true
         }
@@ -78,13 +78,13 @@ export class Derivation<T> extends Observable<T> implements IDerivation<T> {
 
     override get value() {
         // Notifying tracker before checking for updates so circular reference is detected early
-        let access = trackSourceAccessed(this)
+        startSourceAccessed(this)
 
         try {
             if (this._derive.isStale)
                 this.update()
         } finally {
-            access[dispose]()
+            endSourceAccessed(this)
         }
 
         return this._value // Not using super.value to avoid duplicate tracker notification

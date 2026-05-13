@@ -32,9 +32,12 @@ export function collectAccessedSources(observer: IObserver<any> | null) {
     return new AccessTracker(observer)
 }
 
-export function trackSourceAccessed(source: IObservable<any>): Disposable {
+export function startSourceAccessed(source: IObservable<any>) {
     currentAccessTracker?.addAccessed(source)
-    return { [dispose]() { lastSourceAccessed = source } }
+}
+
+export function endSourceAccessed(source: IObservable<any>) {
+    lastSourceAccessed = source
 }
 
 export function getUnderlyingObservable<T>(value: T): IObservable<T> | null {

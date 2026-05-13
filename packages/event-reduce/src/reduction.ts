@@ -1,9 +1,9 @@
 import { Derivation } from "./derivation"
 import { startLogging } from "./logging"
+import { allSources, IObservable, IObserver, isObservable, NoUnderlyingObservableError, Observable } from "./observable"
 import { managedObservableCreated, updateChildren } from "./ownership"
-import { allSources, IObserver, IObservable, isObservable, NoUnderlyingObservableError, Observable } from "./observable"
 import { getState, State } from "./state"
-import { collectAccessedSources, currentIteration, getUnderlyingObservable, trackSourceAccessed } from "./tracking"
+import { collectAccessedSources, currentIteration, endSourceAccessed, getUnderlyingObservable, startSourceAccessed } from "./tracking"
 import { dispose, emptyArray } from "./utils"
 
 export interface IReduction<T, Events = void> extends IObservable<T> {
@@ -109,7 +109,7 @@ export class Reduction<T, Events = void> extends Observable<T> implements IReduc
     }
 
     override get value() {
-        let access = trackSourceAccessed(this) // Notifying tracker before checking for updates so circular reference is detected early
+        startSourceAccessed(this) // Notifying tracker before checking for updates so circular reference is detected early
 
         try {
             if (this._sourcesLastChecked < currentIteration) {
@@ -118,7 +118,7 @@ export class Reduction<T, Events = void> extends Observable<T> implements IReduc
                     this.sourceUpdated(newerSource, (newerSource as Observable<any>).value)
             }
         } finally {
-            access[dispose]()
+            endSourceAccessed(this)
         }
 
         return this._value // Not using super.value to avoid duplicate tracker notification
