@@ -34,14 +34,17 @@ export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriv
 class RenderEffect<T> extends Effect<T> {
     private _observers = new Set<() => void>()
     private _trigger: IObservable<any> | null = null
-    private _triggerState = { triggeredBy: "(nothing)" }
+    private _version = 0
+    private _triggerState: unknown = { triggeredBy: "(nothing)" }
     private _previousValue?: T
 
     constructor(displayName: string) {
         super(displayName, constant(undefined!), (observable) => {
             log('⚛️🚩 (render invalidated)', this.displayName, [observable])
             this._trigger = observable
-            this._triggerState = { triggeredBy: observable.path }
+            this._triggerState = process.env.NODE_ENV !== 'production'
+                ? { triggeredBy: observable.path }
+                : { version: ++this._version }
             for (let subscriber of this._observers)
                 subscriber()
         })
