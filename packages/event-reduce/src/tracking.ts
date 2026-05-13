@@ -62,22 +62,31 @@ class AccessTracker implements IAccessTracker {
     }
 
     addAccessed(source: IObservable<any>) {
-        if (this._observer) {
-            let circularDependency = this.findCircularDependency(source)
-            if (circularDependency)
-                throw new CircularDependencyError([...circularDependency, source])
+        if (this._observer
+            && !this.accessed.has(source)
+            && this.hasCircularDependency(source)
+        ) {
+            throw new CircularDependencyError(this.circularPath(source))
         }
 
         this.accessed.add(source)
     }
 
-    private findCircularDependency(source: IObservable<any>): IObservable<any>[] | null {
-        if (this._observer == source as any as IObserver<any>)
-            return [source]
-        let circularDependency = this._previous?.findCircularDependency(source)
-        return circularDependency
-            ? [...circularDependency, this._observer as any as IObservable<any>]
-            : null
+    private hasCircularDependency(source: IObservable<any>) {
+        let foundCircularDependency = false
+        for (let tracker = this as AccessTracker | null; !foundCircularDependency && tracker; tracker = tracker._previous)
+            foundCircularDependency = tracker._observer == source as any as IObserver<any>
+        return foundCircularDependency
+    }
+
+    private circularPath(source: IObservable<any>) {
+        let path = [source]
+        let tracker: AccessTracker | null = this
+        do {
+            path.unshift(tracker._observer as any as IObservable<any>)
+            tracker = tracker._previous
+        } while (tracker && tracker._observer != source as any as IObserver<any>)
+        return path
     }
 
     [dispose]() {
