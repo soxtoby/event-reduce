@@ -1,7 +1,7 @@
 import { asyncEvent, derive, event, IDerivation, IReduction, ObservableValue, reduce } from "event-reduce"
-import { isModel } from "event-reduce/lib/models"
 import { trackManagedObservableCreation } from "event-reduce/lib/ownership"
 import { Reduction } from "event-reduce/lib/reduction"
+import { isModel } from "event-reduce/lib/symbols"
 import { dispose, emptyArray } from "event-reduce/lib/utils"
 import { DependencyList, useEffect, useMemo, useRef, useState } from "react"
 
