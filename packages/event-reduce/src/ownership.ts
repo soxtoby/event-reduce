@@ -89,7 +89,7 @@ function removeParent(node: GraphNode, parent: GraphNode) {
 export function disposeGarbage() {
     for (let node of garbage) {
         if (!parentRegistry.has(node)) {
-            log('🗑️ (dispose)', getPath(node), emptyArray, undefined)
+            log('🗑️ (dispose)', getName(node), emptyArray, () => ({ Path: getPath(node) }))
             node[dispose]()
         }
     }
@@ -123,9 +123,13 @@ export function getPath(node: GraphNode): string {
     let primaryOwner = parentRegistry.get(node)?.entries().next().value
     return primaryOwner
         ? getPath(primaryOwner[0]) + primaryOwner[1]
-        : isObservable(node) ? node.displayName
-            : isObject(node) ? nameOfFunction(node.constructor) || '$'
-                : '$'
+        : getName(node)
+}
+
+function getName(node: GraphNode) {
+    return isObservable(node) ? node.displayName
+        : isObject(node) ? nameOfFunction(node.constructor) || '$'
+            : '$'
 }
 
 export class UntrackedObservableError extends Error {
@@ -134,3 +138,4 @@ export class UntrackedObservableError extends Error {
 Make sure reductions are defined on a model, and that the model is either a class decorated with @model, or created using createModel().`)
     }
 }
+
