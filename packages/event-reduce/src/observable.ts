@@ -2,7 +2,7 @@ import type { IEventFunction } from "./events"
 import { getPath, updateChildren } from "./ownership"
 import { isEventsClass } from "./symbols"
 import { currentIteration, endSourceAccessed, iterationSource, startSourceAccessed } from "./tracking"
-import { MergedObservables } from "./types"
+import type { ObservedValue } from "./types"
 import { dispose, emptyArray, identity, nameOfCallback, nameOfFunction } from "./utils"
 
 export interface IObservable<T> extends Disposable {
@@ -99,9 +99,9 @@ export function bind<In, Out>(displayName: string, observable: IObservable<In>, 
     return new BoundObservable(displayName, [observable], transform, predicate)
 }
 
-export function merge<Observables extends IObservable<any>[]>(observables: Observables): MergedObservables<Observables>
-export function merge<Observables extends IObservable<any>[]>(displayName: string, observables: Observables): MergedObservables<Observables>
-export function merge<Observables extends IObservable<any>[]>(displayNameOrObservables: string | Observables, maybeObservables?: Observables): MergedObservables<Observables> {
+export function merge<const Observables extends readonly IObservable<any>[]>(observables: Observables): IObservable<ObservedValue<Observables[number]>>
+export function merge<const Observables extends readonly IObservable<any>[]>(displayName: string, observables: Observables): IObservable<ObservedValue<Observables[number]>>
+export function merge<const Observables extends readonly IObservable<any>[]>(displayNameOrObservables: string | Observables, maybeObservables?: Observables): IObservable<ObservedValue<Observables[number]>> {
     let displayName: string;
     let observables: Observables
     if (typeof displayNameOrObservables == 'string') {
@@ -111,7 +111,7 @@ export function merge<Observables extends IObservable<any>[]>(displayNameOrObser
         observables = displayNameOrObservables
         displayName = `merge(${observables.map(s => s.displayName).join(', ')})`
     }
-    return new BoundObservable(displayName, observables, identity)
+    return new BoundObservable(displayName, observables.slice(), identity)
 }
 
 export class BoundObservable<In, Out> extends Observable<Out> {
