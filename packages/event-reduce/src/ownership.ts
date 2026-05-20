@@ -1,5 +1,5 @@
 import { log } from "./logging"
-import { type IObservable, isObservable, Observable } from "./observable"
+import { type IObservable, isObservable } from "./observable"
 import { type EventsClass, isEventsClass, isModel, isStateProperty, type Model } from "./symbols"
 import { dispose, emptyArray, emptyMap, isDisposable, isObject, nameOfFunction } from "./utils"
 
@@ -17,14 +17,24 @@ export function updateChildren(parent: GraphNode, previousValue: unknown, nextVa
     if (Object.is(previousValue, nextValue))
         return
 
+    if (!isObject(previousValue) && isGraphNode(nextValue)) {
+        addParent(nextValue, parent, parentPath) // Fast-track for adding single node
+        return
+    }
+
+    if (!isObject(nextValue) && isGraphNode(previousValue)) {
+        removeParent(previousValue, parent) // Fast-track for removing single node
+        return
+    }
+
     let previousChildren: ReadonlyMap<GraphNode, string> = emptyMap
-    if (isObject(previousValue) || previousValue instanceof Observable) {
+    if (isObject(previousValue)) {
         previousChildren = childSnapshots.get(previousValue) ?? getChildNodes(previousValue)
         childSnapshots.delete(previousValue)
     }
 
     let newChildren: ReadonlyMap<GraphNode, string> = emptyMap
-    if (isObject(nextValue) || nextValue instanceof Observable) {
+    if (isObject(nextValue)) {
         newChildren = getChildNodes(nextValue)
         childSnapshots.set(nextValue, newChildren)
     }

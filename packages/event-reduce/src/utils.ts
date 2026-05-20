@@ -1,4 +1,4 @@
-export const emptyArray = Object.freeze([]) as readonly any[];
+export const emptyArray = Object.freeze([]) as readonly any[]
 
 export const emptySet = Object.freeze(new Set()) as ReadonlySet<any>
 export const emptyMap = Object.freeze(new Map()) as ReadonlyMap<any, any>
@@ -7,21 +7,21 @@ export function constant<T>(value: T) { return identity.bind(null, value) as () 
 export function identity<T>(value: T) { return value; }
 
 export function filteredName(baseName: string, predicate: Function) {
-    return `${baseName}.filter(${nameOfCallback(predicate)})`;
+    return `${baseName}.filter(${nameOfCallback(predicate)})`
 }
 
 export function scopedName(baseName: string, scope: object) {
-    return `${baseName}.scoped({ ${Object.entries(scope).map(([k, v]) => `${k}: ${v}`).join(', ')} })`;
+    return `${baseName}.scoped({ ${Object.entries(scope).map(([k, v]) => `${k}: ${v}`).join(', ')} })`
 }
 
 /** Returns explicit name of function, falling back to function content. */
 export function nameOfCallback(fn: Function) {
-    return nameOfFunction(fn) || String(fn);
+    return nameOfFunction(fn) || String(fn)
 }
 
 /** Returns explicit name of function. */
 export function nameOfFunction(fn: Function) {
-    return (fn as any).displayName as string || fn.name;
+    return (fn as any).displayName as string || fn.name
 }
 
 export function jsonPath(keys: readonly PropertyKey[]) {
@@ -30,7 +30,7 @@ export function jsonPath(keys: readonly PropertyKey[]) {
             : typeof key == 'number' || typeof key == 'symbol' ? `[${String(key)}]`
                 : /^[\w\$]+$/.test(key) ? `.${key}`
                     : `[${JSON.stringify(key)}]`)
-        .join('');
+        .join('')
 }
 
 /** Utility base class for anything with a dynamic displayName */
@@ -41,77 +41,77 @@ export class NamedBase {
     set displayName(name: string) { this._getDisplayName = constant(name); }
 
     /** Just for avoiding unnecessary arrow functions, but importantly reflects changes to the _getDisplayName callback. */
-    protected readonly displayNameGetter = () => this._getDisplayName();
+    protected readonly displayNameGetter = () => this._getDisplayName()
 }
 
-export function matchesScope<Scope extends object>(scope: Scope): <Value>(value: Value) => boolean;
-export function matchesScope<Scope extends object, Value>(scope: Scope, value: Value): boolean;
+export function matchesScope<Scope extends object>(scope: Scope): <Value>(value: Value) => boolean
+export function matchesScope<Scope extends object, Value>(scope: Scope, value: Value): boolean
 export function matchesScope<Scope extends object, Value>(scope: Scope, value?: Value) {
     return arguments.length == 2
         ? matchesScope(scope)(value)
         : <Value extends Scope>(value: Value) => Object.entries(scope)
-            .every(([k, v]) => value[k as keyof Scope] === v);
+            .every(([k, v]) => value[k as keyof Scope] === v)
 }
 
 export function argsAre<Checks extends TypeCheck<any>[]>(args: any[], ...typeChecks: Checks): args is CheckedTypes<Checks> {
     return typeChecks.length <= args.length
         && typeChecks.every((typeCheck, i) => typeCheck(args[i]))
-        && args.slice(typeChecks.length).every(arg => arg === undefined);
+        && args.slice(typeChecks.length).every(arg => arg === undefined)
 }
 
-type TypeCheck<T> = (value: any) => value is T;
+type TypeCheck<T> = (value: any) => value is T
 
 type CheckedTypes<Checks extends TypeCheck<any>[]> = Checks extends [TypeCheck<infer First>, ...infer Rest extends TypeCheck<any>[]]
     ? [First, ...CheckedTypes<Rest>]
-    : [];
+    : []
 
 export function isFunction(value: any): value is Function {
-    return typeof value == 'function';
+    return typeof value == 'function'
 }
 
 export function isPlainObject<T>(value: T): value is T & object {
     return isObject(value)
-        && Object.getPrototypeOf(value) == Object.prototype;
+        && Object.getPrototypeOf(value) == Object.prototype
 }
 
 export function isObject<T>(value: T): value is T & object {
-    return !!value && typeof value == 'object';
+    return !!value && typeof value == 'object'
 }
 
 export function isString(value: any): value is string {
-    return typeof value == 'string';
+    return typeof value == 'string'
 }
 
 export function isUndefined(value: any): value is undefined {
-    return value === undefined;
+    return value === undefined
 }
 
 export function getOrAdd<T>(target: any, key: string | symbol, create: (base: T | undefined) => T): T {
     return target.hasOwnProperty(key)
         ? target[key]
-        : (target[key] = create(target[key]));
+        : (target[key] = create(target[key]))
 }
 
 export function getOrAddWeakEntry<K extends WeakKey, V>(cache: WeakMap<K, V>, key: K, create: (key: K) => V): V {
-    let cached = cache.get(key);
+    let cached = cache.get(key)
     if (!cached)
-        cache.set(key, cached = create(key));
-    return cached;
+        cache.set(key, cached = create(key))
+    return cached
 }
 
 export function firstIntersection<T>(a: Set<T>, b: Set<T>) {
     for (let item of a)
         if (b.has(item))
-            return item;
+            return item
 }
 
 export function getAllPropertyDescriptors(obj: object) {
-    let props = new Map<string, PropertyDescriptor>();
+    let props = new Map<string, PropertyDescriptor>()
     for (let proto of getPrototypeChain(obj))
         for (let [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(proto)))
             if (!props.has(key))
                 props.set(key, descriptor)
-    return props;
+    return props
 }
 
 export function* getPrototypeChain(obj: object) {
@@ -126,15 +126,15 @@ export function isDisposable(value: any): value is Disposable {
         && dispose in value
 }
 
-export const dispose: typeof Symbol.dispose = Symbol.dispose ?? Symbol('Symbol.dispose');
+export const dispose: typeof Symbol.dispose = Symbol.dispose ?? Symbol('Symbol.dispose')
 
 export const nullDisposable: Disposable = Object.freeze({ [dispose]() { } })
 
 /** Shim for `using` declaration until it's properly supported. */
 export function using<Resource extends Disposable>(disposable: Resource, action: (resource: Resource) => void) {
     try {
-        action(disposable);
+        action(disposable)
     } finally {
-        disposable[dispose]();
+        disposable[dispose]()
     }
 }

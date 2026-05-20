@@ -36,7 +36,7 @@ export function markEventsClass(value: object) {
 }
 
 export function isEventsClass(value: unknown): value is EventsClass {
-    return value instanceof Object
+    return isObject(value)
         && eventsBrand in value
 }
 
