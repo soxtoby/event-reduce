@@ -3,10 +3,10 @@ import { collectAccessedSources, currentIteration } from "./tracking"
 import { dispose } from "./utils"
 
 export class Effect<T> implements IObserver<any> {
-    private _attached = false
     private readonly _sources = new Set<IObservable<any>>()
+    private _attached = false
+    private _lastRun = -1 // Stale from the start
     invalidatingSource?: IObservable<any>
-    lastRun = -2 // Stale from the start
 
     constructor(
         public readonly displayName: string,
@@ -33,22 +33,30 @@ export class Effect<T> implements IObserver<any> {
     }
 
     sourceUpdated<S>(source: IObservable<S>, value: S): void {
-        if (source.lastUpdated > this.lastRun) {
+        if (source.lastUpdated > this._lastRun) {
             this.invalidatingSource = source
             this._onSourceUpdatedSinceLastRun(source)
         }
     }
 
-    get isStale() { return this.sourceLastUpdated > this.lastRun }
+    get isStale() {
+        if (this._lastRun < 0
+            || this.invalidatingSource?.lastUpdated! > this._lastRun) // Fast-track for the most common case
+            return true
 
-    get sourceLastUpdated() { return Math.max(-1, ...[...this._sources].map(s => s.lastUpdated)) }
+        for (let source of this._sources)
+            if (source.lastUpdated > this._lastRun)
+                return true
+
+        return false
+    }
 
     /** 
      * Forces the effect to run.
      * @param effect Optional function to use to run the effect. If not provided, the original effect function will be used.
      **/
     run(effect?: () => T) {
-        this.lastRun = currentIteration
+        this._lastRun = currentIteration
         delete this.invalidatingSource
 
         let result: T
