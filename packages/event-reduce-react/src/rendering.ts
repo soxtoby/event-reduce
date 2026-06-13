@@ -1,7 +1,7 @@
 import { Effect, log, startLogging } from "event-reduce"
 import { LogValue } from "event-reduce/lib/logging"
 import { IObservable } from "event-reduce/lib/observable"
-import { beginTransition } from "event-reduce/lib/tracking"
+import { beginTransition, queueTransitionEffect } from "event-reduce/lib/tracking"
 import { constant, dispose, emptyArray, nameOfFunction } from "event-reduce/lib/utils"
 import { Children, Fragment, ReactElement, ReactNode, createElement, isValidElement, useState } from "react"
 import { useSyncExternalStore } from "use-sync-external-store/shim"
@@ -40,13 +40,17 @@ class RenderEffect<T> extends Effect<T> {
 
     constructor(displayName: string) {
         super(displayName, constant(undefined!), (observable) => {
-            log('⚛️🚩 (render invalidated)', this.displayName, [observable])
-            this._trigger = observable
-            this._triggerState = process.env.NODE_ENV !== 'production'
-                ? { triggeredBy: observable.path }
-                : { version: ++this._version }
-            for (let subscriber of this._observers)
-                subscriber()
+            if (!this._trigger) {
+                log('⚛️🚩 (render invalidated)', this.displayName, [observable])
+                this._trigger = observable
+                this._triggerState = process.env.NODE_ENV !== 'production'
+                    ? { triggeredBy: observable.path }
+                    : { version: ++this._version }
+                queueTransitionEffect(() => {
+                    for (let subscriber of this._observers)
+                        subscriber()
+                })
+            }
         })
         this.attach()
     }

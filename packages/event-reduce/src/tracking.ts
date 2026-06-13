@@ -5,6 +5,7 @@ import { dispose, nullDisposable } from "./utils"
 
 export let currentIteration = 0
 export let iterationSource: IObservable<any> | Effect<any> | null = null
+let transitionEffectQueue = [] as (() => void)[]
 
 let currentAccessTracker: AccessTracker | null = null
 let lastSourceAccessed: IObservable<any> | null = null
@@ -19,6 +20,8 @@ export function beginTransition(source: IObservable<any> | Effect<any>, isTrigge
 
         return {
             [dispose]() {
+                for (let effect = transitionEffectQueue.shift(); effect; effect = transitionEffectQueue.shift())
+                    effect()
                 iterationSource = null
                 disposeGarbage()
             }
@@ -26,6 +29,10 @@ export function beginTransition(source: IObservable<any> | Effect<any>, isTrigge
     } else {
         return nullDisposable
     }
+}
+
+export function queueTransitionEffect(effect: () => void) {
+    transitionEffectQueue.push(effect)
 }
 
 export function collectAccessedSources(observer: IObserver<any> | null) {
