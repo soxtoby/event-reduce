@@ -20,7 +20,8 @@ export function beginTransition(source: IObservable<any> | Effect<any>, isTrigge
 
         return {
             [dispose]() {
-                for (let effect = transitionEffectQueue.shift(); effect; effect = transitionEffectQueue.shift())
+                let effect: undefined | (() => void)
+                while (effect = transitionEffectQueue.shift())
                     effect()
                 iterationSource = null
                 disposeGarbage()

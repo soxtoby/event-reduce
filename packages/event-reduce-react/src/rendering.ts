@@ -46,10 +46,7 @@ class RenderEffect<T> extends Effect<T> {
                 this._triggerState = process.env.NODE_ENV !== 'production'
                     ? { triggeredBy: observable.path }
                     : { version: ++this._version }
-                queueTransitionEffect(() => {
-                    for (let subscriber of this._observers)
-                        subscriber()
-                })
+                queueTransitionEffect(this.notifySubscribers.bind(this))
             }
         })
         this.attach()
@@ -61,6 +58,11 @@ class RenderEffect<T> extends Effect<T> {
     }
 
     triggerSnapshot = () => this._triggerState
+
+    notifySubscribers() {
+        for (let subscriber of this._observers)
+            subscriber()
+    }
 
     override run(deriveValue: () => T) {
         let previousValue = this._previousValue
