@@ -3,7 +3,7 @@ import { trackManagedObservableCreation } from "event-reduce/lib/ownership"
 import { Reduction } from "event-reduce/lib/reduction"
 import { isModel } from "event-reduce/lib/symbols"
 import { dispose, emptyArray } from "event-reduce/lib/utils"
-import { DependencyList, useEffect, useMemo, useRef, useState } from "react"
+import { DependencyList, useEffect, useMemo, useState } from "react"
 
 /**
  * Creates a model that persists across renders of the component.
@@ -52,34 +52,8 @@ export function useReduced<T>(initial: T, name?: string): IReduction<T> {
     return reduction
 }
 
-export function useObservedProps<T extends object>(values: T, name: string = '(anonymous observed values)') {
-    let observableValues = useState(() => ({} as { [K in keyof T]?: ObservableValue<T[K]> }))[0]
-    let nameBase = (name || '') + '.'
-
-    // Update any values that are already being observed
-    useEffect(() => {
-        for (let [key, observableValue] of Object.entries(observableValues) as [keyof T, ObservableValue<T[keyof T]>][])
-            observableValue.setValue(values[key])
-    })
-
-    let latestValues = useRef(values)
-    latestValues.current = values
-
-    // Create observable values as properties are accessed
-    return new Proxy({} as T, {
-        get(_, key) {
-            return (observableValues[key as keyof T]
-                ??= new ObservableValue(nameBase + String(key),
-                    (latestValues.current)[key as keyof T]))
-                .value
-        }
-    })
-}
-
-export function useAtom<T>(value: T, name: string = '(anonymous observed value)') {
-    let observableValue = useState(() => new ObservableValue(name, value))[0]
-    observableValue.setValue(value)
-    return observableValue
+export function useObservableValue<T>(initialValue: T, name: string = '(anonymous observed value)') {
+    return useState(() => new ObservableValue(name, initialValue))[0]
 }
 
 class InvalidModelError extends Error {
