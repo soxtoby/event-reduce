@@ -3,7 +3,7 @@ import { getPath, updateChildren } from "./ownership"
 import { isEventsClass } from "./symbols"
 import { currentIteration, endSourceAccessed, iterationSource, startSourceAccessed } from "./tracking"
 import type { ObservedValue } from "./types"
-import { dispose, emptyArray, identity, nameOfCallback, nameOfFunction } from "./utils"
+import { dispose, emptyArray, identity, isObject, nameOfCallback, nameOfFunction } from "./utils"
 
 export interface IObservable<T> extends Disposable {
     readonly displayName: string
@@ -59,7 +59,8 @@ export abstract class Observable<T> implements IObservable<T> {
 
         if (!this.skipUpdate(newValue)) {
             this.lastUpdated = currentIteration
-            this.updateChildren(this._value, newValue)
+            if (isObject(this._value) || isObject(newValue))
+                this.updateChildren(this._value, newValue)
             this._value = newValue
 
             for (let observer of this._observers)

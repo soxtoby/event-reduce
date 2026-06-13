@@ -34,6 +34,7 @@ export type Reducer<Result, Next> = (current: Result, next: Next) => Result
 
 export class Reduction<T, Events = void> extends Observable<T> implements IReduction<T, Events>, IObserver<any> {
     private readonly _sources = new Set<IObservable<any>>()
+    private _singleReducer?: (current: T, next: any) => T
     private _reducers = new Map<IObservable<any>, (current: T, next: any) => T>()
     private _sourcesLastChecked = -1
     private _json: Derivation<State<T>>
@@ -72,6 +73,7 @@ export class Reduction<T, Events = void> extends Observable<T> implements IReduc
         source.subscribe(this)
         this._sources.add(source)
         this._reducers.set(source, reduce)
+        this._singleReducer = this._reducers.size == 1 ? reduce : undefined
         this._sourcesLastChecked = Math.max(this._sourcesLastChecked, source.lastUpdated) // Avoid firing reduction because of new source
 
         return this
@@ -81,7 +83,7 @@ export class Reduction<T, Events = void> extends Observable<T> implements IReduc
 
     sourceUpdated<S>(source: IObservable<S>, value: S) {
         if (source.lastUpdated > this.lastUpdated) {
-            let reduce = this._reducers.get(source)
+            let reduce = this._singleReducer ?? this._reducers.get(source)
             if (reduce) {
                 let previousValue = this._value
                 let nextValue!: T
@@ -113,7 +115,7 @@ export class Reduction<T, Events = void> extends Observable<T> implements IReduc
 
         try {
             if (this._sourcesLastChecked < currentIteration) {
-                let newerSource = Array.from(this._sources).find(s => s.lastUpdated > this._sourcesLastChecked)
+                let newerSource = this._sources.values().find(s => s.lastUpdated > this._sourcesLastChecked)
                 if (newerSource)
                     this.sourceUpdated(newerSource, (newerSource as Observable<any>).value)
             }
