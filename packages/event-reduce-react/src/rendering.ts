@@ -70,7 +70,7 @@ class RenderEffect<T> extends Effect<T> {
         let trigger = this._trigger
         this._trigger = null
 
-        let transition = beginTransition(this, true)
+        let transition = beginTransition(this, trigger ?? { trigger: 'render' })
         let logging = startLogging('⚛️ (render)', this.displayName, emptyArray, () => ({
             Trigger: trigger?.path ?? 'render',
             Previous: loggedReactValue(previousValue),

@@ -97,7 +97,7 @@ export class Derivation<T> extends Observable<T> implements IDerivation<T> {
         let nextValue!: T
         let trigger = this._derive.invalidatingSource
 
-        let transition = beginTransition(this, !iterationSource) // Derivations are always safe to access, and only initiate a transition if necessary
+        let transition = beginTransition(this, iterationSource ? undefined : trigger ?? { reason: reason ?? '(unknown)' }) // Derivations are always safe to access, and only initiate a transition if necessary
         let observableCreation = trackManagedObservableCreation()
         let logging = this.suppressLogging ? nullDisposable : startLogging('🔗 (derivation)', this.displayName, emptyArray, () => ({
             Path: this.path,

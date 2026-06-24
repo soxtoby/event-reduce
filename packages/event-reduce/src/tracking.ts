@@ -1,3 +1,4 @@
+import { sendEvent } from "./devtools"
 import { Effect } from "./effect"
 import { type IObservable, type IObserver, Observable } from "./observable"
 import { disposeGarbage } from "./ownership"
@@ -10,8 +11,8 @@ let transitionEffectQueue = [] as (() => void)[]
 let currentAccessTracker: AccessTracker | null = null
 let lastSourceAccessed: IObservable<any> | null = null
 
-export function beginTransition(source: IObservable<any> | Effect<any>, isTriggerEvent: boolean): Disposable {
-    if (isTriggerEvent) {
+export function beginTransition(source: IObservable<any> | Effect<any>, trigger?: object): Disposable {
+    if (trigger) {
         if (iterationSource)
             throw new SideEffectDuringReactionError(iterationSource, source)
 
@@ -25,6 +26,7 @@ export function beginTransition(source: IObservable<any> | Effect<any>, isTrigge
                     effect()
                 iterationSource = null
                 disposeGarbage()
+                sendEvent(source.displayName, trigger)
             }
         }
     } else {

@@ -24,7 +24,7 @@ export function mutable<T>(model: T): Mutable<T> {
                             property.detach()
 
                         if (property instanceof Observable) {
-                            let transition = beginTransition(property, true)
+                            let transition = beginTransition(property, isObject(value) ? value : { value })
                             try {
                                 property.setValue(value)
                             } finally {

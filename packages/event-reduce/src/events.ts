@@ -3,7 +3,7 @@ import { type IObservable, Observable } from "./observable"
 import { markEvent } from "./symbols"
 import { beginTransition } from "./tracking"
 import { ObservedValue, Scoped } from "./types"
-import { dispose, matchesScope, nameOfCallback } from "./utils"
+import { dispose, isObject, matchesScope, nameOfCallback } from "./utils"
 
 export function event<T = void>(name: string = "(anonymous event)"): IEvent<T> {
     return makeEvent({
@@ -247,7 +247,7 @@ export type AdditionalMembersFactory<Observable extends IObservable<any>, Member
 
 class Event<T> extends Observable<T> {
     emit(value: T) {
-        let transition = beginTransition(this, true)
+        let transition = beginTransition(this, isObject(value) ? value : { value })
         try {
             this.setValue(value)
         } finally {
