@@ -1,6 +1,6 @@
 import { sendEvent } from "./devtools"
 import { Effect } from "./effect"
-import { type IObservable, type IObserver, Observable } from "./observable"
+import { type IObservable, type IObserver, NoUnderlyingObservableError, Observable } from "./observable"
 import { disposeGarbage } from "./ownership"
 import { dispose, nullDisposable } from "./utils"
 
@@ -48,6 +48,14 @@ export function startSourceAccessed(source: IObservable<any>) {
 
 export function endSourceAccessed(source: IObservable<any>) {
     lastSourceAccessed = source
+}
+
+/** Allows subscribing to the changes of the specified observable value. */
+export function valueChanged<T>(observableValue: T) {
+    let observable = getUnderlyingObservable(observableValue);
+    if (observable)
+        return observable;
+    throw new NoUnderlyingObservableError(observableValue);
 }
 
 export function getUnderlyingObservable<T>(value: T): IObservable<T> | null {
