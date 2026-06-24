@@ -2,7 +2,7 @@ import { Derivation } from "./derivation"
 import { startLogging } from "./logging"
 import { allSources, IObservable, IObserver, isObservable, NoUnderlyingObservableError, Observable } from "./observable"
 import { managedObservableCreated, updateChildren } from "./ownership"
-import { getState, State } from "./state"
+import { ModelJSON, modelJSON } from "./state"
 import { collectAccessedSources, currentIteration, endSourceAccessed, getUnderlyingObservable, startSourceAccessed } from "./tracking"
 import { dispose, emptyArray } from "./utils"
 
@@ -37,7 +37,7 @@ export class Reduction<T, Events = void> extends Observable<T> implements IReduc
     private _singleReducer?: (current: T, next: any) => T
     private _reducers = new Map<IObservable<any>, (current: T, next: any) => T>()
     private _sourcesLastChecked = -1
-    private _json: Derivation<State<T>>
+    private _json: Derivation<ModelJSON<T>>
     static defaultName = "(anonymous reduction)"
 
     constructor(
@@ -48,7 +48,7 @@ export class Reduction<T, Events = void> extends Observable<T> implements IReduc
     ) {
         super(displayName)
 
-        this._json = new Derivation(`toJSON(${this.displayName})`, () => getState(this.value))
+        this._json = new Derivation(`toJSON(${this.displayName})`, () => modelJSON(this.value))
         this._json.suppressLogging = true
 
         managedObservableCreated(this)

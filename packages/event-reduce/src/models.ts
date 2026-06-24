@@ -2,7 +2,7 @@ import { Derivation, derive, IDerivation } from "./derivation"
 import { IObservable, isObservable, Observable } from "./observable"
 import { getChildNodes, trackManagedObservableCreation, updateChildren } from "./ownership"
 import { IReduction, Reduction } from "./reduction"
-import { getState } from "./state"
+import { modelJSON } from "./state"
 import { EventsClass, isEvent, isEventsClass, isModel, markEventsClass, modelBrand, modelProperties, statePropertyBrand } from "./symbols"
 import { collectAccessedSources, getUnderlyingObservable } from "./tracking"
 import { ObservedValue } from "./types"
@@ -401,7 +401,7 @@ export class StateProperty implements Disposable {
         updateChildren(_instance, null, this.value)
     }
 
-    toJSON() { return getState(this.value) }
+    toJSON() { return modelJSON(this.value) }
 
     get value() { return this._instance[this.key] }
 

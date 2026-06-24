@@ -1,5 +1,4 @@
-import { getState, State } from "./state"
-import { isObject } from "./utils"
+import { ModelJSON, modelJSON } from "./state"
 
 let modelDevTools = new Map<object, any>()
 
@@ -8,7 +7,7 @@ export function enableDevTools<Model extends object>(model: Model, { restoreStat
         if (!modelDevTools.has(model) && (window as any).__REDUX_DEVTOOLS_EXTENSION__) {
             let dev = (window as any).__REDUX_DEVTOOLS_EXTENSION__.connect(options)
             modelDevTools.set(model, dev)
-            dev.init(getState(model))
+            dev.init(modelJSON(model))
             let unsubscribe = dev.subscribe((event: any) => {
                 if (event.type == 'DISPATCH')
                     restoreState?.(model, JSON.parse(event.state))
@@ -22,16 +21,14 @@ export function enableDevTools<Model extends object>(model: Model, { restoreStat
     return () => { }
 }
 
-export function sendEvent(name: string, arg: any) {
+export function sendEvent(name: string, arg: object) {
     if (process.env.NODE_ENV !== 'production') {
         if (modelDevTools.size) {
-            let event = isObject(arg)
-                ? getState(arg)
-                : { value: arg }
+            let event = modelJSON(arg) as any
             if ('type' in event)
                 event['.type'] = event.type
             event.type = name
-            modelDevTools.forEach((dev, model) => dev.send(event, getState(model)))
+            modelDevTools.forEach((dev, model) => dev.send(event, modelJSON(model)))
         }
     }
 }
@@ -50,7 +47,7 @@ export interface IDevToolsOptions<Model extends object> {
      * Callback to restore state, used when time traveling or importing state from a file. Takes the deserialized state as an argument.
      * event-reduce specific
      */
-    restoreState?: (model: Model, state: State<Model>) => void
+    restoreState?: (model: Model, state: ModelJSON<Model>) => void
 
     /**
      * In ms. If more than one action is dispatched in the indicated interval, all new actions will be collected and sent at once.

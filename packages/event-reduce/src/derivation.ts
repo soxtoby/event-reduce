@@ -2,7 +2,7 @@ import { Effect } from "./effect"
 import { startLogging } from "./logging"
 import { IObservable, IObserver, Observable } from "./observable"
 import { trackManagedObservableCreation } from "./ownership"
-import { getState, State } from "./state"
+import { includeDerivedState, ModelJSON, modelJSON } from "./state"
 import { beginTransition, endSourceAccessed, iterationSource, startSourceAccessed } from "./tracking"
 import { dispose, emptyArray, nameOfFunction, nullDisposable } from "./utils"
 
@@ -19,16 +19,16 @@ export interface IDerivation<T> extends IObservable<T>, IObserver<any> {
 
 export function derive<T>(derive: () => T, displayName?: string): IDerivation<T>
 export function derive<T>(derive: () => T, valuesEqual: (a: T, b: T) => boolean, displayName?: string): IDerivation<T>
-export function derive<T>(derive: () => T, displayNameOrSkip?: string | ((a: T, b: T) => boolean), maybeDisplayName?: string): IDerivation<T> {
-    let [skipUpdate, displayName] = typeof displayNameOrSkip == 'function'
-        ? [displayNameOrSkip, maybeDisplayName]
-        : [Object.is, displayNameOrSkip]
-    return new Derivation((displayName ?? nameOfFunction(derive)) || Derivation.defaultName, derive, skipUpdate)
+export function derive<T>(derive: () => T, displayNameOrValuesEqual?: string | ((a: T, b: T) => boolean), maybeDisplayName?: string): IDerivation<T> {
+    let [valuesEqual, displayName] = typeof displayNameOrValuesEqual == 'function'
+        ? [displayNameOrValuesEqual, maybeDisplayName]
+        : [Object.is, displayNameOrValuesEqual]
+    return new Derivation((displayName ?? nameOfFunction(derive)) || Derivation.defaultName, derive, valuesEqual)
 }
 
 export class Derivation<T> extends Observable<T> implements IDerivation<T> {
     private _derive: Effect<T>
-    private _json?: Derivation<State<T>>
+    private _json?: Derivation<ModelJSON<T> | undefined>
     static defaultName = "(anonymous derivation)"
     suppressLogging = false
 
@@ -47,7 +47,7 @@ export class Derivation<T> extends Observable<T> implements IDerivation<T> {
     toJSON() {
         // Lazy init to avoid infinite loop in Derivation constructor
         if (!this._json) {
-            this._json = new Derivation(`toJSON(${this.displayName})`, () => getState(this.value))
+            this._json = new Derivation(`toJSON(${this.displayName})`, () => includeDerivedState().value ? modelJSON(this.value) : undefined)
             this._json.suppressLogging = true
         }
         return this._json.value
@@ -101,7 +101,7 @@ export class Derivation<T> extends Observable<T> implements IDerivation<T> {
         let observableCreation = trackManagedObservableCreation()
         let logging = this.suppressLogging ? nullDisposable : startLogging('🔗 (derivation)', this.displayName, emptyArray, () => ({
             Path: this.path,
-            Trigger: trigger?.path ?? '(unknown)',
+            Trigger: trigger?.path ?? reason ?? '(unknown)',
             Previous: previousValue,
             Current: nextValue
         }))
