@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, spyOn, test, type Mock } from "bun:test"
-import { ObservableValue, createModel, derive, derived, event, model, reduce, reduced, state } from "event-reduce"
+import { createModel, derive, derived, event, ISignal, model, reduce, reduced, signal, state } from "event-reduce"
 import { getModelProperties } from "event-reduce/lib/models"
 import { isModel } from "event-reduce/lib/symbols"
 import { dispose } from "event-reduce/lib/utils"
@@ -39,7 +39,7 @@ describe("subscription cleanup", () => {
     })
 
     test("when derivation returns a new model, disposes old model", () => {
-        let observable = new ObservableValue('test Observable', 0)
+        let observable = signal(0, 'test Observable')
         let derivation = derive(() => new Model(observable.value))
         let modelInstance = derivation.value
         let unsubscribe = spyOnDispose(modelInstance, 'reducedProp')
@@ -51,7 +51,7 @@ describe("subscription cleanup", () => {
     })
 
     test("when derivation returns the same model, doesn't dispose model", () => {
-        let observable = new ObservableValue('test Observable', 0)
+        let observable = signal(0, 'test Observable')
         let modelInstance = new Model(0)
         let derivation = derive(() => {
             observable.value
@@ -67,17 +67,17 @@ describe("subscription cleanup", () => {
     })
 
     describe("when derivation returns a model from another observable value", () => {
-        let model1: ObservableValue<Model>
-        let model2: ObservableValue<Model>
-        let useModel2: ObservableValue<boolean>
+        let model1: ISignal<Model>
+        let model2: ISignal<Model>
+        let useModel2: ISignal<boolean>
         let derivation: ReturnType<typeof derive<Model>>
         let modelInstance: Model
         let disposeModelSpy: Mock<() => void>
 
         beforeEach(() => {
-            model1 = new ObservableValue('model 1', new Model(1))
-            model2 = new ObservableValue('model 2', new Model(2))
-            useModel2 = new ObservableValue('switch', false)
+            model1 = signal(new Model(1), 'model 1')
+            model2 = signal(new Model(2), 'model 2')
+            useModel2 = signal(false, 'switch')
             derivation = derive(() => useModel2.value ? model2.value : model1.value)
             modelInstance = derivation.value
             disposeModelSpy = spyOnDispose(modelInstance, 'reducedProp')
@@ -145,7 +145,7 @@ describe("subscription cleanup", () => {
                 reduce([model1, model2])
                     .on(removeModel, ms => ms.slice(0, -1)))
 
-            new ObservableValue('other value', model2)
+            signal(model2, 'other value')
 
             removeModel()
 
@@ -213,7 +213,7 @@ describe("subscription cleanup", () => {
                         return remaining
                     }))
 
-            new ObservableValue('other value', model2)
+            signal(model2, 'other value')
 
             removeModel()
 
@@ -292,7 +292,7 @@ describe("subscription cleanup", () => {
             @derived
             get externallyOwned() { return this._ownedModel; }
         }
-        let externalOwner = new ObservableValue('external owner', new Model(3))
+        let externalOwner = signal(new Model(3), 'external owner')
         let outerModel = new OuterModel(externalOwner.value) as OuterModel & Disposable
         let disposeReducedPropValue = spyOnDispose(outerModel.reducedProp, 'reducedProp')
         let disposeDerivedPropValue = spyOnDispose(outerModel.derivedProp, 'reducedProp')
@@ -302,7 +302,7 @@ describe("subscription cleanup", () => {
         // let disposeDerivedProp = spyOnDispose(outerModel, 'derivedProp')
         // let disposeExternallyOwnedProp = spyOnDispose(outerModel, 'externallyOwned')
 
-        let outerOwner = new ObservableValue('outer owner', outerModel)
+        let outerOwner = signal(outerModel, 'outer owner')
         outerOwner.setValue(null!)
 
         expect(disposeReducedProp).toHaveBeenCalled()

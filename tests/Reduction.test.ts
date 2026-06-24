@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
-import { ObservableValue, createModel, event, events, IReduction, reduce } from 'event-reduce';
-import { CircularSubscriptionError } from "event-reduce/lib/reduction";
+import { createModel, event, events, IReduction, ISignal, reduce, signal } from 'event-reduce';
 import { InvalidStateError } from "event-reduce/lib/observable";
+import { CircularSubscriptionError } from "event-reduce/lib/reduction";
 import { CircularDependencyError, collectAccessedSources } from "event-reduce/lib/tracking";
 import { dispose } from "event-reduce/lib/utils";
 import { MockObserver } from "./MockObserver";
@@ -24,11 +24,11 @@ describe("reduce", () => {
         test("starts with initial value", () => expect(sut.value).toBe(1));
 
         describe("when subscribed to an observable", () => {
-            let observableValue: ObservableValue<string>;
+            let observableValue: ISignal<string>;
             let reducer: Mock<(previous: number, event: string) => number>;
 
             beforeEach(() => {
-                observableValue = new ObservableValue<string>('test', 'test');
+                observableValue = signal('test', 'test');
                 reducer = mock();
                 sut.on(observableValue, reducer);
             });
@@ -62,11 +62,11 @@ describe("reduce", () => {
 
         describe("when a reducer accesses a reduced value", () => {
             let other: ReturnType<typeof reduce<number>>;
-            let observable: ObservableValue<number>;
+            let observable: ISignal<number>;
 
             beforeEach(() => {
                 other = createModel(() => reduce(0));
-                observable = new ObservableValue<number>('test', 0);
+                observable = signal(0, 'test');
                 sut.on(observable, () => other.value);
             });
 
@@ -126,12 +126,12 @@ describe("reduce", () => {
         })
 
         describe("when subscribing to an observable", () => {
-            let observableValue: ObservableValue<string>;
-            let getEvent: Mock<(events: typeof eventsObj) => ObservableValue<string>>;
+            let observableValue: ISignal<string>;
+            let getEvent: Mock<(events: typeof eventsObj) => ISignal<string>>;
             let reducer: Mock<(previous: number, event: string) => number>;
 
             beforeEach(() => {
-                observableValue = new ObservableValue<string>('test', 'test');
+                observableValue = signal('test', 'test');
                 getEvent = mock(() => observableValue);
                 reducer = mock();
                 sut.on(getEvent, reducer);
@@ -164,7 +164,7 @@ describe("reduce", () => {
 
     test("when reducer returns an event, throws", () => {
         let eventValue = event('test event');
-        let subject = new ObservableValue<string>('test', 'test');
+        let subject = signal('test', 'test');
         using sut = createModel(() => ({
             reduction: reduce(null as any, 'sut')
                 .on(subject, () => eventValue)
@@ -184,7 +184,7 @@ describe("reduce", () => {
         @events
         class Events { }
         let eventsValue = new Events();
-        let subject = new ObservableValue<string>('test', 'test');
+        let subject = signal('test', 'test');
         using sut = createModel(() => ({
             reduction: reduce(null as any, 'sut')
                 .on(subject, () => eventsValue)

@@ -1,18 +1,18 @@
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
-import { derive, event, events, IDerivation, ObservableValue } from "event-reduce";
+import { derive, event, events, signal, type IDerivation, type ISignal } from "event-reduce";
 import { InvalidStateError } from "event-reduce/lib/observable";
 import { getUnderlyingObservable, SideEffectDuringReactionError } from "event-reduce/lib/tracking";
 import { MockObserver } from "./MockObserver";
 
 describe("derive", () => {
-    let sourceA: ObservableValue<string>;
-    let sourceB: ObservableValue<string>;
+    let sourceA: ISignal<string>;
+    let sourceB: ISignal<string>;
     let calculation: Mock<() => string>;
     let sut: IDerivation<string>;
 
     beforeEach(() => {
-        sourceA = new ObservableValue('a', 'a');
-        sourceB = new ObservableValue('b', 'b');
+        sourceA = signal('a', 'a');
+        sourceB = signal('b', 'b');
         calculation = mock(() => sourceA.value + sourceB.value);
         sut = derive(calculation, 'sut');
     });
@@ -120,7 +120,7 @@ describe("derive", () => {
 });
 
 test("derivation that depends on other derivations only updates once", () => {
-    let observable = new ObservableValue("Observable", "a");
+    let observable = signal("a", "Observable");
     let inner1 = derive(() => observable.value + "_inner1");
     let inner2 = derive(() => observable.value + "_inner2");
     let outerCalc = mock(() => inner1.value + inner2.value);

@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { ObservableValue, type IObservable } from "event-reduce";
+import { ISignal, signal, type IObservable } from "event-reduce";
 import { MockObserver } from "./MockObserver";
 
 describe("Observable", () => {
-    let sut: ObservableValue<string>;
+    let sut: ISignal<string>;
     let observer: MockObserver<string>;
 
     beforeEach(() => {
-        sut = new ObservableValue('sut', 'initial');
+        sut = signal('initial', 'sut');
         observer = new MockObserver();
         sut.subscribe(observer);
     });

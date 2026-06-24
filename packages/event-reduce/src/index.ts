@@ -5,6 +5,6 @@ export { asyncEvent, event, type AsyncError, type AsyncResult, type AsyncStart, 
 export { enableLogging, log, startLogging } from "./logging"
 export { createModel, derived, disposeModel, events, model, reduced, state } from "./models"
 export { merge, type IObservable, type IObserver } from "./observable"
-export { ObservableValue } from "./observableValue"
 export { extendReduce, reduce, type IReduction, type Reducer } from "./reduction"
 export { getState, type State } from "./state"
+export { signal, type ISignal } from "./signal"

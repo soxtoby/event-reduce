@@ -1,16 +1,16 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
-import { ObservableValue } from "event-reduce";
+import { ISignal, signal } from "event-reduce";
 import { useReactive } from "event-reduce-react";
 
 describe('useReactive', () => {
-    let observable: ObservableValue<string>;
+    let observable: ISignal<string>;
     let innerBehaviour: () => void;
     let render: Mock<() => string>;
     let sut: ReturnType<typeof renderHook<unknown, string>>;
 
     beforeEach(() => {
-        observable = new ObservableValue<string>('test value', 'initial value');
+        observable = signal('initial value', 'test value');
         innerBehaviour = () => { };
         render = mock(() => {
             innerBehaviour();

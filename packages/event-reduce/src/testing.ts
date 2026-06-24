@@ -3,7 +3,7 @@ import { Derivation } from "./derivation"
 import { event } from "./events"
 import { getModelProperties } from "./models"
 import { isObservable, Observable } from "./observable"
-import { ObservableValue } from "./observableValue"
+import { Signal } from "./signal"
 import { Reduction } from "./reduction"
 import { beginTransition } from "./tracking"
 import { dispose, isObject } from "./utils"
@@ -52,13 +52,13 @@ export function modelProxy<T extends object>(model: T = {} as T) {
     if (!isObject(model) || Array.isArray(model))
         return model
 
-    let properties = {} as Record<PropertyKey, ObservableValue<any>>
+    let properties = {} as Record<PropertyKey, Signal<any>>
 
     // Pre-populate observable values with plain value fields
     Object.entries(Object.getOwnPropertyDescriptors(model))
         .forEach(([key, prop]) => {
             if ('value' in prop)
-                properties[key] = new ObservableValue(String(key), prop.value)
+                properties[key] = new Signal(String(key), prop.value)
         })
 
     let proxy: T = new Proxy(model, {
@@ -98,8 +98,8 @@ export function modelProxy<T extends object>(model: T = {} as T) {
 
     return proxy
 
-    function getOrAddObservableValue(key: PropertyKey): ObservableValue<any> {
-        return properties[String(key)] ??= new ObservableValue(String(key), model[key as keyof T])
+    function getOrAddObservableValue(key: PropertyKey): Signal<any> {
+        return properties[String(key)] ??= new Signal(String(key), model[key as keyof T])
     }
 }
 

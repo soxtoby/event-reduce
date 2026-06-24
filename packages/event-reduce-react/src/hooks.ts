@@ -1,4 +1,4 @@
-import { asyncEvent, derive, event, IDerivation, IReduction, ObservableValue, reduce } from "event-reduce"
+import { asyncEvent, derive, event, type IDerivation, type IReduction, reduce, signal } from "event-reduce"
 import { trackManagedObservableCreation } from "event-reduce/lib/ownership"
 import { Reduction } from "event-reduce/lib/reduction"
 import { isModel } from "event-reduce/lib/symbols"
@@ -52,8 +52,8 @@ export function useReduced<T>(initial: T, name?: string): IReduction<T> {
     return reduction
 }
 
-export function useObservableValue<T>(initialValue: T, name: string = '(anonymous observed value)') {
-    return useState(() => new ObservableValue(name, initialValue))[0]
+export function useSignal<T>(initialValue: T, name: string = '(anonymous signal)') {
+    return useState(() => signal(initialValue, name))[0]
 }
 
 class InvalidModelError extends Error {

@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { ObservableValue } from "event-reduce";
+import { ISignal, signal } from "event-reduce";
 import { getUnderlyingObservable } from "event-reduce/lib/tracking";
 import { MockObserver } from "./MockObserver";
 
-describe("ObservableValue", () => {
-    let sut: ObservableValue<string>;
+describe("signal", () => {
+    let sut: ISignal<string>;
     let observer: MockObserver<string>;
 
     beforeEach(() => {
-        sut = new ObservableValue('sut', 'initial');
+        sut = signal('initial', 'sut');
         observer = new MockObserver();
         sut.subscribe(observer);
     });
@@ -35,20 +35,9 @@ describe("ObservableValue", () => {
         test("notifies observers", () => expect(observer.sourceUpdated).toHaveBeenCalledWith(sut, 'different'));
     });
 
-    test("when value set to same value, observers are not notified", () => {
+    test("when value set to same value, observers are notified", () => {
         sut.setValue('initial');
 
-        expect(observer.sourceUpdated).not.toHaveBeenCalled();
-    });
-
-    test("when custom equality treats values as equal, observers are not notified", () => {
-        let custom = new ObservableValue('custom', 'Alpha', (left, right) => left?.toLowerCase() === right?.toLowerCase());
-        let customObserver = new MockObserver<string>();
-        custom.subscribe(customObserver);
-
-        custom.setValue('alpha');
-
-        expect(custom.value).toBe('Alpha');
-        expect(customObserver.sourceUpdated).not.toHaveBeenCalled();
+        expect(observer.sourceUpdated).toHaveBeenCalledWith(sut, 'initial');
     });
 });
