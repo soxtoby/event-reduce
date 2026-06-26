@@ -19,10 +19,10 @@ describe("state", () => {
         }));
     });
 
-    test("stringifyState can include derived properties", () => {
+    test("getState can include derived properties", () => {
         let testModel = new TestModel('ctor');
-        let result = stringifyState(testModel, true);
-        expect(result).toBe(JSON.stringify({
+        let result = getState(testModel, true);
+        expect(JSON.stringify(result)).toBe(JSON.stringify({
             valueProperty: 1,
             valuePlusOne: 2,
             reducedModel: { value: 'child' },
@@ -36,7 +36,7 @@ describe("state", () => {
         }));
     });
 
-    test("stringifyState includeDerived is not cached between calls", () => {
+    test("includeDerived is not cached between calls", () => {
         let testModel = new TestModel('ctor');
         stringifyState(testModel);
         let result = stringifyState(testModel, true);

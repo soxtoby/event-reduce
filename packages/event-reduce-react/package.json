@@ -34,14 +34,14 @@
   ],
   "dependencies": {
     "event-reduce": "workspace:^",
-    "use-sync-external-store": "*"
+    "use-sync-external-store": "1.6.0"
   },
   "peerDependencies": {
-    "react": ">=16.8"
+    "react": ">=19.2.7"
   },
   "devDependencies": {
-    "@types/react": ">=16.8",
-    "@types/use-sync-external-store": "*",
-    "typescript": "~5"
+    "@types/react": ">=19.2.17",
+    "@types/use-sync-external-store": "1.5.0",
+    "typescript": "~6.0.3"
   }
 }

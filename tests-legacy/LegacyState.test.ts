@@ -58,7 +58,6 @@ describe("legacy state", () => {
                 { value: 'two' }
             ],
             subClassProperty: 'subClass',
-            valuePlusOne: 2,
             mergedModel: { value: 'merged' },
             constructorProperty: 'ctor'
         }));
