@@ -23,7 +23,7 @@ describe("mutable", () => {
         }
 
         @derived
-        get valuePlusOne() { return this.value + 1; }
+        get valuePlusOne() { return this.value + 1 }
     }
 
     let baseModel: Model

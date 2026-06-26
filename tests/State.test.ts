@@ -1,11 +1,11 @@
-import { describe, expect, test } from "bun:test";
-import { getState, stringifyState } from "event-reduce";
-import { TestModel } from "./State.test/TestModel";
+import { describe, expect, test } from "bun:test"
+import { getState, stringifyState } from "event-reduce"
+import { TestModel } from "./State.test/TestModel"
 
 describe("state", () => {
     test("getState copies the correct properties", () => {
-        let testModel = new TestModel('ctor');
-        let result = getState(testModel);
+        let testModel = new TestModel('ctor')
+        let result = getState(testModel)
         expect(JSON.stringify(result)).toBe(JSON.stringify({
             valueProperty: 1,
             reducedModel: { value: 'child' },
@@ -16,12 +16,12 @@ describe("state", () => {
             mergedModel: { value: 'merged' },
             subClassProperty: 'subClass',
             constructorProperty: 'ctor',
-        }));
-    });
+        }))
+    })
 
     test("getState can include derived properties", () => {
-        let testModel = new TestModel('ctor');
-        let result = getState(testModel, true);
+        let testModel = new TestModel('ctor')
+        let result = getState(testModel, true)
         expect(JSON.stringify(result)).toBe(JSON.stringify({
             valueProperty: 1,
             valuePlusOne: 2,
@@ -33,13 +33,13 @@ describe("state", () => {
             mergedModel: { value: 'merged' },
             subClassProperty: 'subClass',
             constructorProperty: 'ctor',
-        }));
-    });
+        }))
+    })
 
     test("includeDerived is not cached between calls", () => {
-        let testModel = new TestModel('ctor');
-        stringifyState(testModel);
-        let result = stringifyState(testModel, true);
-        expect(result).toContain('"valuePlusOne":2');
-    });
-});
+        let testModel = new TestModel('ctor')
+        stringifyState(testModel)
+        let result = stringifyState(testModel, true)
+        expect(result).toContain('"valuePlusOne":2')
+    })
+})

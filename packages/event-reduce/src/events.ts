@@ -173,9 +173,9 @@ function makeObservableFunction<Observable extends IObservable<any>, Args extend
 ): IEventFunction<ObservedValue<Observable>, Args, Return> & Members {
     let eventFn = fire as Observable & IEventFunction<ObservedValue<Observable>, Args, Return>
     markEvent(eventFn)
-    Object.setPrototypeOf(eventFn, innerEvent);
-    eventFn.apply = Function.prototype.apply;
-    eventFn.call = Function.prototype.call;
+    Object.setPrototypeOf(eventFn, innerEvent)
+    eventFn.apply = Function.prototype.apply
+    eventFn.call = Function.prototype.call
     return additionalMembers
         ? Object.assign(eventFn, additionalMembers(eventFn), { [membersFactory]: additionalMembers as AdditionalMembersFactory<IObservable<any>, any> })
         : eventFn as Observable & IEventFunction<ObservedValue<Observable>, Args, Return> & Members

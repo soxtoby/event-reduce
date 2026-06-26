@@ -102,7 +102,7 @@ function loggedReactValue(value: unknown) {
                 let type = reactElementName(node.type)
                     ?.split('(').at(-1)!.split(')')[0]  // Unwrap HOC names
                     .replace(/^[0-9-]/, '_$&')  // Escape leading number or dash
-                    .replace(/[^a-zA-Z0-9:_.-]/g, '_');  // Escape rest of element name
+                    .replace(/[^a-zA-Z0-9:_.-]/g, '_')  // Escape rest of element name
                 let el = xmlDoc.createElement(type || ':unknown:')
                 for (let child of Children.toArray((node.props as any).children))
                     el.appendChild(xmlTree(child))

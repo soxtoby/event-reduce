@@ -251,10 +251,10 @@ describe("subscription cleanup", () => {
         expect(disposeModelSpy).toHaveBeenCalled()
     })
 
-    /* describe("when array items are also in another observable value", () => {
+    describe("when array items are also in another observable value", () => {
         test("when array value is disposed, doesn't dispose items", () => {
-            let arrayValue = new ObservableValue('array value', [new Model(0)])
-            new ObservableValue('other value', arrayValue.value[0])
+            let arrayValue = signal([new Model(0)], 'array value')
+            signal(arrayValue.value[0], 'other value')
             let disposeModelSpy = spyOnDispose(arrayValue.value[0], 'reducedProp')
 
             arrayValue[dispose]()
@@ -265,15 +265,15 @@ describe("subscription cleanup", () => {
 
     describe("when object values are also in another observable value", () => {
         test("when object value is disposed, doesn't dispose values", () => {
-            let objectValue = new ObservableValue('object value', { model: new Model(0) })
-            new ObservableValue('other value', objectValue.value.model)
+            let objectValue = signal({ model: new Model(0) }, 'object value')
+            signal(objectValue.value.model, 'other value')
             let disposeModelSpy = spyOnDispose(objectValue.value.model, 'reducedProp')
 
             objectValue[dispose]()
 
             expect(disposeModelSpy).not.toHaveBeenCalled()
         })
-    }); */
+    })
 
     test("when model disposed, disposes all properties correctly", () => {
         @model
@@ -281,16 +281,16 @@ describe("subscription cleanup", () => {
             constructor(private _ownedModel: Model) { }
 
             @reduced
-            get reducedProp() { return reduce(new Model(0)).value; }
+            get reducedProp() { return reduce(new Model(0)).value }
 
             @derived
-            get derivedProp() { return new Model(1); }
+            get derivedProp() { return new Model(1) }
 
             @state
             stateProp = new Model(2)
 
             @derived
-            get externallyOwned() { return this._ownedModel; }
+            get externallyOwned() { return this._ownedModel }
         }
         let externalOwner = signal(new Model(3), 'external owner')
         let outerModel = new OuterModel(externalOwner.value) as OuterModel & Disposable
@@ -299,15 +299,15 @@ describe("subscription cleanup", () => {
         let disposeStatePropValue = spyOnDispose(outerModel.stateProp, 'reducedProp')
         let disposeExternallyOwnedPropValue = spyOnDispose(outerModel.externallyOwned, 'reducedProp')
         let disposeReducedProp = spyOnDispose(outerModel, 'reducedProp')
-        // let disposeDerivedProp = spyOnDispose(outerModel, 'derivedProp')
-        // let disposeExternallyOwnedProp = spyOnDispose(outerModel, 'externallyOwned')
+        let disposeDerivedProp = spyOnDispose(outerModel, 'derivedProp')
+        let disposeExternallyOwnedProp = spyOnDispose(outerModel, 'externallyOwned')
 
         let outerOwner = signal(outerModel, 'outer owner')
         outerOwner.setValue(null!)
 
         expect(disposeReducedProp).toHaveBeenCalled()
-        // expect(disposeDerivedProp).toHaveBeenCalled()
-        // expect(disposeExternallyOwnedProp).toHaveBeenCalled()
+        expect(disposeDerivedProp).toHaveBeenCalled()
+        expect(disposeExternallyOwnedProp).toHaveBeenCalled()
 
         expect(disposeReducedPropValue).toHaveBeenCalled()
         expect(disposeDerivedPropValue).toHaveBeenCalled()

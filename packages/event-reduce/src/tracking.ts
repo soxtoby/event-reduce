@@ -52,10 +52,10 @@ export function endSourceAccessed(source: IObservable<any>) {
 
 /** Allows subscribing to the changes of the specified observable value. */
 export function valueChanged<T>(observableValue: T) {
-    let observable = getUnderlyingObservable(observableValue);
+    let observable = getUnderlyingObservable(observableValue)
     if (observable)
-        return observable;
-    throw new NoUnderlyingObservableError(observableValue);
+        return observable
+    throw new NoUnderlyingObservableError(observableValue)
 }
 
 export function getUnderlyingObservable<T>(value: T): IObservable<T> | null {

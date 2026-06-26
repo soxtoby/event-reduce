@@ -1,4 +1,4 @@
-import { derive, derived, event, model, reduce, reduced } from "event-reduce";
+import { derive, derived, event, model, reduce, reduced } from "event-reduce"
 
 // TODO move back into Model.test.ts after https://github.com/oven-sh/bun/issues/28010 is resolved
 
@@ -10,33 +10,33 @@ export class TestModel {
     get property() {
         return reduce(1)
             .on(increment, c => c + 1)
-            .value;
+            .value
     }
 
     @reduced
     accessor accessorProp = reduce(1)
         .on(increment, c => c + 1)
-        .value;
+        .value
 
     @reduced
     get dependentProperty() {
         return reduce(1)
             .on(derive(() => this.property), (_, p) => p)
-            .value;
+            .value
     }
 
     @derived
     get derivedProperty() {
-        return this.property * 2;
+        return this.property * 2
     }
 
     @derived
-    get bool() { return true; }
+    get bool() { return true }
 
     @reduced
     get basedOnDerivedProperty() {
         return reduce(0)
             .on(derive(() => this.derivedProperty), (_, d) => d)
-            .value;
+            .value
     }
 }

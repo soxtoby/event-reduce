@@ -1,5 +1,5 @@
-import { mock } from "bun:test";
-import { IObservable, IObserver } from "event-reduce";
+import { mock } from "bun:test"
+import { IObservable, IObserver } from "event-reduce"
 
 export class MockObserver<T> implements IObserver<T> {
     displayName = 'mock observer'

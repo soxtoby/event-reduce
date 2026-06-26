@@ -1,16 +1,16 @@
-import { reactive } from "event-reduce-react";
-import { asyncEvent, derived, events, model, reduce, reduced } from "event-reduce";
-import { CounterListEvents } from "./CounterList";
+import { reactive } from "event-reduce-react"
+import { asyncEvent, derived, events, model, reduce, reduced } from "event-reduce"
+import { CounterListEvents } from "./CounterList"
 
 @events
 export class CounterEvents {
     constructor(private _parent: CounterListEvents, private _scope: { id: number }) { }
 
-    get incremented() { return this._parent.incremented.scope(this._scope); }
-    get decremented() { return this._parent.decremented.scope(this._scope); }
-    get reset() { return this._parent.reset.scope(this._scope); }
-    get removed() { return this._parent.counterRemoved.scope(this._scope); }
-    valueFetched = asyncEvent<number>();
+    get incremented() { return this._parent.incremented.scope(this._scope) }
+    get decremented() { return this._parent.decremented.scope(this._scope) }
+    get reset() { return this._parent.reset.scope(this._scope) }
+    get removed() { return this._parent.counterRemoved.scope(this._scope) }
+    valueFetched = asyncEvent<number>()
 }
 
 @model
@@ -20,7 +20,7 @@ export class CounterModel {
         private _initial: { id: number, count?: number }
     ) { }
 
-    get id() { return this._initial.id; }
+    get id() { return this._initial.id }
 
     @reduced
     get count() {
@@ -29,15 +29,15 @@ export class CounterModel {
             .on(e => e.decremented, (current) => current - 1)
             .on(e => e.reset, () => 0)
             .on(e => e.valueFetched.resolved, (_, { result }) => result)
-            .value;
+            .value
     }
 
     @derived
-    get countTimesTwo() { return this.count * 2; }
+    get countTimesTwo() { return this.count * 2 }
 }
 
 export const Counter = reactive(function Counter({ model }: { model: CounterModel }) {
-    let events = model.events;
+    let events = model.events
 
     return <div data-testid="counter" style={{ display: 'inline-block', border: '1px solid silver', margin: 8, padding: 8 }}>
         <table>
@@ -64,6 +64,6 @@ export const Counter = reactive(function Counter({ model }: { model: CounterMode
     </div>
 
     function onFetch() {
-        events.valueFetched(Promise.resolve(100));
+        events.valueFetched(Promise.resolve(100))
     }
-});
+})

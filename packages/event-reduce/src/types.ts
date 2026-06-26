@@ -1,4 +1,4 @@
-import type { IObservable } from "./observable";
+import type { IObservable } from "./observable"
 
 export type Scoped<T, Scope extends Partial<T>> =
     & Omit<T, keyof Scope>

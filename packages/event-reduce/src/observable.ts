@@ -103,7 +103,7 @@ export function bind<In, Out>(displayName: string, observable: IObservable<In>, 
 export function merge<const Observables extends readonly IObservable<any>[]>(observables: Observables): IObservable<ObservedValue<Observables[number]>>
 export function merge<const Observables extends readonly IObservable<any>[]>(displayName: string, observables: Observables): IObservable<ObservedValue<Observables[number]>>
 export function merge<const Observables extends readonly IObservable<any>[]>(displayNameOrObservables: string | Observables, maybeObservables?: Observables): IObservable<ObservedValue<Observables[number]>> {
-    let displayName: string;
+    let displayName: string
     let observables: Observables
     if (typeof displayNameOrObservables == 'string') {
         displayName = displayNameOrObservables
@@ -162,7 +162,7 @@ export class NoUnderlyingObservableError extends Error {
     constructor(
         public value: unknown
     ) {
-        super("Couldn't detect observable for value. Make sure you pass in an observable value directly.");
+        super("Couldn't detect observable for value. Make sure you pass in an observable value directly.")
     }
 }
 
@@ -170,7 +170,7 @@ export class InvalidStateError extends Error {
     constructor(
         public observable: IObservable<any>,
         public value: IEventFunction<unknown, unknown[]> | object
-    ) { super(`Tried to store ${isObservable(value) ? value.displayName : value} in ${observable.displayName}. ${nameOfFunction(value.constructor)}s cannot be state.`); }
+    ) { super(`Tried to store ${isObservable(value) ? value.displayName : value} in ${observable.displayName}. ${nameOfFunction(value.constructor)}s cannot be state.`) }
 }
 
 export class StateChangeOutsideTransitionError extends Error {
@@ -178,6 +178,6 @@ export class StateChangeOutsideTransitionError extends Error {
         public source: IObservable<any>
     ) {
         super(`Tried to change state of ${source.displayName} outside of a transition. `
-            + 'This usually means a bug in event-reduce, or in a custom observable implementation.');
+            + 'This usually means a bug in event-reduce, or in a custom observable implementation.')
     }
 }

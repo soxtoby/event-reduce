@@ -1,4 +1,4 @@
-import index from "./index.html";
+import index from "./index.html"
 
 let server = Bun.serve({
     port: 1234,
@@ -7,6 +7,6 @@ let server = Bun.serve({
         hmr: true,
         console: true
     }
-});
+})
 
-console.log(`🚀 Server running at ${server.url}`);
+console.log(`🚀 Server running at ${server.url}`)

@@ -57,7 +57,7 @@ export class Reduction<T, Events = void> extends Observable<T> implements IReduc
         updateChildren(this, null, initialValue)
     }
 
-    toJSON() { return this._json.value; }
+    toJSON() { return this._json.value }
 
     on<S>(source: IObservable<S>, reduce: Reducer<T, S>): this
     on<S>(getSource: (events: Events) => IObservable<S>, reduce: Reducer<T, S>): this
@@ -67,7 +67,7 @@ export class Reduction<T, Events = void> extends Observable<T> implements IReduc
 
         if (process.env.NODE_ENV !== 'production') {
             if (allSources(source).find(s => s == this))
-                throw new CircularSubscriptionError(this, source);
+                throw new CircularSubscriptionError(this, source)
         }
 
         source.subscribe(this)
@@ -149,6 +149,6 @@ export class CircularSubscriptionError extends Error {
         public reduction: IReduction<unknown, unknown>,
         public source: IObservable<unknown>
     ) {
-        super(`Cannot subscribe to '${source.displayName}', as it depends on this reduction, '${reduction.displayName}'.`);
+        super(`Cannot subscribe to '${source.displayName}', as it depends on this reduction, '${reduction.displayName}'.`)
     }
 }

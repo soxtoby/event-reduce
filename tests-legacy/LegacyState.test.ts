@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, test } from "bun:test";
-import { derived, getState, model, reduce, reduced, state } from "event-reduce";
+import { beforeEach, describe, expect, test } from "bun:test"
+import { derived, getState, model, reduce, reduced, state } from "event-reduce"
 
 describe("legacy state", () => {
     @model
@@ -7,31 +7,31 @@ describe("legacy state", () => {
         constructor(@state('constructorProperty') public constructorProperty: string) { }
 
         @reduced
-        valueProperty = reduce(1).value;
+        valueProperty = reduce(1).value
 
         @derived
         get valuePlusOne() {
-            return this.valueProperty + 1;
+            return this.valueProperty + 1
         }
 
         func() { }
 
         @reduced
-        reducedModel = reduce(new ChildModel('child')).value;
+        reducedModel = reduce(new ChildModel('child')).value
 
         @reduced
-        modelArray = reduce([new ChildModel('one'), new ChildModel('two')]).value;
+        modelArray = reduce([new ChildModel('one'), new ChildModel('two')]).value
 
         @state
-        mergedModel = new ChildModel('merged');
+        mergedModel = new ChildModel('merged')
 
-        ignoredValue = 'ignored';
+        ignoredValue = 'ignored'
     }
 
     @model
     class TestModel extends BaseModel {
         @state
-        subClassProperty = 'subClass';
+        subClassProperty = 'subClass'
     }
 
     @model
@@ -39,17 +39,17 @@ describe("legacy state", () => {
         constructor(private _initialValue: string) { }
 
         @reduced
-        value = reduce(this._initialValue).value;
+        value = reduce(this._initialValue).value
     }
 
-    let sut: TestModel;
+    let sut: TestModel
 
     beforeEach(() => {
-        sut = new TestModel('ctor');
-    });
+        sut = new TestModel('ctor')
+    })
 
     test("getState copies the correct properties", () => {
-        let result = getState(sut);
+        let result = getState(sut)
         expect(JSON.stringify(result)).toBe(JSON.stringify({
             valueProperty: 1,
             reducedModel: { value: 'child' },
@@ -60,6 +60,6 @@ describe("legacy state", () => {
             subClassProperty: 'subClass',
             mergedModel: { value: 'merged' },
             constructorProperty: 'ctor'
-        }));
-    });
-});
+        }))
+    })
+})

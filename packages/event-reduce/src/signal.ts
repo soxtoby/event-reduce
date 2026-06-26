@@ -1,9 +1,9 @@
-import { Derivation } from "./derivation";
-import { IObservable, Observable } from "./observable";
-import { updateChildren } from "./ownership";
-import { ModelJSON, modelJSON } from "./state";
-import { beginTransition } from "./tracking";
-import { dispose, isObject } from "./utils";
+import { Derivation } from "./derivation"
+import { IObservable, Observable } from "./observable"
+import { updateChildren } from "./ownership"
+import { ModelJSON, modelJSON } from "./state"
+import { beginTransition } from "./tracking"
+import { dispose, isObject } from "./utils"
 
 export interface ISignal<T> extends IObservable<T> {
     readonly value: T
@@ -21,7 +21,7 @@ export class Signal<T> extends Observable<T> implements IObservable<T> {
         displayName: string,
         initialValue: T,
     ) {
-        super(displayName);
+        super(displayName)
         this._json = new Derivation(`toJSON(${this.displayName})`, () => modelJSON(this.value))
         this._json.suppressLogging = true
         

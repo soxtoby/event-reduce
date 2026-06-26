@@ -221,9 +221,9 @@ describe("events decorator", () => {
     })
 
     test("sets event parents", () => {
-        expect(sut.eventField.path).toBe('TestEvents.eventField');
-        expect(sut.eventGetter.path).toBe('TestEvents.eventGetter');
-    });
+        expect(sut.eventField.path).toBe('TestEvents.eventField')
+        expect(sut.eventGetter.path).toBe('TestEvents.eventGetter')
+    })
 
     test("snapshots getter event", () => {
         sut.eventGetter
