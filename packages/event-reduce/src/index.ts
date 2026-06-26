@@ -9,3 +9,4 @@ export { extendReduce, reduce, type IReduction, type Reducer } from "./reduction
 export { signal, type ISignal } from "./signal"
 export { getState, stringifyState, type State } from "./state"
 export { valueChanged } from "./tracking"
+export { matchesScope, scopedName } from "./utils"

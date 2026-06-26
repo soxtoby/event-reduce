@@ -1,14 +1,9 @@
 export const emptyArray = Object.freeze([]) as readonly any[]
 
-export const emptySet = Object.freeze(new Set()) as ReadonlySet<any>
 export const emptyMap = Object.freeze(new Map()) as ReadonlyMap<any, any>
 
 export function constant<T>(value: T) { return identity.bind(null, value) as () => T; }
 export function identity<T>(value: T) { return value; }
-
-export function filteredName(baseName: string, predicate: Function) {
-    return `${baseName}.filter(${nameOfCallback(predicate)})`
-}
 
 export function scopedName(baseName: string, scope: object) {
     return `${baseName}.scoped({ ${Object.entries(scope).map(([k, v]) => `${k}: ${v}`).join(', ')} })`
@@ -22,26 +17,6 @@ export function nameOfCallback(fn: Function) {
 /** Returns explicit name of function. */
 export function nameOfFunction(fn: Function) {
     return (fn as any).displayName as string || fn.name
-}
-
-export function jsonPath(keys: readonly PropertyKey[]) {
-    return keys.map((key, i) =>
-        i == 0 ? key
-            : typeof key == 'number' || typeof key == 'symbol' ? `[${String(key)}]`
-                : /^[\w\$]+$/.test(key) ? `.${key}`
-                    : `[${JSON.stringify(key)}]`)
-        .join('')
-}
-
-/** Utility base class for anything with a dynamic displayName */
-export class NamedBase {
-    constructor(private _getDisplayName: () => string) { }
-
-    get displayName() { return this._getDisplayName(); }
-    set displayName(name: string) { this._getDisplayName = constant(name); }
-
-    /** Just for avoiding unnecessary arrow functions, but importantly reflects changes to the _getDisplayName callback. */
-    protected readonly displayNameGetter = () => this._getDisplayName()
 }
 
 export function matchesScope<Scope extends object>(scope: Scope): <Value>(value: Value) => boolean
@@ -69,11 +44,6 @@ export function isFunction(value: any): value is Function {
     return typeof value == 'function'
 }
 
-export function isPlainObject<T>(value: T): value is T & object {
-    return isObject(value)
-        && Object.getPrototypeOf(value) == Object.prototype
-}
-
 export function isObject<T>(value: T): value is T & object {
     return !!value && typeof value == 'object'
 }
@@ -86,23 +56,11 @@ export function isUndefined(value: any): value is undefined {
     return value === undefined
 }
 
-export function getOrAdd<T>(target: any, key: string | symbol, create: (base: T | undefined) => T): T {
-    return target.hasOwnProperty(key)
-        ? target[key]
-        : (target[key] = create(target[key]))
-}
-
 export function getOrAddWeakEntry<K extends WeakKey, V>(cache: WeakMap<K, V>, key: K, create: (key: K) => V): V {
     let cached = cache.get(key)
     if (!cached)
         cache.set(key, cached = create(key))
     return cached
-}
-
-export function firstIntersection<T>(a: Set<T>, b: Set<T>) {
-    for (let item of a)
-        if (b.has(item))
-            return item
 }
 
 export function getAllPropertyDescriptors(obj: object) {
@@ -129,12 +87,3 @@ export function isDisposable(value: any): value is Disposable {
 export const dispose: typeof Symbol.dispose = Symbol.dispose ?? Symbol('Symbol.dispose')
 
 export const nullDisposable: Disposable = Object.freeze({ [dispose]() { } })
-
-/** Shim for `using` declaration until it's properly supported. */
-export function using<Resource extends Disposable>(disposable: Resource, action: (resource: Resource) => void) {
-    try {
-        action(disposable)
-    } finally {
-        disposable[dispose]()
-    }
-}

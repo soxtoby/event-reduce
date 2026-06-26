@@ -3,7 +3,7 @@ import { type IObservable, Observable } from "./observable"
 import { markEvent } from "./symbols"
 import { beginTransition } from "./tracking"
 import { ObservedValue, Scoped } from "./types"
-import { dispose, isObject, matchesScope, nameOfCallback } from "./utils"
+import { dispose, isObject, matchesScope, nameOfCallback, scopedName } from "./utils"
 
 export function event<T = void>(name: string = "(anonymous event)"): IEvent<T> {
     return makeEvent({
@@ -20,7 +20,7 @@ export function event<T = void>(name: string = "(anonymous event)"): IEvent<T> {
         additionalMembers: <In>(e: IEventFunction<T, [In]>) => ({
             scope<Scope extends Partial<In>>(scope: Scope): IEvent<Scoped<In, Scope>, T> {
                 return bindEvent(e,
-                    `${e.displayName}.scoped(${JSON.stringify(scope)})`,
+                    scopedName(e.displayName, scope),
                     (value: Scoped<In, Scope>) => e({ ...value, ...scope } as In),
                     matchesScope(scope)) as IEvent<Scoped<In, Scope>, T>
             }
@@ -104,7 +104,7 @@ export function makePhasedEvent<
             ),
             scope<Scope extends CurrentContext extends object ? Partial<CurrentContext> : never>(scope: Scope): IPhasedEvent<NarrowContext<Value, CurrentContext & Scope>, ScopedArgs<Args, Scoped<CurrentContext, Scope>>, Return, CurrentContext & Scope> {
                 return bindEvent(e,
-                    `${e.displayName}.scoped(${JSON.stringify(scope)})`,
+                    scopedName(e.displayName, scope),
                     (...args: ScopedArgs<Args, Scoped<CurrentContext, Scope>>) => {
                         let argsWithScope = args.slice()
                         argsWithScope[argsWithScope.length - 1] = { ...argsWithScope[argsWithScope.length - 1], ...scope }
