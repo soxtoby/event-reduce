@@ -6,5 +6,13 @@
     "types": [
       "bun"
     ]
-  }
+  },
+  "references": [
+    {
+      "path": "../packages/event-reduce"
+    },
+    {
+      "path": "../packages/event-reduce-react"
+    }
+  ]
 }

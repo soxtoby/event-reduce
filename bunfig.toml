@@ -1,2 +1,7 @@
+[install]
+minimumReleaseAge = 604800 # 1 week
+
 [test]
-preload = ["./tests/dist/setup.js"]
+root = "tests"
+pathIgnorePatterns = ["**/dist/**"]
+preload = ["./tests/setup.ts"]

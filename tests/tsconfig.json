@@ -1,10 +1,17 @@
 {
     "extends": "../tsconfig.base.json",
     "compilerOptions": {
-        "baseUrl": ".",
         "outDir": "./dist",
         "rootDir": "."
     },
+    "references": [
+        {
+            "path": "../packages/event-reduce"
+        },
+        {
+            "path": "../packages/event-reduce-react"
+        }
+    ],
     "include": [
         "./**/*.ts",
         "./**/*.tsx"

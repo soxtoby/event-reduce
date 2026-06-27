@@ -1,17 +1,69 @@
-import { changeOwnedValue } from "./cleanup";
-import { Derivation, derive } from "./derivation";
-import { isEvent } from "./events";
-import { ObservableValue, ValueIsNotObservableError, getUnderlyingObservable, protectionAgainstAccessingValueWithCommonSource } from "./observableValue";
-import { Reduction, reduce } from "./reduction";
-import { StringKey } from "./types";
-import { argsAre, constant, dispose, emptyArray, getAllPropertyDescriptors, getOrAdd, isFunction, isObject, isPlainObject, isString, isUndefined, nameOfFunction } from "./utils";
+import { Derivation, derive, IDerivation } from "./derivation"
+import { IObservable, isObservable, Observable } from "./observable"
+import { getChildNodes, trackManagedObservableCreation, updateChildren } from "./ownership"
+import { IReduction, Reduction } from "./reduction"
+import { modelJSON } from "./state"
+import { EventsClass, isEvent, isEventsClass, isModel, markEventsClass, modelBrand, modelProperties, statePropertyBrand } from "./symbols"
+import { collectAccessedSources, getUnderlyingObservable } from "./tracking"
+import { ObservedValue } from "./types"
+import { argsAre, constant, dispose, emptyArray, getAllPropertyDescriptors, getOrAddWeakEntry, getPrototypeChain, isDisposable, isFunction, isObject, isString, isUndefined, nameOfFunction } from "./utils"
 
-const ModelClassBrand = Symbol('IsModel');
-const EventsClassBrand = Symbol('IsEventsClass');
-const StateProperties = Symbol('StateProperties');
-const ObservablePropertyFactories = Symbol('ObservablePropertyInitializers');
-const LegacyObservablePropertyFactories = Symbol('ObservableValueFactories');
-const ObservableValues = Symbol('ObservableValues');
+export interface Model extends Disposable {
+    [modelProperties]: Record<PropertyKey, ModelProperty>
+}
+
+export type ModelProperty = IObservable<any> | StateProperty
+
+/** instance -> key -> provider */
+let instancePropertyProviders = new WeakMap<object, Record<PropertyKey, () => ModelProperty>>()
+/** prototype -> key -> provider */
+let prototypePropertyProviders = new WeakMap<object, Record<PropertyKey, (instance: any) => ModelProperty>>()
+/** 
+ * instance -> getter -> property observable
+ * Required for getters to cache their Observable without being overridden in sub-classes
+*/
+let getterCache = new WeakMap<object, Map<Function, IObservable<any>>>()
+let registeredInstanceProperties = new WeakMap<object, ModelProperty[]>()
+
+
+/** Creates a loose model object. Not required if your model is already decorated with \@{@link model}. */
+export function createModel<T extends object>(create: () => T): T & Model {
+    let sourceCreation = trackManagedObservableCreation()
+    let accesses = collectAccessedSources(null) // Don't want anything accessed during construction to become a source for whatever is creating this
+    try {
+        let instance = create()
+        if (isModel(instance))
+            return instance
+        let model = Object.create(instance, {
+            [modelProperties]: {
+                value: Object.fromEntries(
+                    getChildNodes(instance)
+                        .entries()
+                        .flatMap(([node, path]) => isObservable(node) ? [[path, node]] : []))
+            },
+            [dispose]: {
+                value() {
+                    Object.values(this[modelProperties])
+                        .filter(isDisposable)
+                        .forEach(p => p[dispose]())
+                    if (isDisposable(instance))
+                        instance[dispose]()
+                }
+            }
+        })
+        updateChildren(model, null, instance)
+        sourceCreation.verifyObservableManagement()
+        return model
+    } finally {
+        accesses[dispose]()
+        sourceCreation[dispose]()
+    }
+}
+
+export function disposeModel(model: object) {
+    if (isModel(model))
+        model[dispose]()
+}
 
 /** 
  * Marks a class as a model.
@@ -19,321 +71,341 @@ const ObservableValues = Symbol('ObservableValues');
  * Observable values accessed during construction will not be tracked.
  * The model instance will take ownership of all observable and state properties.
  **/
-export function model<Class extends new (...args: any[]) => any>(target: Class): Class {
-    (target as any)[ModelClassBrand] = true;
-
-    let legacyFactories = getOrAddLegacyObservablePropertyFactories(target.prototype);
-
-    const className = nameOfFunction(target);
-    return {
+export function model<Class extends new (...args: any[]) => object>(target: Class): Class {
+    const className = nameOfFunction(target)
+    let thisCtor: Class
+    return thisCtor = {
         [className]: class extends target {
+            static [modelBrand] = true
             constructor(...args: any[]) {
-                let protection = protectionAgainstAccessingValueWithCommonSource(); // Introduces new tracking scope, while still protecting against accessing values derived from the current event
-                try {
-                    super(...args);
-
-                    let observableValues = getOrAddObservableValues(this);
-
-                    // New decorators
-                    let propertyFactories = getOrAddObservablePropertyFactories(this);
-                    for (let key of Object.keys(propertyFactories))
-                        observableValues[key] = defineObservableProperty(this, key, propertyFactories[key]);
-
-                    // Legacy decorators
-                    for (let key of Object.getOwnPropertyNames(legacyFactories)) // Super class could have its own value factories
-                        observableValues[key] = defineObservableProperty(this, key, legacyFactories[key]);
-                } finally {
-                    protection[dispose]();
+                // Model decorator is ignored on base classes
+                let outerMostModelCtor = getPrototypeChain(new.target).find(ctor => Object.hasOwn(ctor, modelBrand))
+                if (thisCtor != outerMostModelCtor) {
+                    super(...args)
+                    return
                 }
 
-                for (let value of Object.values(getObservableValues(this)))
-                    changeOwnedValue(this, undefined, value);
+                let sourceCreation = trackManagedObservableCreation()
+                let accesses = collectAccessedSources(null) // Don't want anything accessed during construction to become a source for whatever is creating this
+                let allProperties: readonly ModelProperty[] = emptyArray
+                try {
+                    super(...args)
 
-                for (let key of getStateProperties(this)) {
-                    let value = this[key];
-                    if (process.env.NODE_ENV !== 'production') {
-                        if (isEvent(value) || isEventsClass(value))
-                            throw new EventsMarkedAsStateError(this, key);
+                    let model = this as any as Model
+                    let properties = model[modelProperties] = {} as Record<PropertyKey, ModelProperty>
+
+                    let instanceProviders = Object.entries(getInstancePropertyProviders(model))
+                    for (let [key, getProperty] of instanceProviders)
+                        properties[key] = getProperty()
+
+                    let prototypeProviders = getPrototypeChain(target.prototype).flatMap(p => Object.entries(getPrototypePropertyProviders(p)))
+                    for (let [key, getProperty] of prototypeProviders)
+                        properties[key] ??= getProperty(model) // Instance and sub-class properties take precedence over super-class properties
+
+                    for (let [key, property] of Object.entries(properties)) {
+                        if (isObservable(property)) {
+                            Object.defineProperty(model, key, {
+                                // Bind directly to the property for cleaner call stack
+                                get: getPrototypeChain(property)
+                                    .map(proto => Object.getOwnPropertyDescriptor(proto, 'value'))
+                                    .find(value => !!value)!
+                                    .get!.bind(property),
+                                enumerable: true,
+                                configurable: true
+                            })
+                        }
                     }
-                    changeOwnedValue(this, undefined, this[key]);
+
+                    allProperties = registeredInstanceProperties.get(model) ?? [] // Includes overridden super-class properties
+                    if (process.env.NODE_ENV !== 'production' && !allProperties.length)
+                        console.warn(`Model ${className} has no @reduced, @derived, or @state properties. You can remove the @model decorator.`)
+
+                    sourceCreation.verifyObservableManagement()
+
+                    // These are no longer needed
+                    registeredInstanceProperties.delete(model)
+                    instancePropertyProviders.delete(model)
+                    getterCache.delete(model)
+
+                    if (typeof (model as any).toJSON != 'function')
+                        Object.assign(this, { toJSON() { return properties } })
+
+                    Object.assign(this, {
+                        [dispose]() {
+                            for (let property of allProperties)
+                                updateChildren(model, property, null)
+                            super[dispose]?.()
+                        }
+                    })
+                } finally {
+                    accesses[dispose]()
+                    sourceCreation[dispose]()
                 }
             }
         }
-    }[className];
+    }[className]
 }
 
-function defineObservableProperty(model: any, key: string, createObservableValue: (instance: any) => ObservableValue<any>) {
-    let observableValue = createObservableValue(model);
-    observableValue.container = model;
-    Object.defineProperty(model, key, {
-        get() { return observableValue.value; },
-        enumerable: true,
-        configurable: true
-    });
-    return observableValue;
-}
-
-export function reduced<Model, Value>(accessor: ClassAccessorDecoratorTarget<Model, Value>, context: ClassAccessorDecoratorContext<Model, Value>): ClassAccessorDecoratorResult<unknown, Value>;
-export function reduced<Model, Value>(getter: () => Value, context: ClassGetterDecoratorContext<Model, Value>): void;
-export function reduced(prototype: object, key: string | symbol): void;
-export function reduced<Value, Model extends object>(...args:
-    | [ClassAccessorDecoratorTarget<unknown, Value>, ClassAccessorDecoratorContext<Model, Value>]
-    | [() => Value, ClassGetterDecoratorContext<Model, Value>]
+export function reduced<Model, Value>(accessor: ClassAccessorDecoratorTarget<Model, Value>, context: ClassAccessorDecoratorContext<Model, Value>): ClassAccessorDecoratorResult<unknown, Value>
+export function reduced<Model, Value>(getter: () => Value, context: ClassGetterDecoratorContext<Model, Value>): void
+export function reduced(prototype: object, key: string | symbol): void
+export function reduced<Value, Target extends Model>(...args:
+    | [ClassAccessorDecoratorTarget<unknown, Value>, ClassAccessorDecoratorContext<Target, Value>]
+    | [() => Value, ClassGetterDecoratorContext<Target, Value>]
     | [Object, string | symbol]
 ) {
     if (argsAre(args, isClassAccessorDecoratorTarget, isClassAccessorDecoratorContext)) {
         // Auto-accessor property decorator
-        let [_, context] = args;
+        let [target, context] = args
 
         return {
-            init(this: Model, initial: Value) {
-                assertIsModel(this, context.name);
-
-                let reduction = getUnderlyingObservable(initial);
-                if (!(reduction instanceof Reduction))
-                    throw new InvalidReducedPropertyError(context.name);
-
-                getOrAddObservablePropertyFactories(this)[context.name] = constant(reduction);
-
-                return initial;
+            init(this: Target, initial: Value) {
+                return cachedGetter(
+                    context.name,
+                    target.get,
+                    factory => addInstancePropertyFactory(this, context.name, factory),
+                    instance => getUnderlyingReduction(instance, context.name, () => initial)
+                ).call(assertIsModel(this, context.name))
             },
-            get(this: Model) {
-                return getObservableValues(this)?.[context.name as string].value as Value;
-            }
-        };
+            get(this: Target) { return (getModelGetterCache(this).get(target.get) as Reduction<Value, any>)!.value },
+        }
     } else if (argsAre(args, isFunction, isDecoratorContext)) {
         // Getter property decorator
-        let [getter, context] = args;
+        let [getter, context] = args
+        return cachedGetter(
+            context.name,
+            getter,
+            factory => addInstancePropertyFactoryInitializer(context, factory),
+            instance => getUnderlyingReduction(instance, context.name, getter))
 
-        context.addInitializer(function (this: Model) {
-            assertIsModel(this, context.name);
-
-            getOrAddObservablePropertyFactories(this)[context.name] = getterReduction.bind(null, this, context.name, getter);
-        });
     } else {
         // Legacy decorator
-        let [prototype, key] = args;
-        let property = Object.getOwnPropertyDescriptor(prototype, key)!;
+        let [prototype, key] = args
+        let property = Object.getOwnPropertyDescriptor(prototype, key)!
 
         if (property?.get) {
-            let getter = property.get;
-            getOrAddLegacyObservablePropertyFactories(prototype)[key] = instance => getterReduction(instance, key, getter);
+            let getter = property.get
+
             return {
-                get(this: object) {
-                    let observableValue = getObservableValue(this, key as string);
-                    if (!observableValue)
-                        throw new MissingModelDecoratorError(this, key);
-                    return observableValue.value;
-                },
+                get: cachedGetter(
+                    key,
+                    getter,
+                    factory => addPrototypePropertyFactory(prototype, key, factory),
+                    instance => getUnderlyingReduction(assertIsModel(instance, key), key, getter)),
                 enumerable: true,
                 configurable: true
-            };
+            }
         } else {
-            return observableValueProperty(key, Reduction, () => new InvalidReducedPropertyError(key));
+            return sourceSetter(key, Reduction, () => new InvalidReducedPropertyError(key))
         }
     }
+
+    function getUnderlyingReduction(instance: any, key: PropertyKey, getter: Function) {
+        let reduction = getUnderlyingObservable(getter.call(instance))
+
+        if (!(reduction instanceof Reduction))
+            throw new InvalidReducedPropertyError(key)
+
+        if (reduction.displayName == Reduction.defaultName)
+            reduction.displayName = String(key)
+
+        return reduction
+    }
 }
 
-function getterReduction<Value>(instance: object, key: string | symbol, getter: () => Value) {
-    let observableValue = getUnderlyingObservable(getter.call(instance));
-    if (!(observableValue instanceof Reduction))
-        throw new InvalidReducedPropertyError(key);
-    return observableValue;
-}
-
-export function derived<Model, Value>(getter: () => Value, context: ClassGetterDecoratorContext<Model, Value>): void;
-export function derived<Value>(valuesEqual: (previous: Value, next: Value) => boolean): { <Model>(getter: () => Value, context: ClassGetterDecoratorContext<Model, Value>): void; (prototype: Object, key: string | symbol): void; };
-export function derived(prototype: object, key: string | symbol): void;
-export function derived<Model extends object, Value>(...args:
+export function derived<Model, Value>(getter: () => Value, context: ClassGetterDecoratorContext<Model, Value>): void
+export function derived<Value>(valuesEqual: (previous: Value, next: Value) => boolean): { <Model>(getter: () => Value, context: ClassGetterDecoratorContext<Model, Value>): void; (prototype: Object, key: string | symbol): void; }
+export function derived(prototype: object, key: string | symbol): void
+export function derived<Target extends Model, Value>(...args:
     | [(previous: Value, next: Value) => boolean]
-    | [() => Value, ClassGetterDecoratorContext<Model, Value>]
+    | [() => Value, ClassGetterDecoratorContext<Target, Value>]
     | [object, string | symbol]
 ) {
-    let valuesEqual = undefined as ((previous: any, next: any) => boolean) | undefined;
+    let valuesEqual = undefined as ((previous: any, next: any) => boolean) | undefined
 
     if (argsAre(args, isFunction)) {
-        [valuesEqual] = args;
-        return decorate;
+        [valuesEqual] = args
+        return decorate
     } else if (argsAre(args, isFunction, isDecoratorContext)) {
-        return decorate(...args);
+        return decorate(...args)
     } else {
-        return decorate(...args);
+        return decorate(...args)
     }
 
-    function decorate<Model, Value>(getter: () => Value, context: ClassGetterDecoratorContext<Model, Value>): void;
-    function decorate(prototype: object, key: string | symbol): void;
-    function decorate<Model extends object, Value>(...args:
-        | [() => Value, ClassGetterDecoratorContext<Model, Value>]
+    function decorate<Model, Value>(getter: () => Value, context: ClassGetterDecoratorContext<Model, Value>): void
+    function decorate(prototype: object, key: string | symbol): void
+    function decorate<Target extends Model, Value>(...args:
+        | [() => Value, ClassGetterDecoratorContext<Target, Value>]
         | [object, string | symbol]
     ) {
         if (argsAre(args, isFunction, isDecoratorContext)) {
             // Getter property decorator
-            let [getter, context] = args;
-            context.addInitializer(function (this: Model) {
-                assertIsModel(this, context.name);
-
-                getOrAddObservablePropertyFactories(this)[context.name] = () => derive(getter.bind(this), String(context.name), valuesEqual);
-            });
+            let [getter, context] = args
+            return cachedGetter(
+                context.name,
+                getter,
+                factory => addInstancePropertyFactoryInitializer(context, factory),
+                instance => derive(getter.bind(instance), valuesEqual ?? Object.is, String(context.name)))
         } else {
             // Legacy decorator
-            let [prototype, key] = args;
-            let property = Object.getOwnPropertyDescriptor(prototype, key)!;
+            let [prototype, key] = args
+            let property = Object.getOwnPropertyDescriptor(prototype, key)!
 
             if (property?.get) {
-                let getter = property.get;
-                let createDerivation = (instance: any) => derive(getter.bind(instance), String(key), valuesEqual);
-                getOrAddLegacyObservablePropertyFactories(prototype)[key] = createDerivation;
+                let getter = property.get
                 return {
-                    get() { return getOrSetObservableValue(this, key, () => createDerivation(this)).value; },
+                    get: cachedGetter(
+                        key,
+                        getter,
+                        factory => addPrototypePropertyFactory(prototype, key, factory),
+                        instance => derive(getter.bind(assertIsModel(instance, key)), valuesEqual ?? Object.is, String(key))),
                     enumerable: true,
                     configurable: true
                 }
+            } else {
+                return sourceSetter(key, Derivation, () => new InvalidDerivedPropertyError(key))
             }
-
-            return observableValueProperty(key, Derivation, () => new InvalidDerivedPropertyError(key));
         }
     }
 }
 
-function observableValueProperty<Type extends ObservableValue<any>>(
-    key: string | symbol,
-    type: new (...args: any) => Type,
-    createInvalidPropertyError: () => Error
-): PropertyDescriptor {
-    return { set };
+function cachedGetter<Observable extends IDerivation<any> | IReduction<any, any>>(
+    key: PropertyKey,
+    getter: () => ObservedValue<Observable>,
+    addPropertyFactory: (cachedSource: (instance: any) => Observable) => void,
+    createSource: (instance: Model) => Observable
+) {
+    addPropertyFactory(cachedSource)
 
-    function set(this: any, value: any) {
-        let observableValue = getUnderlyingObservable(value);
-        if (!observableValue || !(observableValue instanceof type))
-            throw createInvalidPropertyError();
-        observableValue.displayName = String(key);
-        observableValue.container = this;
-        getOrAddObservableValues(this)[key as string] = observableValue;
-        Object.defineProperty(this, key, {
-            get: () => observableValue!.value,
-            set,
-            enumerable: true,
-            configurable: true
-        });
+    /** Ensures observable is only created once during model construction. */
+    return function cachedGetter(this: Model) {
+        return cachedSource(this).value
+    }
+
+    function cachedSource(instance: Model) {
+        let cache = getModelGetterCache(instance)
+        let observable = cache.get(getter) as Observable
+        if (!observable)
+            cache.set(getter, observable = registerModelProperty<Observable>(instance, key, createSource))
+        return observable
     }
 }
 
-export function state<Model, Value>(value: undefined, context: ClassFieldDecoratorContext<Model, Value>): void;
-export function state<Model, Value>(accessor: ClassAccessorDecoratorTarget<Model, Value>, context: ClassAccessorDecoratorContext<Model, Value>): void;
+function addInstancePropertyFactoryInitializer(context: ClassGetterDecoratorContext<Model, any> | ClassAccessorDecoratorContext<Model, any>, cachedSource: (instance: any) => IObservable<any>) {
+    context.addInitializer(function (this: Model) {
+        assertIsModel(this, context.name)
+        addInstancePropertyFactory(this, context.name, cachedSource)
+    })
+}
+
+function addInstancePropertyFactory(instance: Model, key: PropertyKey, cachedSource: (instance: any) => IObservable<any>) {
+    getInstancePropertyProviders(instance)[key] = cachedSource.bind(null, instance)
+}
+
+function addPrototypePropertyFactory(prototype: object, key: PropertyKey, cachedSource: (instance: any) => IObservable<any>) {
+    getPrototypePropertyProviders(prototype)[key] = cachedSource
+}
+
+function sourceSetter(key: PropertyKey, sourceType: { new(...args: any[]): IObservable<any>; defaultName: string; }, errorFactory: () => Error): PropertyDescriptor {
+    return { set }
+
+    function set(this: object, value: unknown) {
+        assertIsModel(this as Model, key)
+
+        let observable = getUnderlyingObservable(value)
+        if (!(observable instanceof sourceType))
+            throw errorFactory()
+
+        if (observable.displayName == sourceType.defaultName)
+            observable.setDisplayName(String(key))
+
+        registerModelProperty(this as Model, key, () => observable)
+        getInstancePropertyProviders(this)[key] = constant(observable)
+
+        Object.defineProperty(this, key, {
+            get: () => (observable as Observable<any>).value,
+            set,
+            enumerable: true,
+            configurable: true
+        })
+    }
+}
+
+/** Mark a property as part of the model's state. */
+export function state<Model, Value>(value: undefined, context: ClassFieldDecoratorContext<Model, Value>): void
+/** Mark a property as part of the model's state. */
+export function state<Model, Value>(accessor: ClassAccessorDecoratorTarget<Model, Value>, context: ClassAccessorDecoratorContext<Model, Value>): void
 /** Mark a constructor parameter as a state property by specifying its name. */
-export function state<Key extends string>(property: Key): (target: Function, ...rest: any) => void; //..rest: any to support both constructor parameters and classes
+export function state<Key extends string>(property: Key): (target: Function, ...rest: any) => void //..rest: any to support both constructor parameters and classes
 /** Mark a property as a state property. */
-export function state(target: object, key: string): void;
-export function state<Model, Value>(...args:
+export function state(target: object, key: string): void
+export function state<Target extends Model, Value>(...args:
     | string[]
-    | [undefined, ClassFieldDecoratorContext<Model, Value>]
-    | [ClassAccessorDecoratorTarget<Model, Value>, ClassAccessorDecoratorContext<Model, Value>]
+    | [undefined, ClassFieldDecoratorContext<Target, Value>]
+    | [ClassAccessorDecoratorTarget<Target, Value>, ClassAccessorDecoratorContext<Target, Value>]
     | [string]
     | [object, string]
 ) {
     if (argsAre(args, isObject, isString)) {
         // Legacy decorator
-        let [instance, key] = args;
-        addStateProp(instance.constructor.prototype, key);
+        let [prototype, key] = args
+        getPrototypePropertyProviders(prototype)[key] = instance => registerModelProperty(instance, key, () => new StateProperty(instance, key))
     } else if (argsAre(args, isUndefined, isClassFieldDecoratorContext)) {
         // Field decorator
-        let [_, context] = args;
-        context.addInitializer(function (this: Model) { addStateProp(Object.getPrototypeOf(this), String(context.name)); });
+        let [_, context] = args
+        context.addInitializer(function (this: Target) {
+            assertIsModel(this, context.name)
+            getInstancePropertyProviders(this)[context.name] = () => registerModelProperty(this, context.name, () => new StateProperty(this, context.name))
+        })
     } else if (argsAre(args, isClassAccessorDecoratorTarget, isClassAccessorDecoratorContext)) {
         // Auto-accessor property decorator
-        let [_, context] = args;
-        context.addInitializer(function (this: Model) { addStateProp(Object.getPrototypeOf(this), String(context.name)); });
+        let [_, context] = args
+        context.addInitializer(function (this: Target) {
+            assertIsModel(this, context.name)
+            getInstancePropertyProviders(this)[context.name] = () => registerModelProperty(this, context.name, () => new StateProperty(this, context.name))
+        })
     } else {
         // Class decorator, or legacy constructor parameter decorator
         return function decorate(ctor: new (...ctorArgs: any[]) => any) {
             for (let key of args)
-                addStateProp(ctor.prototype, key);
+                getPrototypePropertyProviders(ctor.prototype)[key] = instance => registerModelProperty(instance, key, () => new StateProperty(instance, key))
         }
     }
 }
 
-function addStateProp(prototype: any, key: string) {
-    getOrAdd(prototype, StateProperties, () => [] as string[])
-        .push(key);
+function assertIsModel<Target extends Model>(model: Target, key: PropertyKey) {
+    if (process.env.NODE_ENV !== 'production' && !getPrototypeChain(model.constructor).some(p => Object.hasOwn(p, modelBrand)))
+        throw new MissingModelDecoratorError(model, key)
+    return model
 }
 
-function isClassFieldDecoratorContext(context: ClassFieldDecoratorContext<any, any> | unknown): context is ClassFieldDecoratorContext<any, any> {
-    return isDecoratorContext(context) && context.kind == 'field';
+function registerModelProperty<Property extends ModelProperty>(model: Model, key: PropertyKey, createProperty: (model: Model) => Property) {
+    let property = createProperty(model)
+    updateChildren(model, null, property, `.${String(key)}`)
+    getOrAddWeakEntry(registeredInstanceProperties, model, () => []).push(property)
+    return property
 }
 
-function isClassAccessorDecoratorTarget(context: ClassAccessorDecoratorTarget<any, any> | unknown): context is ClassAccessorDecoratorTarget<any, any> {
-    return isObject(context) && !!(context as ClassAccessorDecoratorTarget<any, any>).get;
-}
+export class StateProperty implements Disposable {
+    readonly [statePropertyBrand] = true
 
-function isClassAccessorDecoratorContext(context: ClassAccessorDecoratorContext<any, any> | unknown): context is ClassAccessorDecoratorContext<any, any> {
-    return isDecoratorContext(context) && context.kind == 'accessor';
-}
+    constructor(
+        private _instance: any,
+        public readonly key: PropertyKey
+    ) {
+        if (process.env.NODE_ENV !== 'production') {
+            if (isEvent(this.value) || isEventsClass(this.value))
+                throw new EventsMarkedAsStateError(_instance, this.key)
+        }
 
-function isDecoratorContext(context: ClassMemberDecoratorContext | unknown): context is DecoratorContext {
-    return isObject(context) && !!(context as ClassMemberDecoratorContext).kind;
-}
+        updateChildren(_instance, null, this.value)
+    }
 
-function assertIsModel(model: object, propertyName: string | symbol) {
-    if (!(ModelClassBrand in model.constructor))
-        throw new MissingModelDecoratorError(model, propertyName);
-}
+    toJSON() { return modelJSON(this.value) }
 
-export function isModel<T>(model: T): model is T & object {
-    return isObject(model)
-        && (ModelClassBrand in Object.getPrototypeOf(model) // TODO only check this - the other checks are for legacy decorators with legacy fields
-            || ObservableValues in model
-            || !!getStateProperties(model).length);
-}
+    get value() { return this._instance[this.key] }
 
-export function extend<T>(reducedValue: T) {
-    let source = getUnderlyingObservable(reducedValue);
-    if (source && source instanceof Reduction)
-        return reduce(reducedValue).on(source, (_, val) => val);
-    throw new ValueIsNotObservableError(reducedValue);
-}
-
-export function getOrSetObservableValue(instance: any, key: string | symbol, createObservableValue: () => ObservableValue<any>) {
-    return getOrAdd(getOrAddObservableValues(instance), key, () => Object.assign(createObservableValue(), { container: instance }));
-}
-
-function getOrAddObservableValues(instance: any) {
-    return getOrAdd(instance, ObservableValues, () => ({} as Record<string, ObservableValue<any>>));
-}
-
-export function getObservableValue(instance: any, key: string) {
-    let observableValues = getObservableValues(instance);
-    return Object.hasOwn(observableValues, key)
-        ? observableValues[key]
-        : undefined;
-}
-
-export function getObservableValues(instance: any): { [property: string]: ObservableValue<unknown> } {
-    return isObject(instance) && ObservableValues in instance
-        ? instance[ObservableValues]
-        : {};
-}
-
-/**
- * Initializing observable properties before construction is complete can cause problems if they access an uninitialized field,
- * so we store the initializers on the instance and run them after construction.
- **/
-function getOrAddObservablePropertyFactories(instance: any) {
-    return getOrAdd<Record<PropertyKey, () => ObservableValue<any>>>(instance, ObservablePropertyFactories, () => ({}));
-}
-
-/** Same as getOrAddObservablePropertyInitializers, but for old experimental decorators, which only have access to the prototype. */
-function getOrAddLegacyObservablePropertyFactories(prototype: any) {
-    return getOrAdd<Record<string | symbol, (instance: any) => ObservableValue<any>>>(prototype, LegacyObservablePropertyFactories,
-        base => base ? Object.create(base) : {}); // Because we're dealing with prototypes, we need to inherit from base class' factories
-}
-
-export function getStateProperties<T>(model: T): readonly string[] {
-    if (isPlainObject(model))
-        return emptyArray;
-
-    let prototype = Object.getPrototypeOf(model);
-    return getStateProperties(prototype)
-        .concat(prototype[StateProperties] as StringKey<T>[] | undefined || emptyArray);
+    [dispose]() { updateChildren(this._instance, this.value, null) }
 }
 
 /**
@@ -342,65 +414,95 @@ export function getStateProperties<T>(model: T): readonly string[] {
  * Events returned from getters will be snapshotted, so the getter function is only called once.
  */
 export let events = <T extends { new(...args: any[]): any }>(target: T): T => {
-    const className = nameOfFunction(target);
+    const className = nameOfFunction(target)
     return {
         [className]: class extends target {
             constructor(...args: any[]) {
-                super(...args);
+                super(...args)
                 for (let [key, property] of getAllPropertyDescriptors(this)) {
-                    let value = this[key];
+                    let value = this[key]
                     if (isEvent(value)) {
-                        value.displayName = key;
-                        value.container = this;
+                        value.setDisplayName(key)
+                        updateChildren(this as any as EventsClass, null, value, `.${key}`)
                         if (property.get)
                             Object.defineProperty(this, key, {
                                 value,
                                 configurable: true,
                                 enumerable: true
-                            });
+                            })
                     }
                 }
-                (this as any)[EventsClassBrand] = true;
+                markEventsClass(this)
             }
         }
-    }[className];
+    }[className]
 }
 
-export function isEventsClass(value: unknown): value is Object {
-    return value instanceof Object
-        && EventsClassBrand in value;
+export function getModelProperties(model: Model): Record<PropertyKey, ModelProperty> {
+    return model[modelProperties]
+}
+
+function isClassFieldDecoratorContext(context: ClassFieldDecoratorContext<any, any> | unknown): context is ClassFieldDecoratorContext<any, any> {
+    return isDecoratorContext(context) && context.kind == 'field'
+}
+
+function isClassAccessorDecoratorTarget(context: ClassAccessorDecoratorTarget<any, any> | unknown): context is ClassAccessorDecoratorTarget<any, any> {
+    return isObject(context) && !!(context as ClassAccessorDecoratorTarget<any, any>).get
+}
+
+function isClassAccessorDecoratorContext(context: ClassAccessorDecoratorContext<any, any> | unknown): context is ClassAccessorDecoratorContext<any, any> {
+    return isDecoratorContext(context) && context.kind == 'accessor'
+}
+
+function isDecoratorContext(context: ClassMemberDecoratorContext | unknown): context is DecoratorContext {
+    return isObject(context) && !!(context as ClassMemberDecoratorContext).kind
+}
+
+/** For new decorators which have access to the instance. */
+function getInstancePropertyProviders(instance: object): Record<PropertyKey, () => ModelProperty> {
+    return getOrAddWeakEntry(instancePropertyProviders, instance, () => ({}))
+}
+
+/** For class decorators and legacy decorators that don't have access to the instance. */
+function getPrototypePropertyProviders(prototype: object): Record<PropertyKey, (instance: any) => ModelProperty> {
+    return getOrAddWeakEntry(prototypePropertyProviders, prototype, () => ({}))
+}
+
+/** For caching getters during model construction, so accessing them doesn't create extra sources. */
+function getModelGetterCache(instance: object): Map<Function, ModelProperty> {
+    return getOrAddWeakEntry(getterCache, instance, () => new Map())
 }
 
 export class MissingModelDecoratorError extends Error {
     constructor(
         public model: object,
-        public property: string | symbol
+        public property: PropertyKey
     ) {
-        super(`${nameOfFunction(model.constructor)} class must be marked as a @model to use @reduced, @derived, or @state properties.`);
+        super(`${nameOfFunction(model.constructor)} class must be marked as a @model to use @reduced, @derived, or @state properties.`)
+    }
+}
+
+export class InvalidReducedPropertyError extends Error {
+    constructor(
+        public property: PropertyKey
+    ) {
+        super(`@reduced property '${String(property)}' must return, or be set to, the value of a reduction.`)
+    }
+}
+
+export class InvalidDerivedPropertyError extends Error {
+    constructor(
+        public property: PropertyKey
+    ) {
+        super(`@derived property ${String(property)} must have a getter or be set to the value of a derivation.`)
     }
 }
 
 export class EventsMarkedAsStateError extends Error {
     constructor(
         public model: object,
-        public property: string | symbol
+        public property: PropertyKey
     ) {
-        super(`Model property ${String(property)} returns an event or events class, and cannot be marked as @state.`);
-    }
-}
-
-export class InvalidReducedPropertyError extends Error {
-    constructor(
-        public property: string | symbol
-    ) {
-        super(`@reduced property '${String(property)}' must return, or be set to, the value of a reduction.`);
-    }
-}
-
-export class InvalidDerivedPropertyError extends Error {
-    constructor(
-        public property: string | symbol
-    ) {
-        super(`@derived property ${String(property)} must have a getter or be set to the value of a derivation.`);
+        super(`Model property ${String(property)} returns an event or events class, and cannot be marked as @state.`)
     }
 }

@@ -10,18 +10,18 @@
     "url": "https://github.com/soxtoby/event-reduce.git"
   },
   "dependencies": {
-    "event-reduce": "*",
-    "event-reduce-react": "*"
+    "event-reduce": "workspace:*",
+    "event-reduce-react": "workspace:*",
+    "event-reduce-example": "workspace:*"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.6.2",
-    "@testing-library/react": "*",
-    "@testing-library/react-hooks": "*",
-    "@types/react": ">=16.8",
-    "@types/react-dom": ">=16.8",
-    "react": ">=16.8",
-    "react-dom": ">=16.8",
-    "react-test-renderer": ">=16.8",
-    "typescript": "~5"
+    "@happy-dom/global-registrator": "^20.10.6",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-test-renderer": "^19.2.7",
+    "typescript": "~6.0.2"
   }
 }

@@ -1,70 +1,70 @@
-import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
-import { derived, event, events, model, reduce, reduced } from "event-reduce";
-import { disposeModel } from "event-reduce/lib/cleanup";
-import { eventProxy, modelProxy, mutable } from "event-reduce/lib/testing";
+import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test"
+import { derived, disposeModel, event, events, model, reduce, reduced } from "event-reduce"
+import { eventProxy, getTarget, modelProxy, Mutable, mutable } from "event-reduce/lib/testing"
+import { MockObserver } from "./MockObserver"
 
 describe("mutable", () => {
     @events
     class Events {
-        nextValue = event<number>();
+        nextValue = event<number>()
     }
 
     @model
     class Model {
-        private privateVal = 'private';
+        private privateVal = 'private'
 
-        events = new Events();
+        events = new Events()
 
         @reduced
         get value() {
             return reduce(0)
                 .on(this.events.nextValue, (_, val) => val)
-                .value;
+                .value
         }
 
         @derived
-        get valuePlusOne() { return this.value + 1; }
+        get valuePlusOne() { return this.value + 1 }
     }
 
-    let baseModel: Model;
-    let sut: ReturnType<typeof mutable<Model>>;
-    let typedModel: Model;
+    let baseModel: Model
+    let sut: Mutable<Model>
+    let typedModel: Model
 
     beforeEach(() => {
-        baseModel = new Model();
-        baseModel.valuePlusOne;
-        sut = mutable(baseModel);
-        typedModel = sut.target;
-    });
+        baseModel = new Model()
+        baseModel.valuePlusOne
+        sut = mutable(baseModel)
+        typedModel = sut.target
+    })
 
     test("without overrides, properties behave normally", () => {
-        sut.events.nextValue(3);
+        sut.events.nextValue(3)
 
-        expect(sut.value).toBe(3);
-        expect(sut.valuePlusOne).toBe(4);
-        expect(sut.valuePlusOne).toBe(4);
-    });
+        expect(sut.value).toBe(3)
+        expect(sut.valuePlusOne).toBe(4)
+        expect(sut.valuePlusOne).toBe(4)
+    })
 
     describe("when reduced property overridden", () => {
         beforeEach(() => {
-            sut.value = 2;
-        });
+            sut.value = 2
+        })
 
-        test("reduced value returns override", () => expect(sut.value).toBe(2));
+        test("reduced value returns override", () => expect(sut.value).toBe(2))
 
-        test("computed value is still computed", () => expect(sut.valuePlusOne).toBe(3));
-    });
+        test("computed value is still computed", () => expect(sut.valuePlusOne).toBe(3))
+    })
 
     test("when computed property overridden, computed value returns override", () => {
-        sut.valuePlusOne = 3;
+        sut.valuePlusOne = 3
 
-        expect(sut.valuePlusOne).toBe(3);
-    });
+        expect(sut.valuePlusOne).toBe(3)
+    })
 
     test("can be disposed", () => {
-        disposeModel(sut);
-    });
-});
+        disposeModel(sut)
+    })
+})
 
 describe("modelProxy", () => {
     class ModelClass {
@@ -74,11 +74,11 @@ describe("modelProxy", () => {
         ) { }
     }
 
-    let sut: ModelClass;
+    let sut: ModelClass
 
     beforeEach(() => {
-        sut = modelProxy(new ModelClass('foo', { prop: 'bar' }));
-    });
+        sut = modelProxy(new ModelClass('foo', { prop: 'bar' }))
+    })
 
     test("can deeply compare proxy", () => {
         expect(sut).toEqual({
@@ -86,44 +86,44 @@ describe("modelProxy", () => {
             objectValue: {
                 prop: 'bar'
             }
-        });
-    });
+        })
+    })
 
     test("can be disposed", () => {
-        disposeModel(sut);
-    });
-});
+        disposeModel(sut)
+    })
+})
 
 describe("eventProxy", () => {
     @events
     class Events {
-        nextValue = event<number>();
+        nextValue = event<number>()
     }
 
-    let untyped: any;
-    let typed: Events;
+    let untyped: any
+    let typed: Events
 
     beforeEach(() => {
-        untyped = eventProxy();
-        typed = eventProxy<Events>();
-    });
+        untyped = eventProxy()
+        typed = eventProxy<Events>()
+    })
 
     test("arbitrary events work", () => {
-        let handler: Mock<(value: string) => void> = mock();
-        untyped.foo.subscribe(handler);
+        let handler = new MockObserver<any>()
+        untyped.foo.subscribe(handler)
 
-        untyped.foo('bar');
+        untyped.foo('bar')
 
-        expect(handler).toHaveBeenCalledWith('bar');
-    });
+        expect(handler.sourceUpdated).toHaveBeenCalledWith(getTarget(untyped.foo), 'bar')
+    })
 
     test("custom event creation", () => {
-        let custom = eventProxy(() => event<{ value: string }>().scope({ value: 'foo' }));
-        let handler: Mock<(value: { value: string }) => void> = mock();
-        custom.foo.subscribe(handler);
+        let custom = eventProxy(() => event<{ value: string }>().scope({ value: 'foo' }))
+        let handler = new MockObserver<{ value: string }>()
+        custom.foo.subscribe(handler)
 
-        custom.foo({});
+        custom.foo({})
 
-        expect(handler).toHaveBeenCalledWith(expect.objectContaining({ value: 'foo' }));
-    });
-});
+        expect(handler.sourceUpdated).toHaveBeenCalledWith(custom.foo, expect.objectContaining({ value: 'foo' }))
+    })
+})

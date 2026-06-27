@@ -1,177 +1,202 @@
-import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
-import { event, events, reduce } from 'event-reduce';
-import { AccessedValueWithCommonSourceError, collectAccessedValues } from 'event-reduce/lib/observableValue';
-import { CircularSubscriptionError, IBoundReduction, IReduction, ReducedEventsError } from "event-reduce/lib/reduction";
-import { Subject } from 'event-reduce/lib/subject';
+import { afterEach, beforeEach, describe, expect, mock, test, type Mock } from "bun:test"
+import { createModel, event, events, IReduction, ISignal, reduce, signal } from 'event-reduce'
+import { InvalidStateError } from "event-reduce/lib/observable"
+import { CircularSubscriptionError } from "event-reduce/lib/reduction"
+import { CircularDependencyError, collectAccessedSources } from "event-reduce/lib/tracking"
+import { dispose } from "event-reduce/lib/utils"
+import { MockObserver } from "./MockObserver"
 
 describe("reduce", () => {
     describe("when unbound", () => {
-        let subscriber: Mock<(value: number) => void>;
-        let sut: IReduction<number>;
+        let subscriber: MockObserver<number>
+        let sut: IReduction<number>
 
         beforeEach(() => {
-            subscriber = mock();
-            sut = reduce(1, 'sut');
-            sut.subscribe(subscriber);
-        });
+            subscriber = new MockObserver<number>()
+            sut = createModel(() => reduce(1, 'sut'))
+            sut.subscribe(subscriber)
+        })
 
-        test("starts with initial value", () => expect(sut.value).toBe(1));
+        afterEach(() => {
+            sut[dispose]()
+        })
+
+        test("starts with initial value", () => expect(sut.value).toBe(1))
 
         describe("when subscribed to an observable", () => {
-            let subject: Subject<string>;
-            let reducer: Mock<(previous: number, event: string) => number>;
+            let observableValue: ISignal<string>
+            let reducer: Mock<(previous: number, event: string) => number>
 
             beforeEach(() => {
-                subject = new Subject<string>(() => 'test');
-                reducer = mock();
-                sut.on(subject, reducer);
-            });
+                observableValue = signal('test', 'test')
+                reducer = mock()
+                sut.on(observableValue, reducer)
+            })
 
             describe("when observable emits a value", () => {
                 beforeEach(() => {
-                    reducer.mockReturnValue(3);
-                    subject.next('foo');
-                });
+                    reducer.mockReturnValue(3)
+                    observableValue.setValue('foo')
+                })
 
                 test("reducer called with previous value and observable value", () => {
-                    expect(reducer).toHaveBeenCalledWith(1, 'foo');
-                });
+                    expect(reducer).toHaveBeenCalledWith(1, 'foo')
+                })
 
-                test("value becomes return value of reducer", () => expect(sut.value).toBe(3));
+                test("value becomes return value of reducer", () => expect(sut.value).toBe(3))
 
                 describe("when another value is emitted", () => {
                     beforeEach(() => {
-                        reducer.mockReturnValue(4);
-                        subject.next('bar');
-                    });
+                        reducer.mockReturnValue(4)
+                        observableValue.setValue('bar')
+                    })
 
                     test("reducer called with previous value and observable value", () => {
-                        expect(reducer).toHaveBeenCalledWith(3, 'bar');
-                    });
+                        expect(reducer).toHaveBeenCalledWith(3, 'bar')
+                    })
 
-                    test("value becomes return value of reducer", () => expect(sut.value).toBe(4));
-                });
-            });
-        });
+                    test("value becomes return value of reducer", () => expect(sut.value).toBe(4))
+                })
+            })
+        })
 
         describe("when a reducer accesses a reduced value", () => {
-            let other: ReturnType<typeof reduce<number>>;
-            let subject: Subject<number>;
+            let other: ReturnType<typeof reduce<number>>
+            let observable: ISignal<number>
 
             beforeEach(() => {
-                other = reduce(0);
-                subject = new Subject<number>(() => 'test');
-                sut.on(subject, () => other.value);
-            });
+                other = createModel(() => reduce(0))
+                observable = signal(0, 'test')
+                sut.on(observable, () => other.value)
+            })
 
-            test("when other value based on same event, throws", () => {
-                other.on(subject, () => 0);
+            afterEach(() => {
+                other[dispose]()
+            })
+
+            test("when other value based on same source, uses latest value", () => {
+                other.on(observable, (_, value) => value)
+
+                observable.setValue(3)
+
+                expect(other.value).toBe(3)
+                expect(sut.value).toBe(3)
+            })
+
+            test("when other value also accesses current reduction, throws", () => {
+                other.on(observable, () => sut.value)
 
                 try {
-                    subject.next(0);
-                    expect.unreachable("Should have thrown");
+                    observable.setValue(1)
+                    expect.unreachable("Should have thrown")
                 } catch (e) {
-                    expect(e).toBeInstanceOf(AccessedValueWithCommonSourceError);
-                    expect((e as AccessedValueWithCommonSourceError).commonSource).toBe(subject);
-                    expect((e as AccessedValueWithCommonSourceError).triggeringObservable).toBe(subject);
-                    expect((e as AccessedValueWithCommonSourceError).accessedObservable).toBe(other as any);
+                    expect(e).toBeInstanceOf(CircularDependencyError)
                 }
-            });
+            })
 
             test("when other value not based on same event, doesn't throw", () => {
-                subject.next(0);
-            });
-        });
+                observable.setValue(0)
+            })
+        })
 
         test("when subscribing to an observable based on itself, throws", () => {
-            let observable = sut.filter(n => n > 3);
+            let observable = sut.filter(n => n > 3)
             try {
-                sut.on(observable, (_, n) => n);
-                expect.unreachable("Should have thrown");
+                sut.on(observable, (_, n) => n)
+                expect.unreachable("Should have thrown")
             } catch (e) {
-                expect(e).toBeInstanceOf(CircularSubscriptionError);
-                expect((e as CircularSubscriptionError).observable).toBe(observable);
-                expect((e as CircularSubscriptionError).reduction).toBe(sut);
+                expect(e).toBeInstanceOf(CircularSubscriptionError)
+                expect((e as CircularSubscriptionError).source).toBe(observable)
+                expect((e as CircularSubscriptionError).reduction).toBe(sut)
             }
-        });
-    });
+        })
+    })
 
     describe("when bound to events object", () => {
-        let eventsObj: {};
-        let sut: IBoundReduction<number, typeof eventsObj>;
+        let eventsObj: {}
+        let sut: IReduction<number, typeof eventsObj>
 
         beforeEach(() => {
-            eventsObj = {};
-            sut = reduce(1, eventsObj);
-        });
+            eventsObj = {}
+            sut = createModel(() => reduce(1, eventsObj))
+        })
+
+        afterEach(() => {
+            sut[dispose]()
+        })
 
         describe("when subscribing to an observable", () => {
-            let subject: Subject<string>;
-            let getEvent: Mock<(events: typeof eventsObj) => Subject<string>>;
-            let reducer: Mock<(previous: number, event: string) => number>;
+            let observableValue: ISignal<string>
+            let getEvent: Mock<(events: typeof eventsObj) => ISignal<string>>
+            let reducer: Mock<(previous: number, event: string) => number>
 
             beforeEach(() => {
-                subject = new Subject<string>(() => 'test');
-                getEvent = mock(() => subject);
-                reducer = mock();
-                sut.on(getEvent, reducer);
-            });
+                observableValue = signal('test', 'test')
+                getEvent = mock(() => observableValue)
+                reducer = mock()
+                sut.on(getEvent, reducer)
+            })
 
             test("event getter called with bound events", () => {
-                expect(getEvent).toHaveBeenCalledWith(eventsObj);
-            });
+                expect(getEvent).toHaveBeenCalledWith(eventsObj)
+            })
 
             test("reduction subscribed to result of event getter", () => {
-                subject.next('foo');
-                expect(reducer).toHaveBeenCalledWith(1, 'foo');
-            });
-        });
-    });
+                observableValue.setValue('foo')
+                expect(reducer).toHaveBeenCalledWith(1, 'foo')
+            })
+        })
+    })
 
     test("accessed reductions updated when value is accessed", () => {
-        let r1 = reduce(1);
-        let r2 = reduce(2);
+        using sut = createModel(() => ({
+            r1: reduce(1, 'r1'),
+            r2: reduce(2, 'r2')
+        }))
 
-        let accessed = collectAccessedValues(() => {
-            r1.value;
-            r2.value;
-        });
+        using tracker = collectAccessedSources(null)
+        sut.r1.value
+        sut.r2.value
 
-        expect(Array.from(accessed)).toContain(r1 as any);
-        expect(Array.from(accessed)).toContain(r2 as any);
-    });
+        expect(tracker.accessed).toContain(sut.r1 as any)
+        expect(tracker.accessed).toContain(sut.r2 as any)
+    })
 
     test("when reducer returns an event, throws", () => {
-        let eventValue = event('test event');
-        let subject = new Subject<string>(() => 'test');
-        let sut = reduce(null as any, 'sut')
-            .on(subject, () => eventValue);
+        let eventValue = event('test event')
+        let subject = signal('test', 'test')
+        using sut = createModel(() => ({
+            reduction: reduce(null as any, 'sut')
+                .on(subject, () => eventValue)
+        }))
 
         try {
-            subject.next('foo');
-            expect.unreachable("Should have thrown");
+            subject.setValue('foo')
+            expect.unreachable("Should have thrown")
         } catch (e) {
-            expect(e).toBeInstanceOf(ReducedEventsError);
-            expect((e as ReducedEventsError).reduction).toBe(sut);
-            expect((e as ReducedEventsError).value).toBe(eventValue);
+            expect(e).toBeInstanceOf(InvalidStateError)
+            expect((e as InvalidStateError).observable).toBe(sut.reduction)
+            expect((e as InvalidStateError).value).toBe(eventValue)
         }
-    });
+    })
 
     test("when reducer returns an events object, throws", () => {
         @events
         class Events { }
-        let eventsValue = new Events();
-        let subject = new Subject<string>(() => 'test');
-        let sut = reduce(null as any, 'sut')
-            .on(subject, () => eventsValue);
+        let eventsValue = new Events()
+        let subject = signal('test', 'test')
+        using sut = createModel(() => ({
+            reduction: reduce(null as any, 'sut')
+                .on(subject, () => eventsValue)
+        }))
 
         try {
-            subject.next('foo');
-            expect.unreachable("Should have thrown");
+            subject.setValue('foo')
+            expect.unreachable("Should have thrown")
         } catch (e) {
-            expect(e).toBeInstanceOf(ReducedEventsError);
-            expect((e as ReducedEventsError).reduction).toBe(sut);
-            expect((e as ReducedEventsError).value).toBe(eventsValue);
+            expect(e).toBeInstanceOf(InvalidStateError)
+            expect((e as InvalidStateError).observable).toBe(sut.reduction)
+            expect((e as InvalidStateError).value).toBe(eventsValue)
         }
-    });
-});
+    })
+})

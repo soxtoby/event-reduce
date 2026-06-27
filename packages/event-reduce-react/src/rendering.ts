@@ -1,116 +1,130 @@
-import { IObservableValue, Observe } from "event-reduce";
-import { Derivation } from "event-reduce/lib/derivation";
-import { LogValue } from "event-reduce/lib/logging";
-import { ObservableValue } from "event-reduce/lib/observableValue";
-import { reactionQueue } from "event-reduce/lib/reactions";
-import { constant, nameOfFunction, unsubscribeAll } from "event-reduce/lib/utils";
-import { Children, Fragment, ReactElement, ReactNode, createElement, isValidElement, useCallback, useEffect, useState } from "react";
-import { useSyncExternalStore } from "use-sync-external-store/shim";
+import { Effect, log, startLogging } from "event-reduce"
+import { LogValue } from "event-reduce/lib/logging"
+import { IObservable } from "event-reduce/lib/observable"
+import { beginTransition, queueTransitionEffect } from "event-reduce/lib/tracking"
+import { constant, dispose, emptyArray, nameOfFunction } from "event-reduce/lib/utils"
+import { Children, Fragment, ReactElement, ReactNode, createElement, isValidElement, useState } from "react"
+import { useSyncExternalStore } from "use-sync-external-store/shim"
 
 export function Reactive(props: { name?: string; children: () => ReactNode; }): ReactElement {
-    return useReactive(props.name || 'Derived', () => createElement(Fragment, { children: props.children() }));
+    return useReactive(props.name || 'Derived', () => createElement(Fragment, { children: props.children() }))
 }
 
 export function reactive<Args extends any[]>(component: (...args: Args) => ReactElement | null) {
-    let componentName = nameOfFunction(component) || 'ReactiveComponent';
+    let componentName = nameOfFunction(component) || 'ReactiveComponent'
 
-    const reactiveComponentName = `reactive(${componentName})`;
+    const reactiveComponentName = `reactive(${componentName})`
     return {
         [reactiveComponentName]: (...args: Args) => useReactive(componentName, () => component(...args))
-    }[reactiveComponentName];
+    }[reactiveComponentName]
 }
 
-export function useReactive<T>(deriveValue: () => T): T;
-export function useReactive<T>(name: string, deriveValue: () => T): T;
+export function useReactive<T>(deriveValue: () => T): T
+export function useReactive<T>(name: string, deriveValue: () => T): T
 export function useReactive<T>(nameOrDeriveValue: string | (() => T), maybeDeriveValue?: () => T): T {
     let [name, deriveValue] = typeof nameOrDeriveValue == 'string'
         ? [nameOrDeriveValue, maybeDeriveValue!]
-        : ['ReactiveValue', nameOrDeriveValue];
+        : ['ReactiveValue', nameOrDeriveValue]
 
-    let derivation = useSyncDerivation<T>(name);
-    return useRenderValue<T>(derivation, deriveValue);
+    let renderEffect = useState(() => new RenderEffect<T>(name))[0]
+    useSyncExternalStore(renderEffect.subscribe, renderEffect.triggerSnapshot)
+    return renderEffect.run(deriveValue)
 }
 
-function useSyncDerivation<T>(name: string) {
-    // Using a bogus derive function because we'll provide a new one every render
-    let renderedValue = useState(() => new RenderedValue<T>(constant(name), constant(undefined!)))[0];
+class RenderEffect<T> extends Effect<T> {
+    private _observers = new Set<() => void>()
+    private _trigger: IObservable<any> | null = null
+    private _version = 0
+    private _triggerState: unknown = { triggeredBy: "(nothing)" }
+    private _previousValue?: T
 
-    useEffect(renderedValue.connect);
-
-    useSyncExternalStore(renderedValue.onInvalidated, renderedValue.getInvalidatedState);
-
-    return renderedValue;
-}
-
-function useRenderValue<T>(derivation: RenderedValue<T>, deriveValue: () => T) {
-    useCallback(function update() { derivation.update(deriveValue, 'render'); }, [deriveValue])(); // need to use a hook to be considered a hook in devtools
-    return derivation.value;
-}
-
-class RenderedValue<T> extends Derivation<T> {
-    private readonly _invalidatedState = new ObservableValue(() => `${this.displayName}.render`, { invalidatedBy: "(nothing)" });
-
-    onInvalidated = (observe: Observe<{ invalidatedBy: string }>) => this._invalidatedState.subscribe(observe);
-
-    getInvalidatedState = () => this._invalidatedState.value;
-
-    connect = () => {
-        let subscriptions = this.subscribeToSources();
-        return unsubscribeAll.bind(null, subscriptions);
+    constructor(displayName: string) {
+        super(displayName, constant(undefined!), (observable) => {
+            if (!this._trigger) {
+                log('⚛️🚩 (render invalidated)', this.displayName, [observable])
+                this._trigger = observable
+                this._triggerState = process.env.NODE_ENV !== 'production'
+                    ? { triggeredBy: observable.path }
+                    : { version: ++this._version }
+                queueTransitionEffect(this.notifySubscribers.bind(this))
+            }
+        })
+        this.attach()
     }
 
-    protected override onSourcesUpdated(): void {
-        // Do nothing - will subscribe later
+    subscribe = (observer: () => void) => {
+        this._observers.add(observer)
+        return () => this._observers.delete(observer)
     }
 
-    protected override onSourceValueChanged(source: IObservableValue<unknown>) {
-        if (this._state == 'indeterminate') {
-            this._state = 'uninitialized';
-            reactionQueue.current.add(() => this._invalidatedState.setValue({ invalidatedBy: source.displayName ?? "(unknown)" }));
+    triggerSnapshot = () => this._triggerState
+
+    notifySubscribers() {
+        for (let subscriber of this._observers)
+            subscriber()
+    }
+
+    override run(deriveValue: () => T) {
+        let previousValue = this._previousValue
+        let nextValue!: T
+        let trigger = this._trigger
+        this._trigger = null
+
+        let transition = beginTransition(this, trigger ?? { trigger: 'render' })
+        let logging = startLogging('⚛️ (render)', this.displayName, emptyArray, () => ({
+            Trigger: trigger?.path ?? 'render',
+            Previous: loggedReactValue(previousValue),
+            Current: loggedReactValue(nextValue),
+        }))
+
+        try {
+            nextValue = super.run(deriveValue)
+            if (process.env.NODE_ENV !== 'production')
+                this._previousValue = nextValue
+            return nextValue
+        } finally {
+            logging[dispose]()
+            transition[dispose]()
         }
     }
+}
 
-    protected override getInvalidatedMessage() { return '⚛️🚩 (render invalidated)'; }
+function loggedReactValue(value: unknown) {
+    if (process.env.NODE_ENV !== 'production' && isValidElement(value)) {
+        let xmlDoc = document.implementation.createDocument(null, null)
+        return new LogValue([
+            xmlTree(value),
+            { ['React element']: value }
+        ])
 
-    protected override getUpdateMessage() { return '⚛️ (render)'; }
-
-    protected override loggedValue(value: T) {
-        if (process.env.NODE_ENV !== 'production' && isValidElement(value)) {
-            let xmlDoc = document.implementation.createDocument(null, null);
-            return new LogValue([
-                xmlTree(value),
-                { ['React element']: value }
-            ]);
-
-            function xmlTree<T>(node: T): Node {
-                if (isValidElement(node)) {
-                    let type = reactElementName(node.type)
-                        .split('(').at(-1)!.split(')')[0]  // Unwrap HOC names
-                        .replace(/^[0-9-]/, '_$&')  // Escape leading number or dash
-                        .replace(/[^a-zA-Z0-9:_.-]/g, '_');  // Escape rest of element name
-                    let el = xmlDoc.createElement(type || ':unknown:');
-                    for (let child of Children.toArray((node.props as any).children))
-                        el.appendChild(xmlTree(child));
-                    return el;
-                }
-                return document.createTextNode(String(node));
+        function xmlTree(node: unknown): Node {
+            if (isValidElement(node)) {
+                let type = reactElementName(node.type)
+                    ?.split('(').at(-1)!.split(')')[0]  // Unwrap HOC names
+                    .replace(/^[0-9-]/, '_$&')  // Escape leading number or dash
+                    .replace(/[^a-zA-Z0-9:_.-]/g, '_')  // Escape rest of element name
+                let el = xmlDoc.createElement(type || ':unknown:')
+                for (let child of Children.toArray((node.props as any).children))
+                    el.appendChild(xmlTree(child))
+                return el
             }
+            return document.createTextNode(String(node))
+        }
 
-            function reactElementName(elementType: any) {
-                switch (typeof elementType) {
-                    case 'string':
-                        return elementType;
-                    case 'function':
-                        return nameOfFunction(elementType);
-                    case 'symbol':
-                        return String(elementType);
-                    case 'object':
-                        if ('_context' in elementType) return 'Context.Provider';
-                        if (elementType.displayName) return elementType.displayName;
-                        if (elementType.type?.displayName) return elementType.type.displayName;
-                }
+        function reactElementName(elementType: any) {
+            switch (typeof elementType) {
+                case 'string':
+                    return elementType
+                case 'function':
+                    return nameOfFunction(elementType)
+                case 'symbol':
+                    return String(elementType)
+                case 'object':
+                    if ('_context' in elementType || ('Consumer' in elementType && 'Provider' in elementType)) return 'Context.Provider'
+                    if (elementType.displayName) return elementType.displayName
+                    if (elementType.type?.displayName) return elementType.type.displayName
             }
         }
-        return value;
     }
+    return value
 }

@@ -1,12 +1,16 @@
 {
     "extends": "../tsconfig.base.json",
     "compilerOptions": {
-        "baseUrl": ".",
         "outDir": "./dist",
         "rootDir": ".",
         "experimentalDecorators": true,
         "useDefineForClassFields": false
     },
+    "references": [
+        {
+            "path": "../packages/event-reduce"
+        }
+    ],
     "include": [
         "./**/*.ts",
         "./**/*.tsx"

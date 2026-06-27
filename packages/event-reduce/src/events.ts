@@ -1,226 +1,272 @@
-import { ensureNotInsideDerivation } from "./derivation";
-import { log, logEvent } from "./logging";
-import { IObservable, ObservableOperation } from "./observable";
-import { ISubject, Subject } from "./subject";
-import { Scoped } from "./types";
-import { NamedBase, constant, filteredName, matchesScope, scopedName } from "./utils";
+import { startLogging } from "./logging"
+import { type IObservable, Observable } from "./observable"
+import { markEvent } from "./symbols"
+import { beginTransition } from "./tracking"
+import { ObservedValue, Scoped } from "./types"
+import { dispose, isObject, matchesScope, nameOfCallback, scopedName } from "./utils"
 
-export interface IEventBase {
-    displayName: string;
-    container?: any;
+export function event<T = void>(name: string = "(anonymous event)"): IEvent<T> {
+    return makeEvent({
+        name,
+        fire(emit: (value: T) => void, value: T) {
+            let logging = startLogging('⚡ (event)', name, [value], () => ({ Path: this.path }))
+            try {
+                emit(value)
+            } finally {
+                logging?.[dispose]()
+            }
+            return value
+        },
+        additionalMembers: <In>(e: IEventFunction<T, [In]>) => ({
+            scope<Scope extends Partial<In>>(scope: Scope): IEvent<Scoped<In, Scope>, T> {
+                return bindEvent(e,
+                    scopedName(e.displayName, scope),
+                    (value: Scoped<In, Scope>) => e({ ...value, ...scope } as In),
+                    matchesScope(scope)) as IEvent<Scoped<In, Scope>, T>
+            }
+        })
+    }) as IEvent<T>
 }
 
-/** Event implementation */
-export interface IEventClass extends IEventBase {
-    next(...args: any): any;
-}
+export function asyncEvent<Result = void, Context = void>(name: string = "(anonymous async event)"): IAsyncEvent<Result, Context> {
+    return makePhasedEvent({
+        name,
+        phases: ['started', 'resolved', 'rejected'],
+        fire<P extends PromiseLike<Result>>(
+            emit: (value: AsyncValue<Result, Context>) => void,
+            promise: P,
+            context: Context
+        ) {
+            let val = { phase: 'started', promise, context } satisfies AsyncStart<Result, Context>
+            let logging = startLogging('⚡⌚ (async event)', name, [val], () => ({ Path: this.path, Promise: promise }))
+            try {
+                emit(val)
+            } finally {
+                logging?.[dispose]()
+            }
 
-export interface IEvent<TIn = void, TOut = TIn> extends IObservable<TOut>, IEventBase {
-    (eventValue: TIn): TIn;
-    scope<ObjectIn extends Scope, ObjectOut extends Scope, Scope extends object>(this: IEvent<ObjectIn, ObjectOut>, scope: Scope): IEvent<Scoped<ObjectIn, Scope>, ObjectOut>;
-}
+            promise.then(
+                result => {
+                    let val = { phase: 'resolved', result, context } satisfies AsyncResult<Result, Context>
+                    let logging = startLogging('⚡✔ (async resolved)', name, [val], () => ({ Path: this.path, Promise: promise }))
+                    try {
+                        emit(val)
+                    } finally {
+                        logging?.[dispose]()
+                    }
+                },
+                error => {
+                    let val = { phase: 'rejected', error, context } satisfies AsyncError<Context>
+                    let logging = startLogging('⚡✘ (async rejected)', name, [val], () => ({ Path: this.path, Promise: promise }))
+                    try {
+                        emit(val)
+                    } finally {
+                        logging?.[dispose]()
+                    }
+                })
 
-export interface IAsyncObservables<Result = void, Context = void> {
-    readonly started: IObservable<AsyncStart<Result, Context>>;
-    readonly resolved: IObservable<AsyncResult<Result, Context>>;
-    readonly rejected: IObservable<AsyncError<Context>>;
-}
-
-export interface IFilterableAsyncObservables<Result = void, Context = void> extends IAsyncObservables<Result, Context>, IEventBase {
-    filter(predicate: (context: Context) => boolean): IFilterableAsyncObservables<Result, Context>;
-}
-
-export interface IAsyncEvent<Result = void, ContextIn = void, ContextOut = ContextIn> extends IFilterableAsyncObservables<Result, ContextOut> {
-    <Promise extends PromiseLike<Result>>(promise: Promise, context: ContextIn): Promise;
-    scope<ObjectContext extends Scope, Scope extends object>(this: IAsyncEvent<Result, ObjectContext>, scope: Scope): IAsyncEvent<Result, Scoped<ObjectContext, Scope>, ObjectContext>;
-}
-
-export interface AsyncStart<Result, Context> {
-    promise: PromiseLike<Result>;
-    context: Context;
-}
-
-export interface AsyncResult<Result, Context> {
-    result: Result;
-    context: Context;
-}
-
-export interface AsyncError<Context> {
-    error: any;
-    context: Context;
-}
-
-export function event<T = void>(name?: string): IEvent<T> {
-    return makeEventFunction(new EventSubject<T>(name ? constant(name) : anonymousEventName));
-}
-
-class EventBase<TOut> extends ObservableOperation<TOut> {
-    container?: any;
-
-    scope<ObjectIn extends Scope, ObjectOut extends Scope, Scope extends object>(this: IEvent<ObjectIn, ObjectOut>, scope: Scope) {
-        return makeEventFunction(new ScopedEventSubject<ObjectIn, ObjectOut, Scope>(this, scope));
-    }
-}
-
-class EventSubject<T> extends EventBase<T> implements IEventClass {
-    private _subject: ISubject<T>;
-
-    constructor(getDisplayName: () => string) {
-        let subject = new Subject<T>(() => this.displayName);
-        super(getDisplayName, [subject], observer => subject.subscribe(observer.next, observer.getDisplayName));
-        this._subject = subject;
-    }
-
-    next(value: T) {
-        fireEvent('⚡ (event)', this.displayName, value, () => ({ Container: this.container }),
-            () => this._subject.next(value));
-        return value;
-    }
-}
-
-class ScopedEventSubject<ObjectIn extends Scope, ObjectOut extends Scope, Scope extends object> extends EventBase<ObjectOut> implements IEventClass {
-    constructor(private _source: IEvent<ObjectIn, ObjectOut>, private _scope: Scope) {
-        super(() => scopedName(_source.displayName, _scope), [_source],
-            observer => _source.subscribe(value => matchesScope(_scope, value) && observer.next(value), observer.getDisplayName));
-    }
-
-    next(partial: Scoped<ObjectIn, Scope>) {
-        // Using plain log so only the unscoped event is logged as an event
-        log('{⚡} (scoped event)', this.displayName, [partial], () => ({ Scope: this._scope, Container: this.container }),
-            () => this._source({ ...partial, ...this._scope } as ObjectIn));
-        return partial;
-    }
-}
-
-const anonymousAsyncEventName = constant("(anonymous async event)");
-
-/** Creates an event that takes promises as inputs, along with an optional context value */
-export function asyncEvent<Result = void, Context = void>(name?: string): IAsyncEvent<Result, Context> {
-    return makeEventFunction(new AsyncEvent<Result, Context>(name ? constant(name) : anonymousAsyncEventName));
-}
-
-abstract class FilterableAsyncObservables<Result, Context> extends NamedBase {
-    container?: any;
-
-    abstract readonly started: IObservable<AsyncStart<Result, Context>>;
-    abstract readonly resolved: IObservable<AsyncResult<Result, Context>>;
-    abstract readonly rejected: IObservable<AsyncError<Context>>;
-
-    filter(predicate: (context: Context) => boolean): IFilterableAsyncObservables<Result, Context> {
-        return new FilteredAsyncObservables(this, predicate);
-    }
-}
-
-class FilteredAsyncObservables<Result, Context> extends FilterableAsyncObservables<Result, Context> {
-    constructor(private _source: IFilterableAsyncObservables<Result, Context>, private _predicate: (context: Context) => boolean) {
-        super(() => filteredName(_source.displayName, _predicate));
-
-        this.started = this._source.started.filter(s => this._predicate(s.context), () => `${this.displayName}.started`);
-        this.resolved = this._source.resolved.filter(r => this._predicate(r.context), () => `${this.displayName}.resolved`);
-        this.rejected = this._source.rejected.filter(r => this._predicate(r.context), () => `${this.displayName}.rejected`);
-    }
-
-    readonly started: IObservable<AsyncStart<Result, Context>>;
-    readonly resolved: IObservable<AsyncResult<Result, Context>>;
-    readonly rejected: IObservable<AsyncError<Context>>;
-}
-
-abstract class AsyncEventBase<Result, Context> extends FilterableAsyncObservables<Result, Context> {
-    scope<ObjectContextIn extends Scope, ObjectContextOut extends Scope, Scope extends object>(this: IAsyncEvent<Result, ObjectContextIn, ObjectContextOut>, scope: Scope) {
-        return makeEventFunction(new ScopedAsyncEvent<Result, ObjectContextIn, ObjectContextOut, Scope>(this, scope));
-    }
-}
-
-class AsyncEvent<Result, Context> extends AsyncEventBase<Result, Context> implements IEventClass {
-    readonly started = new Subject<AsyncStart<Result, Context>>(() => `${this.displayName}.started`);
-    readonly resolved = new Subject<AsyncResult<Result, Context>>(() => `${this.displayName}.resolved`);
-    readonly rejected = new Subject<AsyncError<Context>>(() => `${this.displayName}.rejected`);
-
-    next<Promise extends PromiseLike<Result>>(promise: Promise, context: Context) {
-        fireEvent('⚡⌚ (async event)', this.displayName + '.started', { promise, context }, () => ({ Promise: promise, Container: this.container }),
-            () => this.started.next({ promise, context }));
-
-        promise.then(
-            result => fireEvent('⚡✔ (async result)', this.displayName + '.resolved', { result, context }, () => ({ Promise: promise, Container: this.container }),
-                () => this.resolved.next({ result, context })),
-            error => fireEvent('⚡❌ (async error)', this.displayName + '.rejected', { error, context }, () => ({ Promise: promise, Container: this.container }),
-                () => this.rejected.next({ error, context })));
-
-        return promise;
-    }
-}
-
-class ScopedAsyncEvent<Result, ContextIn extends Scope, ContextOut extends Scope, Scope extends object> extends AsyncEventBase<Result, ContextOut> implements IEventClass {
-    constructor(private _source: IAsyncEvent<Result, ContextIn, ContextOut>, private _scope: Scope) {
-        super(() => scopedName(_source.displayName, _scope));
-
-        this.started = this._source.started.filter(s => matchesScope(this._scope, s.context), () => `${this.displayName}.started`);
-        this.resolved = this._source.resolved.filter(r => matchesScope(this._scope, r.context), () => `${this.displayName}.resolved`);
-        this.rejected = this._source.rejected.filter(e => matchesScope(this._scope, e.context), () => `${this.displayName}.rejected`);
-    }
-
-    readonly started: IObservable<AsyncStart<Result, ContextOut>>;
-    readonly resolved: IObservable<AsyncResult<Result, ContextOut>>;
-    readonly rejected: IObservable<AsyncError<ContextOut>>;
-
-    next<Promise extends PromiseLike<Result>>(promise: Promise, partialContext: Scoped<ContextIn, Scope>) {
-        // Using plain log so only the unscoped event is logged as an event
-        log('{⚡⌚} (scoped async event)', this.displayName, [partialContext], () => ({ Scope: this._scope, Container: this.container }),
-            () => this._source(promise, { ...this._scope, ...partialContext } as ContextIn));
-        return promise;
-    }
-}
-
-/** Converts an event class into a callable function */
-export function makeEventFunction<Event extends IEventClass>(event: Event) {
-    Object.setPrototypeOf(eventFn, event);
-    eventFn[eventBrand] = true;
-    eventFn.apply = Function.prototype.apply;
-    Object.defineProperty(eventFn, 'displayName', { // Delegate to prototype, since already initialised Subjects' displayNames will have captured the prototype as 'this'
-        get() { return event.displayName; },
-        set(value: string) { event.displayName = value; }
-    });
-    return eventFn as EventFn<Event>;
-
-    function eventFn(...args: any) {
-        return event.next.apply(eventFn, args);
-    }
-}
-
-export function isEvent(event: unknown): event is EventFn<IEventClass> {
-    return typeof event == 'function'
-        && eventBrand in event;
-}
-
-export type EventFn<Event extends IEventClass> = Event & Event['next'] & { [eventBrand]: true };
-
-/** Logs event and ensures no other events are run at the same time. */
-export function fireEvent(type: string, displayName: string, arg: any, getInfo: (() => object) | undefined, runEvent: () => void) {
-    logEvent(type, displayName, arg, getInfo, () => {
-        try {
-            if (currentlyFiringEvent)
-                throw new ChainedEventsError(currentlyFiringEvent, displayName);
-
-            ensureNotInsideDerivation(displayName || anonymousEvent);
-
-            currentlyFiringEvent = displayName || anonymousEvent;
-            runEvent();
-        } finally {
-            currentlyFiringEvent = null;
+            return promise
         }
-    });
+    }) as IAsyncEvent<Result, Context>
 }
 
-let currentlyFiringEvent = null as string | null;
-const anonymousEvent = "(anonymous event)";
-const anonymousEventName = constant(anonymousEvent);
-const eventBrand = Symbol('IsEvent');
+/**
+ * Creates a callable event with named phase observables.
+ *
+ * Use this to build custom async-style events, such as observable or stream events. The `fire`
+ * callback receives an `emit` function; emit values must include a `phase` matching one of
+ * `phases` and a `context` matching the last argument passed to the event. The returned event
+ * exposes an observable for each phase, plus `filterContext` and `scope`.
+ */
+export function makePhasedEvent<
+    const Phases extends readonly string[],
+    Args extends any[],
+    Return,
+    Value extends { phase: Phases[number], context: ContextArg<Args> }
+>(
+    {
+        name,
+        phases,
+        fire
+    }: {
+        name: string,
+        phases: Phases,
+        fire: (emit: (value: Value) => void, ...args: Args) => Return
+    } & ThisType<IObservable<Value>>
+): IPhasedEvent<Value, Args, Return> {
+    return makeEvent({
+        name,
+        fire,
+        additionalMembers: <CurrentContext>(e: IEventFunction<NarrowContext<Value, CurrentContext>, ScopedArgs<Args, CurrentContext>, Return>) => ({
+            ...phasedObservableMembers<NarrowContext<Value, CurrentContext>, CurrentContext>(
+                e as unknown as IObservable<NarrowContext<Value, CurrentContext>>,
+                phases as readonly (NarrowContext<Value, CurrentContext>['phase'] & string)[]
+            ),
+            scope<Scope extends CurrentContext extends object ? Partial<CurrentContext> : never>(scope: Scope): IPhasedEvent<NarrowContext<Value, CurrentContext & Scope>, ScopedArgs<Args, Scoped<CurrentContext, Scope>>, Return, CurrentContext & Scope> {
+                return bindEvent(e,
+                    scopedName(e.displayName, scope),
+                    (...args: ScopedArgs<Args, Scoped<CurrentContext, Scope>>) => {
+                        let argsWithScope = args.slice()
+                        argsWithScope[argsWithScope.length - 1] = { ...argsWithScope[argsWithScope.length - 1], ...scope }
+                        return e(...argsWithScope as ScopedArgs<Args, CurrentContext>)
+                    },
+                    v => matchesScope(scope, v.context),
+                ) as unknown as IPhasedEvent<NarrowContext<Value, CurrentContext & Scope>, ScopedArgs<Args, Scoped<CurrentContext, Scope>>, Return, CurrentContext & Scope>
+            }
+        })
+    }) as IPhasedEvent<Value, Args, Return>
+}
 
-export class ChainedEventsError extends Error {
-    constructor(
-        public currentEvent: string,
-        public newEvent = anonymousEvent
-    ) {
-        super(`Events should not be fired in response to other events. Fired '${newEvent}' in response to '${currentEvent}'.`)
+/** Creates a callable event object. */
+export function makeEvent<T, Args extends any[] = [T], Return = Args[0], Members extends object = {}>(
+    {
+        name,
+        fire,
+        additionalMembers
+    }: {
+        name: string,
+        fire: (this: IEventFunction<T, Args, Return>, emit: (value: T) => void, ...args: Args) => Return,
+        additionalMembers?: AdditionalMembersFactory<IObservable<any>, Members>
+    } & ThisType<IEventFunction<T, Args, Return>>
+): IEventFunction<T, Args, Return> & Members {
+    let eventSource = new Event<T>(name) as Event<T> & IEventFunction<T, Args, Return>
+    return makeObservableFunction(eventSource, event, additionalMembers)
+
+    function event(...args: Args) { return fire.call(event as IEventFunction<T, Args, Return>, eventSource.emit.bind(event), ...args) }
+}
+
+/** Wrap an event with input and output filter. Useful for scoping. */
+export function bindEvent<E extends IEventFunction<any, any>, Args extends any[], Return>(
+    event: E,
+    displayName: string,
+    fire: (...args: Args) => Return,
+    predicate: (value: ObservedValue<E>) => boolean
+) {
+    return makeObservableFunction(event.filter(predicate, displayName), fire, (event as EventWithAdditionalMembers)[membersFactory])
+}
+
+function phasedObservableMembers<Value extends { phase: string, context: Context }, Context>(observable: IObservable<Value>, phases: readonly (Value['phase'] & string)[]) {
+    let setBaseDisplayName = observable.setDisplayName
+    let phaseMembers = Object.fromEntries(phases.map(phase => [
+        phase,
+        observable.filter(e => e.phase == phase, `${observable.displayName}.${phase}`)
+    ]))
+
+    return {
+        ...phaseMembers,
+        filterContext(predicate: (context: Context) => boolean, displayName = `${observable.displayName}.filterContext(${nameOfCallback(predicate)})`) {
+            let filtered = observable.filter(e => predicate(e.context), displayName)
+            return Object.assign(filtered, phasedObservableMembers(filtered, phases))
+        },
+        setDisplayName(this: IPhasedObservable<Value, Context>, name: string) {
+            setBaseDisplayName.call(observable, name)
+            for (let phase of phases)
+                this[phase].setDisplayName(`${name}.${phase}`)
+        }
     }
 }
+
+function makeObservableFunction<Observable extends IObservable<any>, Args extends any[], Return, Members extends object>(
+    innerEvent: Observable,
+    fire: (...args: Args) => Return,
+    additionalMembers?: AdditionalMembersFactory<Observable, Members>
+): IEventFunction<ObservedValue<Observable>, Args, Return> & Members {
+    let eventFn = fire as Observable & IEventFunction<ObservedValue<Observable>, Args, Return>
+    markEvent(eventFn)
+    Object.setPrototypeOf(eventFn, innerEvent)
+    eventFn.apply = Function.prototype.apply
+    eventFn.call = Function.prototype.call
+    return additionalMembers
+        ? Object.assign(eventFn, additionalMembers(eventFn), { [membersFactory]: additionalMembers as AdditionalMembersFactory<IObservable<any>, any> })
+        : eventFn as Observable & IEventFunction<ObservedValue<Observable>, Args, Return> & Members
+}
+
+export interface IEvent<In, Out = In> extends IEventFunction<Out, [value: In]> {
+    scope<Scope extends Partial<In>>(scope: Scope): IEvent<Scoped<In, Scope>, Out>
+}
+
+export interface IEventFunction<T, Args extends any[], Return = Args[0]> extends IObservable<T> {
+    (...args: Args): Return
+}
+
+export interface IAsyncObservable<Result, Context> extends IObservable<AsyncValue<Result, Context>> {
+    started: IObservable<AsyncStart<Result, Context>>
+    resolved: IObservable<AsyncResult<Result, Context>>
+    rejected: IObservable<AsyncError<Context>>
+
+    filterContext<FilteredContext extends Context>(predicate: (context: Context) => context is FilteredContext, displayName?: string): IAsyncObservable<Result, FilteredContext>
+    filterContext(predicate: (context: Context) => boolean, displayName?: string): IAsyncObservable<Result, Context>
+}
+
+export interface IAsyncEvent<Result, Context> extends IEventFunction<AsyncValue<Result, Context>, [promise: PromiseLike<Result>, context: Context]>, IAsyncObservable<Result, Context> {
+    scope<Scope extends Partial<Context>>(scope: Scope): IAsyncEvent<Result, Scoped<Context, Scope>>
+}
+
+export type AsyncValue<Result, Context = void> =
+    | AsyncStart<Result, Context>
+    | AsyncResult<Result, Context>
+    | AsyncError<Context>
+
+export interface AsyncStart<Result, Context = void> {
+    phase: 'started'
+    context: Context
+    promise: PromiseLike<Result>
+}
+
+export interface AsyncResult<Result, Context = void> {
+    phase: 'resolved'
+    context: Context
+    result: Result
+}
+
+export interface AsyncError<Context = void> {
+    phase: 'rejected'
+    context: Context
+    error: unknown
+}
+
+export type IPhasedObservable<Value extends { phase: string, context: any }, Context> =
+    IObservable<Value>
+    & { [Phase in Value['phase'] & string]: IObservable<Extract<Value, { phase: Phase }>> }
+    & {
+        filterContext<FilteredContext extends Context>(predicate: (context: Context) => context is FilteredContext, displayName?: string): IPhasedObservable<NarrowContext<Value, FilteredContext>, FilteredContext>
+        filterContext(predicate: (context: Context) => boolean, displayName?: string): IPhasedObservable<Value, Context>
+    }
+
+export type IPhasedEvent<Value extends { phase: string, context: any }, Args extends any[], Return, Context = ContextArg<Args>> =
+    IEventFunction<Value, Args, Return>
+    & IPhasedObservable<Value, Context>
+    & {
+        scope<Scope extends Context extends object ? Partial<Context> : never>(
+            scope: Scope
+        ): IPhasedEvent<NarrowContext<Value, Context & Scope>, ScopedArgs<Args, Scoped<Context, Scope>>, Return, Context & Scope>
+    }
+
+export type AdditionalMembersFactory<Observable extends IObservable<any>, Members extends object> =
+    (observable: Observable & IEventFunction<ObservedValue<Observable>, any>) => Members
+
+class Event<T> extends Observable<T> {
+    emit(value: T) {
+        let transition = beginTransition(this, isObject(value) ? value : { value })
+        try {
+            this.setValue(value)
+        } finally {
+            this._value = undefined! // Events shouldn't hold on to their values
+            transition[dispose]()
+        }
+    }
+    override isValidAsState = false
+    override skipUpdate(nextValue: T) { return false }
+    protected override updateChildren(previousValue: T, nextValue: T) { } // Value won't be held onto
+}
+
+const membersFactory = Symbol('event members factory')
+
+type ContextArg<Args extends any[]> = Args extends [...any[], infer Ctx] ? Ctx : never
+type NarrowContext<Value, Context> = Value & { context: Context }
+type ScopedArgs<Args extends any[], Context> =
+    Args extends [...infer Rest, any]
+    ? [...Rest, Context]
+    : never
+
+type EventWithAdditionalMembers = { [membersFactory]?: AdditionalMembersFactory<IObservable<any>, any> }

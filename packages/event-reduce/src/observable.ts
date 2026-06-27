@@ -1,151 +1,183 @@
-import { ISourceInfo, sourceTree } from "./logging";
-import { Unsubscribe } from "./types";
-import { constant, dispose, emptyArray, filteredName, NamedBase, nameOfCallback } from "./utils";
+import type { IEventFunction } from "./events"
+import { getPath, updateChildren } from "./ownership"
+import { isEventsClass } from "./symbols"
+import { currentIteration, endSourceAccessed, iterationSource, startSourceAccessed } from "./tracking"
+import type { ObservedValue } from "./types"
+import { dispose, emptyArray, identity, isObject, nameOfCallback, nameOfFunction } from "./utils"
 
-export type Observe<T> = (value: T) => void;
+export interface IObservable<T> extends Disposable {
+    readonly displayName: string
+    setDisplayName(name: string): void
+    readonly path: string
+    getSources(): Iterable<IObservable<any>>
+    readonly lastUpdated: number
+    subscribe(observer: IObserver<T>): void
+    unsubscribe(observer: IObserver<T>): void
 
-export interface IObservable<T> {
-    subscribe(observe: Observe<T>, getObserverName?: () => string): Unsubscribe;
-    [dispose](): void;
-    filter(condition: (value: T) => boolean, getDisplayName?: () => string): IObservable<T>;
-    map<U>(select: (value: T) => U, getDisplayName?: () => string): IObservable<U>;
-    filterMap<U>(select: (value: T) => U | undefined, getDisplayName?: () => string): IObservable<U>;
-
-    displayName: string;
-    readonly sources: readonly IObservable<any>[];
+    map<Out>(transform: (value: T) => Out, displayName?: string): IObservable<Out>
+    filter<Out extends T>(predicate: (value: T) => value is Out, displayName?: string): IObservable<Out>
+    filter(predicate: (value: T) => boolean, displayName?: string): IObservable<T>
+    filterMap<Out>(transform: (value: T) => Out | undefined, displayName?: string): IObservable<Out>
 }
 
 export interface IObserver<T> {
-    getDisplayName(): string;
-    next: Observe<T>;
+    readonly displayName: string
+    sourceUpdated<S extends T>(source: IObservable<S>, value: S): void
 }
 
-export function merge<T>(observables: IObservable<T>[]): IObservable<T> {
-    let getDisplayName = () => `merged(${observables.map(o => o.displayName).join(', ')})`;
-    return new ObservableOperation<T>(getDisplayName, observables,
-        observer => {
-            let unsubscribes = observables.map(o => o.subscribe(value => observer.next(value), getDisplayName));
-            return () => unsubscribes.forEach(u => u());
-        });
+export function isObservable(value: any): value is IObservable<any> {
+    return value instanceof Observable
 }
 
-const anonymousObserverName = constant("(anonymous observer)");
+export abstract class Observable<T> implements IObservable<T> {
+    protected readonly _observers = new Set<IObserver<T>>()
+    protected _value!: T
+    lastUpdated = -1
 
-export class Observable<T> extends NamedBase {
-    protected _observers = new Set<IObserver<T>>();
-    private _sourceInfo?: readonly ISourceInfo[];
+    constructor(public displayName: string) { }
 
-    get sources() { return emptyArray as readonly IObservable<any>[]; }
+    setDisplayName(name: string) { this.displayName = name }
 
-    get sourceInfo() { return this._sourceInfo ??= sourceTree(this.sources); }
+    get path(): string { return getPath(this) }
 
-    protected clearSourceInfo() {
-        delete this._sourceInfo;
-        for (let observer of this._observers)
-            if (observer instanceof Observable)
-                observer.clearSourceInfo();
+    getSources() { return emptyArray as Iterable<IObservable<any>> }
+
+    get value() {
+        startSourceAccessed(this)
+        endSourceAccessed(this)
+        return this._value
     }
 
-    get isObserved() { return this._observers.size > 0; }
+    setValue(newValue: T) {
+        if (process.env.NODE_ENV !== 'production') {
+            if (isEventsClass(newValue) || newValue instanceof Observable && !newValue.isValidAsState)
+                throw new InvalidStateError(this, newValue)
 
-    subscribe(observe: Observe<T>, getObserverName = anonymousObserverName): Unsubscribe {
-        let observer = { getDisplayName: getObserverName, next: observe };
-        this._observers.add(observer);
-        return this.unsubscribe.bind(this, observer);
-    }
+            if (!iterationSource)
+                throw new StateChangeOutsideTransitionError(this)
+        }
 
-    protected unsubscribe(observer: IObserver<T>) {
-        this._observers.delete(observer);
-    }
+        if (!this.skipUpdate(newValue)) {
+            this.lastUpdated = currentIteration
+            if (isObject(this._value) || isObject(newValue))
+                this.updateChildren(this._value, newValue)
+            this._value = newValue
 
-    [dispose]() {
-        this.unsubscribeFromSources();
-        this._observers.clear();
-    }
-
-    protected notifyObservers(value: T) {
-        Array.from(this._observers).forEach(o => o.next(value));
-    }
-
-    unsubscribeFromSources() { }
-
-    filter(condition: (value: T) => boolean, getDisplayName: () => string = () => filteredName(this.displayName, condition)): IObservable<T> {
-        return new ObservableOperation<T>(getDisplayName, [this],
-            observer => this.subscribe(value => condition(value) && observer.next(value), getDisplayName));
-    }
-
-    map<U>(select: (value: T) => U, getDisplayName: () => string = () => `${this.displayName}.map(${nameOfCallback(select)})`): IObservable<U> {
-        return new ObservableOperation<U>(getDisplayName, [this],
-            observer => this.subscribe(value => observer.next(select(value)), getDisplayName));
-    }
-
-    /** Maps values to a new type, filtering out undefined results. */
-    filterMap<U>(select: (value: T) => U | undefined, getDisplayName: () => string = () => `${this.displayName}.filterMap(${nameOfCallback(select)})`): IObservable<U> {
-        return new ObservableOperation<U>(getDisplayName, [this],
-            observer => this.subscribe(value => {
-                let mapped = select(value);
-                if (mapped !== undefined)
-                    observer.next(mapped);
-            }, getDisplayName));
-    }
-}
-
-export class ObservableOperation<T> extends Observable<T> {
-    private _unsubscribeFromSources?: Unsubscribe;
-
-    constructor(
-        getDisplayName: () => string,
-        private _sources: readonly IObservable<any>[],
-        private readonly _subscribeToSources: (observer: IObserver<T>) => Unsubscribe
-    ) {
-        super(getDisplayName);
-    }
-
-    override get sources() { return this._sources; }
-
-    override subscribe(observer: Observe<T>, getObserverName = anonymousObserverName): Unsubscribe {
-        let unsubscribe = super.subscribe(observer, getObserverName);
-        if (this._observers.size == 1)
-            this._unsubscribeFromSources = this._subscribeToSources({ getDisplayName: this.displayNameGetter, next: this.notifyObservers.bind(this) });
-        return unsubscribe;
-    }
-
-    protected override unsubscribe(observer: IObserver<T>) {
-        super.unsubscribe(observer);
-        if (!this._observers.size)
-            this.unsubscribeFromSources();
-    }
-
-    override unsubscribeFromSources() {
-        this._unsubscribeFromSources?.();
-    }
-}
-
-export function allSources(sources: Iterable<IObservable<any>>) {
-    let allSources = new Set<IObservable<any>>();
-    addSourcesRecursive(sources);
-    return allSources;
-
-    function addSourcesRecursive(sources: Iterable<IObservable<any>>) {
-        for (let s of sources) {
-            if (!allSources.has(s)) {
-                allSources.add(s);
-                addSourcesRecursive(s.sources);
-            }
+            for (let observer of this._observers)
+                observer.sourceUpdated(this, this._value)
         }
     }
-}
 
-export function pathToSource(leaves: Iterable<IObservable<any>>, root: IObservable<any>): IObservable<any>[] | undefined {
-    for (let l of leaves) {
-        if (l == root)
-            return [l];
-        let path = pathToSource(l.sources, root);
-        if (path)
-            return path.concat([l]);
+    protected skipUpdate(nextValue: T) { return Object.is(this._value, nextValue) }
+
+    protected updateChildren(previousValue: T, nextValue: T) { updateChildren(this, previousValue, nextValue) }
+
+    protected isValidAsState = true
+
+    map<S extends Observable<any>, Out>(this: S, transform: (value: T) => Out, displayName = `${this.displayName}.map(${nameOfCallback(transform)})`): IObservable<Out> {
+        return bind(displayName, this, transform)
+    }
+
+    filter<S extends Observable<any>>(this: S, predicate: (value: T) => boolean, displayName = `${this.displayName}.filter(${nameOfCallback(predicate)})`): IObservable<T> {
+        return bind(displayName, this, identity, predicate)
+    }
+
+    filterMap<S extends Observable<any>, Out>(this: S, transform: (value: T) => Out | undefined, displayName = `${this.displayName}.filterMap(${nameOfCallback(transform)})`): IObservable<Out> {
+        return bind(displayName, this, v => transform(v)!, value => value != undefined)
+    }
+
+    subscribe(observer: IObserver<T>) { this._observers.add(observer) }
+    unsubscribe(observer: IObserver<T>) { this._observers.delete(observer) }
+
+    [dispose]() {
+        this.updateChildren(this._value, undefined!)
+        this._value = undefined!
+        this._observers.clear()
     }
 }
 
-export function isObservable<T>(maybeObservable: any): maybeObservable is IObservable<T> {
-    return maybeObservable && typeof maybeObservable.subscribe == 'function';
+export function bind<In, Out>(displayName: string, observable: IObservable<In>, transform: (value: In) => Out, predicate?: (value: Out) => boolean) {
+    return new BoundObservable(displayName, [observable], transform, predicate)
+}
+
+export function merge<const Observables extends readonly IObservable<any>[]>(observables: Observables): IObservable<ObservedValue<Observables[number]>>
+export function merge<const Observables extends readonly IObservable<any>[]>(displayName: string, observables: Observables): IObservable<ObservedValue<Observables[number]>>
+export function merge<const Observables extends readonly IObservable<any>[]>(displayNameOrObservables: string | Observables, maybeObservables?: Observables): IObservable<ObservedValue<Observables[number]>> {
+    let displayName: string
+    let observables: Observables
+    if (typeof displayNameOrObservables == 'string') {
+        displayName = displayNameOrObservables
+        observables = maybeObservables!
+    } else {
+        observables = displayNameOrObservables
+        displayName = `merge(${observables.map(s => s.displayName).join(', ')})`
+    }
+    return new BoundObservable(displayName, observables.slice(), identity)
+}
+
+export class BoundObservable<In, Out> extends Observable<Out> {
+    constructor(
+        displayName: string,
+        protected _sources: IObservable<In>[],
+        protected _transform: (value: In) => Out,
+        protected _predicate?: (value: Out) => boolean
+    ) { super(displayName) }
+
+    override getSources() { return this._sources }
+
+    override subscribe(observer: IObserver<Out>): void {
+        if (!this._observers.size)
+            this._sources.forEach(source => source.subscribe(this))
+
+        super.subscribe(observer)
+    }
+
+    override unsubscribe(observer: IObserver<Out>): void {
+        super.unsubscribe(observer)
+
+        if (!this._observers.size)
+            this._sources.forEach(source => source.unsubscribe(this))
+    }
+
+    sourceUpdated(source: IObservable<In>, value: In): void {
+        try {
+            this.setValue(this._transform(value))
+        } finally {
+            this._value = undefined! // Bound sources shouldn't hold on to their values
+        }
+    }
+
+    protected override updateChildren(previousValue: Out, nextValue: Out) { } // Value won't be held onto
+
+    protected override skipUpdate(value: Out) { return this._predicate?.(value) == false }
+}
+
+export function* allSources(observable: IObservable<any>): Generator<IObservable<any>> {
+    yield observable
+    for (let dependency of observable.getSources())
+        yield* allSources(dependency)
+}
+
+export class NoUnderlyingObservableError extends Error {
+    constructor(
+        public value: unknown
+    ) {
+        super("Couldn't detect observable for value. Make sure you pass in an observable value directly.")
+    }
+}
+
+export class InvalidStateError extends Error {
+    constructor(
+        public observable: IObservable<any>,
+        public value: IEventFunction<unknown, unknown[]> | object
+    ) { super(`Tried to store ${isObservable(value) ? value.displayName : value} in ${observable.displayName}. ${nameOfFunction(value.constructor)}s cannot be state.`) }
+}
+
+export class StateChangeOutsideTransitionError extends Error {
+    constructor(
+        public source: IObservable<any>
+    ) {
+        super(`Tried to change state of ${source.displayName} outside of a transition. `
+            + 'This usually means a bug in event-reduce, or in a custom observable implementation.')
+    }
 }

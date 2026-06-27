@@ -1,58 +1,43 @@
-import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
-import { ObservableValue, collectAccessedValues, consumeLastAccessed } from "event-reduce/lib/observableValue";
+import { beforeEach, describe, expect, test } from "bun:test"
+import { ISignal, signal } from "event-reduce"
+import { getUnderlyingObservable } from "event-reduce/lib/tracking"
+import { MockObserver } from "./MockObserver"
 
-describe("ObservableValue", () => {
-    let sut: ObservableValue<string>;
-    let observer: Mock<(value: string) => void>;
+describe("signal", () => {
+    let sut: ISignal<string>
+    let observer: MockObserver<string>
 
     beforeEach(() => {
-        sut = new ObservableValue(() => 'sut', 'initial');
-        observer = mock();
-        sut.subscribe(observer);
-    });
+        sut = signal('initial', 'sut')
+        observer = new MockObserver()
+        sut.subscribe(observer)
+    })
 
     describe("when value accessed", () => {
-        let result: string;
+        let result: string
 
         beforeEach(() => {
-            result = sut.value;
-        });
+            result = sut.value
+        })
 
-        test("returns provided value", () => expect(result).toBe('initial'));
+        test("returns provided value", () => expect(result).toBe('initial'))
 
-        test("is last accessed value", () => expect(consumeLastAccessed()!).toBe(sut));
-    });
+        test("tracks the accessed observable", () => expect(getUnderlyingObservable(result)).toBe(sut))
+    })
 
     describe("when value changed", () => {
         beforeEach(() => {
-            sut.setValue('different');
-        });
+            sut.setValue('different')
+        })
 
-        test("value updated", () => expect(sut.value).toBe('different'));
+        test("updates the value", () => expect(sut.value).toBe('different'))
 
-        test("observers notified", () => expect(observer).toHaveBeenCalled());
-    });
+        test("notifies observers", () => expect(observer.sourceUpdated).toHaveBeenCalledWith(sut, 'different'))
+    })
 
-    test("when value set to same value, observers not notified", () => {
-        sut.setValue('initial');
+    test("when value set to same value, observers are notified", () => {
+        sut.setValue('initial')
 
-        expect(observer).not.toHaveBeenCalled();
-    });
-});
-
-describe("collectAccessedValues", () => {
-    let valueA: ObservableValue<string>;
-    let valueB: ObservableValue<string>;
-
-    beforeEach(() => {
-        valueA = new ObservableValue(() => 'a', 'a');
-        valueB = new ObservableValue(() => 'b', 'b');
-    });
-
-    test("when multiple values accessed, all accessed values returned", () => {
-        let result = collectAccessedValues(() => valueA.value + valueB.value);
-
-        expect(Array.from(result)).toContain(valueA);
-        expect(Array.from(result)).toContain(valueB);
-    });
-});
+        expect(observer.sourceUpdated).toHaveBeenCalledWith(sut, 'initial')
+    })
+})

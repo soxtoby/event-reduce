@@ -1,73 +1,69 @@
-import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test";
-import { IObservable, IObserver, merge, Subject, Unsubscribe } from 'event-reduce';
-import { ObservableOperation } from 'event-reduce/lib/observable';
+import { beforeEach, describe, expect, test } from "bun:test"
+import { ISignal, signal, type IObservable } from "event-reduce"
+import { MockObserver } from "./MockObserver"
 
-describe("ObservableOperation", () => {
-    describe("when subscribing", () => {
-        let unsubscribe: Mock<Unsubscribe>;
-        let subscribe: Mock<(observer: IObserver<any>) => Unsubscribe>;
-        let observer: Mock<(value: any) => void>;
-        let sut: ObservableOperation<any>;
-        let result: () => void;
+describe("Observable", () => {
+    let sut: ISignal<string>
+    let observer: MockObserver<string>
 
-        beforeEach(() => {
-            unsubscribe = mock();
-            subscribe = mock(() => unsubscribe);
-            observer = mock();
-            sut = new ObservableOperation(() => 'test', [], subscribe);
-            result = sut.subscribe(observer);
-        });
+    beforeEach(() => {
+        sut = signal('initial', 'sut')
+        observer = new MockObserver()
+        sut.subscribe(observer)
+    })
 
-        test("subscribe function called with observer", () => {
-            expect(subscribe).toHaveBeenCalledWith(expect.objectContaining({
-                getDisplayName: expect.any(Function),
-                next: expect.any(Function)
-            }));
-        });
+    test("when updated, notifies subscribed observers", () => {
+        sut.setValue('updated')
 
-        test("when unsubscribed, unsubscribed from inner subscription", () => {
-            result();
+        expect(observer.sourceUpdated).toHaveBeenCalledWith(sut, 'updated')
+    })
 
-            expect(unsubscribe).toHaveBeenCalled();
-        });
-    });
+    test("when unsubscribed, stops notifying observer", () => {
+        sut.unsubscribe(observer)
 
-    test("filter", () => {
-        let source = observableOf(1, 2, 3, 2, 1);
-        let result = source.filter(v => v > 1);
-        expect(values(result)).toEqual([2, 3, 2]);
-    });
+        sut.setValue('updated')
+
+        expect(observer.sourceUpdated).not.toHaveBeenCalled()
+    })
 
     test("map", () => {
-        let source = observableOf(1, 2, 3);
-        let result = source.map(v => v * 2);
-        expect(values(result)).toEqual([2, 4, 6]);
-    });
+        let mapped = sut.map(value => value.toUpperCase())
+        let observed = values(mapped)
 
-    test("merge", () => {
-        let source1 = new Subject<number>(() => 'source 1');
-        let source2 = new Subject<number>(() => 'source 2');
-        let result = merge([source1, source2]);
-        let vals = [] as number[];
-        result.subscribe(v => vals.push(v));
+        sut.setValue('a')
+        sut.setValue('b')
 
-        source1.next(1);
-        source2.next(2);
-        source1.next(3);
+        expect(observed).toEqual(['A', 'B'])
+    })
 
-        expect(vals).toEqual([1, 2, 3]);
-    });
+    test("filter", () => {
+        let filtered = sut.filter(value => value.length > 1)
+        let observed = values(filtered)
 
-    function observableOf<T>(...args: T[]) {
-        return new ObservableOperation<T>(() => 'source', [], observer => {
-            args.forEach(a => observer.next(a));
-            return () => { }
-        });
-    }
+        sut.setValue('a')
+        sut.setValue('bb')
+        sut.setValue('ccc')
+
+        expect(observed).toEqual(['bb', 'ccc'])
+    })
+
+    test("filterMap", () => {
+        let filtered = sut.filterMap(value => value.length > 1 ? value.length : undefined)
+        let observed = values(filtered)
+
+        sut.setValue('a')
+        sut.setValue('bb')
+        sut.setValue('cccc')
+
+        expect(observed).toEqual([2, 4])
+    })
 
     function values<T>(observable: IObservable<T>) {
-        let vals = [] as T[];
-        observable.subscribe(value => vals.push(value));
-        return vals;
+        let observed: T[] = []
+        observable.subscribe({
+            displayName: 'value collector',
+            sourceUpdated: (_, value) => observed.push(value)
+        })
+        return observed
     }
-});
+})

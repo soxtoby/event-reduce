@@ -1,13 +1,15 @@
 {
   "compilerOptions": {
     "target": "es2024",
-    "module": "commonjs",
-    "lib": ["ES2022", "ESNext.Disposable", "dom"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["ES2024", "ESNext.Collection", "ESNext.Iterator", "ESNext.Disposable", "dom"],
     "jsx": "react-jsx",
-    "strict": true,
+    "strict": true, 
     "noImplicitOverride": true,
-    "inlineSourceMap": true,
+    "sourceMap": true,
     "inlineSources": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["bun"]
   }
 }

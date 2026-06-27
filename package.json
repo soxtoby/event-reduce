@@ -19,11 +19,13 @@
     "scripts": {
         "prepare": "tsc -b",
         "watch": "tsc -b -w",
-        "test": "tsc -b tests tests-legacy && bun test tests/dist tests-legacy/dist",
+        "test:modern": "bun test",
+        "test:legacy": "tsc -b tests-legacy && bun test --config=bunfig.legacy.toml",
+        "test": "bun run test:modern && bun run test:legacy",
         "example": "bun example/serve.ts"
     },
     "devDependencies": {
-        "typescript": "~5.9.3"
+        "typescript": "~6.0.3"
     },
     "resolutions": {
         "deasync": "0.1.30"
