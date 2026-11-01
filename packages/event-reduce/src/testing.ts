@@ -1,4 +1,4 @@
-import { isModel } from "./symbols"
+import { isEvent, isEventsClass, isModel } from "./symbols"
 import { Derivation } from "./derivation"
 import { event } from "./events"
 import { getModelProperties } from "./models"
@@ -59,7 +59,7 @@ export function modelProxy<T extends object>(model: T = {} as T) {
     // Pre-populate observable values with plain value fields
     Object.entries(Object.getOwnPropertyDescriptors(model))
         .forEach(([key, prop]) => {
-            if ('value' in prop)
+            if ('value' in prop && !isEventOrEventsClass(prop.value))
                 properties[key] = new Signal(String(key), prop.value)
         })
 
@@ -84,6 +84,11 @@ export function modelProxy<T extends object>(model: T = {} as T) {
             if (key == 'target')
                 return false
 
+            if (isEventOrEventsClass(value)) {
+                delete properties[key as string]
+                return Reflect.set(target, key, value)
+            }
+
             getOrAddObservableValue(key).setValue(value)
             return true
         },
@@ -103,6 +108,11 @@ export function modelProxy<T extends object>(model: T = {} as T) {
     function getOrAddObservableValue(key: PropertyKey): Signal<any> {
         return properties[String(key)] ??= new Signal(String(key), model[key as keyof T])
     }
+}
+
+/** Events can't be stored as state, so they're kept as plain properties. */
+function isEventOrEventsClass(value: unknown) {
+    return isEvent(value) || isEventsClass(value)
 }
 
 export type Mutable<T> =

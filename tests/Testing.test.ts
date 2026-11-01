@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test"
-import { derived, disposeModel, event, events, model, reduce, reduced } from "event-reduce"
+import { derived, disposeModel, event, events, model, reduce, reduced, type IEvent } from "event-reduce"
 import { eventProxy, getTarget, modelProxy, Mutable, mutable } from "event-reduce/lib/testing"
 import { MockObserver } from "./MockObserver"
 
@@ -85,6 +85,26 @@ describe("mutable", () => {
     test("can be disposed", () => {
         disposeModel(sut)
     })
+})
+
+test("modelProxy, when an event is assigned, returns the event", () => {
+    let sut = modelProxy<{ fired?: IEvent<number> }>()
+    let fired = event<number>('fired')
+
+    sut.fired = fired
+
+    expect(sut.fired).toBe(fired)
+})
+
+test("modelProxy, when an events class is assigned, returns the events class", () => {
+    @events
+    class Events { }
+    let sut = modelProxy<{ events?: Events }>()
+    let eventsInstance = new Events()
+
+    sut.events = eventsInstance
+
+    expect(sut.events).toBe(eventsInstance)
 })
 
 describe("modelProxy", () => {
