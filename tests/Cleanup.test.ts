@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, spyOn, test, type Mock } from "bun:test"
-import { createModel, derive, derived, event, ISignal, model, reduce, reduced, signal, state } from "event-reduce"
+import { createModel, derive, derived, disposeModel, event, ISignal, model, reduce, reduced, signal, state } from "event-reduce"
 import { getModelProperties } from "event-reduce/lib/models"
 import { DisposedObservableError } from "event-reduce/lib/observable"
 import { isModel } from "event-reduce/lib/symbols"
@@ -376,5 +376,39 @@ describe("reading after disposal", () => {
         replace()
 
         expect(() => replaced.value).toThrow(DisposedObservableError)
+    })
+})
+
+describe("disposeModel", () => {
+    @model
+    class Child {
+        @reduced
+        get value() { return reduce(1).value }
+    }
+
+    test("outside a transition, disposes the model straight away", () => {
+        let sut = new Child()
+
+        disposeModel(sut)
+
+        expect(() => sut.value).toThrow(DisposedObservableError)
+    })
+
+    test("during a transition, disposes the model when the transition ends", () => {
+        let sut = new Child()
+        let disposeChild = event('disposeChild')
+        let readDuringTransition: number | undefined
+        using _ = createModel(() => ({
+            disposer: reduce(0, 'disposer').on(disposeChild, count => {
+                disposeModel(sut)
+                readDuringTransition = sut.value
+                return count + 1
+            })
+        }))
+
+        disposeChild()
+
+        expect(readDuringTransition).toBe(1)
+        expect(() => sut.value).toThrow(DisposedObservableError)
     })
 })

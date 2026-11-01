@@ -1,6 +1,6 @@
 import { Derivation, derive, IDerivation } from "./derivation"
 import { IObservable, isObservable, Observable } from "./observable"
-import { getChildNodes, trackManagedObservableCreation, updateChildren } from "./ownership"
+import { disposeGarbage, getChildNodes, trackManagedObservableCreation, updateChildren } from "./ownership"
 import { IReduction, Reduction } from "./reduction"
 import { modelJSON } from "./state"
 import { EventsClass, isEvent, isEventsClass, isModel, markEventsClass, modelBrand, modelProperties, statePropertyBrand } from "./symbols"
@@ -45,9 +45,8 @@ export function createModel<T extends object>(create: () => NotObservable<T>): T
             },
             [dispose]: {
                 value() {
-                    Object.values(this[modelProperties])
-                        .filter(isDisposable)
-                        .forEach(p => p[dispose]())
+                    updateChildren(model, instance, null)
+                    disposeGarbage()
                     if (isDisposable(instance))
                         instance[dispose]()
                 }
@@ -139,6 +138,7 @@ export function model<Class extends new (...args: any[]) => object>(target: Clas
                         [dispose]() {
                             for (let property of allProperties)
                                 updateChildren(model, property, null)
+                            disposeGarbage()
                             super[dispose]?.()
                         }
                     })

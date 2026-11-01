@@ -1,6 +1,7 @@
 import { log } from "./logging"
 import { type IObservable, isObservable } from "./observable"
 import { type EventsClass, isEventsClass, isModel, isStateProperty, type Model } from "./symbols"
+import { iterationSource } from "./tracking"
 import { dispose, emptyArray, emptyMap, isDisposable, isObject, nameOfFunction } from "./utils"
 
 type GraphNode = IObservable<any> | Model | EventsClass
@@ -96,14 +97,17 @@ function removeParent(node: GraphNode, parent: GraphNode) {
     }
 }
 
+/** Does nothing during a transition, since the transition disposes garbage when it ends. */
 export function disposeGarbage() {
-    for (let node of garbage) {
-        if (!parentRegistry.has(node)) {
-            log('🗑️ (dispose)', getName(node), emptyArray, () => ({ Path: getPath(node) }))
-            node[dispose]()
+    if (!iterationSource) {
+        for (let node of garbage) {
+            garbage.delete(node) // Disposing can dispose more garbage, which shouldn't include this again
+            if (!parentRegistry.has(node)) {
+                log('🗑️ (dispose)', getName(node), emptyArray, () => ({ Path: getPath(node) }))
+                node[dispose]()
+            }
         }
     }
-    garbage.clear()
 }
 
 export interface IManagedObservableTracker extends Disposable {
