@@ -22,7 +22,8 @@
         "test:modern": "bun test",
         "test:legacy": "tsc -b tests-legacy && bun test --config=bunfig.legacy.toml",
         "test": "bun run test:modern && bun run test:legacy",
-        "example": "bun example/serve.ts"
+        "example": "bun example/serve.ts",
+        "prepare-release": "bun scripts/prepare-release.ts"
     },
     "devDependencies": {
         "typescript": "~6.0.3"

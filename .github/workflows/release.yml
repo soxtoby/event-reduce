@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      # npm publishes the packages, since bun publish can't use trusted publishing yet
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Check the tag matches the packages and changelog
+        run: |
+          versions=$(jq -r .version packages/*/package.json | sort -u)
+          if [ "$versions" != "${GITHUB_REF_NAME#v}" ]; then
+            echo "::error::$GITHUB_REF_NAME doesn't match the package versions: $versions."
+            exit 1
+          fi
+          awk -v heading="## $GITHUB_REF_NAME" '$0 == heading { found = 1; next } /^## / { found = 0 } found' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/notes.md"; then
+            echo "::error::CHANGELOG.md has no notes for $GITHUB_REF_NAME."
+            exit 1
+          fi
+      - run: bun install --frozen-lockfile
+      - run: bun run test
+      # Packing replaces workspace: dependency ranges with versions. Dependencies publish first,
+      # and versions already on npm are skipped, so a release that failed partway can be re-run.
+      - name: Publish to npm
+        run: |
+          for name in event-reduce event-reduce-react; do
+            if ! npm view "$name@${GITHUB_REF_NAME#v}" version > /dev/null 2>&1; then
+              (cd "packages/$name" && bun pm pack --filename "$RUNNER_TEMP/$name.tgz" --quiet)
+              npm publish "$RUNNER_TEMP/$name.tgz"
+            fi
+          done
+      - name: Create GitHub release
+        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md"
+        env:
+          GH_TOKEN: ${{ github.token }}
