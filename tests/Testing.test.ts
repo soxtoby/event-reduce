@@ -32,7 +32,6 @@ describe("mutable", () => {
 
     beforeEach(() => {
         baseModel = new Model()
-        baseModel.valuePlusOne
         sut = mutable(baseModel)
         typedModel = sut.target
     })
@@ -53,9 +52,31 @@ describe("mutable", () => {
         test("reduced value returns override", () => expect(sut.value).toBe(2))
 
         test("computed value is still computed", () => expect(sut.valuePlusOne).toBe(3))
+
+        test("when its event fires, reduced value returns override", () => {
+            sut.events.nextValue(5)
+
+            expect(sut.value).toBe(2)
+        })
     })
 
-    test("when computed property overridden, computed value returns override", () => {
+    describe("when computed property overridden", () => {
+        beforeEach(() => {
+            sut.valuePlusOne = 3
+        })
+
+        test("computed value returns override", () => expect(sut.valuePlusOne).toBe(3))
+
+        test("when its source changes, computed value returns override", () => {
+            sut.events.nextValue(5)
+
+            expect(sut.valuePlusOne).toBe(3)
+        })
+    })
+
+    test("when computed property overridden after being read, computed value returns override", () => {
+        sut.valuePlusOne
+
         sut.valuePlusOne = 3
 
         expect(sut.valuePlusOne).toBe(3)

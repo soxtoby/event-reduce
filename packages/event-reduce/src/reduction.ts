@@ -154,6 +154,10 @@ export class Reduction<T, Events = void> extends Observable<T> implements IReduc
     detach() {
         for (let source of this._sources)
             source.unsubscribe(this)
+        // Otherwise reading the value would still reduce source changes
+        this._sources.clear()
+        this._reducers.clear()
+        this._singleReducer = undefined
     }
 
     override[dispose]() {

@@ -20,10 +20,12 @@ export function mutable<T>(model: T): Mutable<T> {
                 Object.defineProperty(model, key, {
                     get() { return (property as Observable<any>).value },
                     set(value) {
-                        if (property instanceof Reduction || property instanceof Derivation)
-                            property.detach()
+                        if (property instanceof Derivation) {
+                            property.update(() => value, 'mutable override') // Leaves it with no sources to be recalculated from
+                        } else if (property instanceof Observable) {
+                            if (property instanceof Reduction)
+                                property.detach()
 
-                        if (property instanceof Observable) {
                             let transition = beginTransition(property, isObject(value) ? value : { value })
                             try {
                                 property.setValue(value)
