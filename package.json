@@ -19,8 +19,9 @@
     "scripts": {
         "prepare": "tsc -b",
         "watch": "tsc -b -w",
+        "check": "bun check -b",
         "test:modern": "bun test",
-        "test:legacy": "tsc -b tests-legacy && bun test --config=bunfig.legacy.toml",
+        "test:legacy": "bun test --config=bunfig.legacy.toml --tsconfig-override=tests-legacy/tsconfig.json",
         "test": "bun run test:modern && bun run test:legacy",
         "example": "bun example/serve.ts",
         "prepare-release": "bun scripts/prepare-release.ts"

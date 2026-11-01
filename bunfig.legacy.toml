@@ -1,2 +1,3 @@
 [test]
-root = "tests-legacy/dist"
+root = "tests-legacy"
+pathIgnorePatterns = ["**/dist/**"]
