@@ -57,9 +57,6 @@ export class Derivation<T> extends Observable<T> implements IDerivation<T> {
         if (!this._observers.size)
             this._derive.attach()
 
-        if (this.lastUpdated < 0)
-            this.update() // Subscriber may never be notified if we don't collect any sources
-
         super.subscribe(observer)
     }
 
@@ -81,13 +78,17 @@ export class Derivation<T> extends Observable<T> implements IDerivation<T> {
         startSourceAccessed(this)
 
         try {
-            if (this._derive.isStale)
-                this.update()
+            this.updateIfStale()
         } finally {
             endSourceAccessed(this)
         }
 
         return this._value // Not using super.value to avoid duplicate tracker notification
+    }
+
+    override updateIfStale() {
+        if (this._derive.isStale)
+            this.update()
     }
 
     protected override skipUpdate(nextValue: T) { return this._skipUpdate(this._value, nextValue) }

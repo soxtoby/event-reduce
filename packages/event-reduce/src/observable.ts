@@ -1,7 +1,7 @@
 import type { IEventFunction } from "./events"
 import { getPath, updateChildren } from "./ownership"
 import { isEventsClass } from "./symbols"
-import { currentIteration, endSourceAccessed, iterationSource, startSourceAccessed } from "./tracking"
+import { currentIteration, endSourceAccessed, iterationSource, recordChange, startSourceAccessed, untrackedValue } from "./tracking"
 import type { ObservedValue } from "./types"
 import { dispose, emptyArray, identity, isObject, nameOfCallback, nameOfFunction } from "./utils"
 
@@ -10,7 +10,11 @@ export interface IObservable<T> extends Disposable {
     setDisplayName(name: string): void
     readonly path: string
     getSources(): Iterable<IObservable<any>>
-    readonly lastUpdated: number
+    /** The iteration this observable's value last changed in, as of its last update. */
+    readonly lastChanged: number
+    /** Updates this observable if its sources have changed since it was last updated. Updating doesn't necessarily change its value. */
+    updateIfStale(): void
+    /** Updates this observable first if it's stale, so that its pending changes aren't notified to the observer. A change that's already being notified may still reach it. */
     subscribe(observer: IObserver<T>): void
     unsubscribe(observer: IObserver<T>): void
 
@@ -32,13 +36,17 @@ export function isObservable(value: any): value is IObservable<any> {
 export abstract class Observable<T> implements IObservable<T> {
     protected readonly _observers = new Set<IObserver<T>>()
     protected _value!: T
-    lastUpdated = -1
+    protected _lastChanged = -1
 
     constructor(public displayName: string) { }
 
     setDisplayName(name: string) { this.displayName = name }
 
     get path(): string { return getPath(this) }
+
+    get lastChanged() { return this._lastChanged }
+
+    updateIfStale() { } // Signals and events are up to date as soon as they're set
 
     getSources() { return emptyArray as Iterable<IObservable<any>> }
 
@@ -58,7 +66,8 @@ export abstract class Observable<T> implements IObservable<T> {
         }
 
         if (!this.skipUpdate(newValue)) {
-            this.lastUpdated = currentIteration
+            this._lastChanged = currentIteration
+            recordChange()
             if (isObject(this._value) || isObject(newValue))
                 this.updateChildren(this._value, newValue)
             this._value = newValue
@@ -86,7 +95,11 @@ export abstract class Observable<T> implements IObservable<T> {
         return bind(displayName, this, v => transform(v)!, value => value != undefined)
     }
 
-    subscribe(observer: IObserver<T>) { this._observers.add(observer) }
+    subscribe(observer: IObserver<T>) {
+        this.updateIfStale()
+        this._observers.add(observer)
+    }
+
     unsubscribe(observer: IObserver<T>) { this._observers.delete(observer) }
 
     [dispose]() {
@@ -116,6 +129,9 @@ export function merge<const Observables extends readonly IObservable<any>[]>(dis
 }
 
 export class BoundObservable<In, Out> extends Observable<Out> {
+    private _lastHandled = -1 // Iteration source changes were last handled in, whether they were forwarded or filtered out
+    private _lastHandledSource?: IObservable<In> // The source whose change was handled in that iteration, if any
+
     constructor(
         displayName: string,
         protected _sources: IObservable<In>[],
@@ -125,14 +141,18 @@ export class BoundObservable<In, Out> extends Observable<Out> {
 
     override getSources() { return this._sources }
 
-    override subscribe(observer: IObserver<Out>): void {
-        if (!this._observers.size)
+    override subscribe(observer: IObserver<Out>) {
+        if (!this._observers.size) {
             this._sources.forEach(source => source.subscribe(this))
+            // Only want to forward changes that happen after subscribing
+            this._lastHandled = currentIteration
+            this._lastHandledSource = undefined
+        }
 
         super.subscribe(observer)
     }
 
-    override unsubscribe(observer: IObserver<Out>): void {
+    override unsubscribe(observer: IObserver<Out>) {
         super.unsubscribe(observer)
 
         if (!this._observers.size)
@@ -140,10 +160,32 @@ export class BoundObservable<In, Out> extends Observable<Out> {
     }
 
     sourceUpdated(source: IObservable<In>, value: In): void {
-        try {
-            this.setValue(this._transform(value))
-        } finally {
-            this._value = undefined! // Bound sources shouldn't hold on to their values
+        if (source.lastChanged > this._lastHandled) {
+            this._lastHandled = currentIteration
+            this._lastHandledSource = source
+            try {
+                this.setValue(this._transform(value))
+            } finally {
+                this._value = undefined! // Bound sources shouldn't hold on to their values
+            }
+        } else if (process.env.NODE_ENV !== 'production'
+            && this._lastHandledSource
+            && source != this._lastHandledSource // The handled source notifies again after being handled early
+        ) {
+            throw new SourcesChangedTogetherError(this, this._lastHandledSource, source)
+        }
+    }
+
+    // Updating a stale source makes it notify this as usual.
+    // A source that has already changed, but hasn't notified this yet, has its change handled here, and its notification is ignored when it arrives.
+    override updateIfStale() {
+        if (this._observers.size && this._lastHandled < currentIteration) {
+            let changedSource = this._sources.find(source => {
+                source.updateIfStale()
+                return source.lastChanged > this._lastHandled
+            })
+            if (changedSource)
+                this.sourceUpdated(changedSource, untrackedValue(changedSource))
         }
     }
 
@@ -171,6 +213,17 @@ export class InvalidStateError extends Error {
         public observable: IObservable<any>,
         public value: IEventFunction<unknown, unknown[]> | object
     ) { super(`Tried to store ${isObservable(value) ? value.displayName : value} in ${observable.displayName}. ${nameOfFunction(value.constructor)}s cannot be state.`) }
+}
+
+export class SourcesChangedTogetherError extends Error {
+    constructor(
+        public observable: IObservable<any>,
+        public firstSource: IObservable<any>,
+        public secondSource: IObservable<any>
+    ) {
+        super(`'${observable.displayName}' was updated by both '${firstSource.displayName}' and '${secondSource.displayName}' in response to '${iterationSource?.displayName}'. `
+            + "Sources of a merge or reduction mustn't change in the same update, since the order they're handled in isn't reliable.")
+    }
 }
 
 export class StateChangeOutsideTransitionError extends Error {

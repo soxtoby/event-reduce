@@ -1,9 +1,9 @@
 import { Derivation } from "./derivation"
 import { startLogging } from "./logging"
-import { allSources, IObservable, IObserver, isObservable, NoUnderlyingObservableError, Observable } from "./observable"
+import { allSources, IObservable, IObserver, isObservable, NoUnderlyingObservableError, Observable, SourcesChangedTogetherError } from "./observable"
 import { managedObservableCreated, updateChildren } from "./ownership"
 import { ModelJSON, modelJSON } from "./state"
-import { collectAccessedSources, currentIteration, endSourceAccessed, getUnderlyingObservable, startSourceAccessed } from "./tracking"
+import { collectAccessedSources, currentIteration, endSourceAccessed, getUnderlyingObservable, startSourceAccessed, untrackedValue } from "./tracking"
 import { dispose, emptyArray } from "./utils"
 
 export interface IReduction<T, Events = void> extends IObservable<T> {
@@ -37,6 +37,7 @@ export class Reduction<T, Events = void> extends Observable<T> implements IReduc
     private _singleReducer?: (current: T, next: any) => T
     private _reducers = new Map<IObservable<any>, (current: T, next: any) => T>()
     private _sourcesLastChecked = -1
+    private _lastReducedSource?: IObservable<any> // The source reduced in the iteration sources were last checked in, if any
     private _json: Derivation<ModelJSON<T>>
     static defaultName = "(anonymous reduction)"
 
@@ -74,7 +75,10 @@ export class Reduction<T, Events = void> extends Observable<T> implements IReduc
         this._sources.add(source)
         this._reducers.set(source, reduce)
         this._singleReducer = this._reducers.size == 1 ? reduce : undefined
-        this._sourcesLastChecked = Math.max(this._sourcesLastChecked, source.lastUpdated) // Avoid firing reduction because of new source
+        if (source.lastChanged > this._sourcesLastChecked) { // Avoid firing reduction because of new source
+            this._sourcesLastChecked = source.lastChanged
+            this._lastReducedSource = undefined // Nothing can have been reduced in that iteration yet
+        }
 
         return this
     }
@@ -82,9 +86,11 @@ export class Reduction<T, Events = void> extends Observable<T> implements IReduc
     override getSources() { return this._sources }
 
     sourceUpdated<S>(source: IObservable<S>, value: S) {
-        if (source.lastUpdated > this.lastUpdated) {
+        if (source.lastChanged > this._sourcesLastChecked) {
             let reduce = this._singleReducer ?? this._reducers.get(source)
             if (reduce) {
+                this._sourcesLastChecked = currentIteration // Before reducing, so a source notifying during the reducer isn't reduced too
+                this._lastReducedSource = source
                 let previousValue = this._value
                 let nextValue!: T
                 let logging = startLogging('🧪 (reduction)', this.displayName, emptyArray, () => ({
@@ -107,6 +113,11 @@ export class Reduction<T, Events = void> extends Observable<T> implements IReduc
                     logging[dispose]()
                 }
             }
+        } else if (process.env.NODE_ENV !== 'production'
+            && this._lastReducedSource
+            && source != this._lastReducedSource // The reduced source notifies again after being reduced early
+        ) {
+            throw new SourcesChangedTogetherError(this, this._lastReducedSource, source)
         }
     }
 
@@ -114,16 +125,23 @@ export class Reduction<T, Events = void> extends Observable<T> implements IReduc
         startSourceAccessed(this) // Notifying tracker before checking for updates so circular reference is detected early
 
         try {
-            if (this._sourcesLastChecked < currentIteration) {
-                let newerSource = this._sources.values().find(s => s.lastUpdated > this._sourcesLastChecked)
-                if (newerSource)
-                    this.sourceUpdated(newerSource, (newerSource as Observable<any>).value)
-            }
+            this.updateIfStale()
         } finally {
             endSourceAccessed(this)
         }
 
         return this._value // Not using super.value to avoid duplicate tracker notification
+    }
+
+    override updateIfStale() {
+        if (this._sourcesLastChecked < currentIteration) {
+            let changedSource = this._sources.values().find(source => {
+                source.updateIfStale()
+                return source.lastChanged > this._sourcesLastChecked
+            })
+            if (changedSource)
+                this.sourceUpdated(changedSource, untrackedValue(changedSource))
+        }
     }
 
     override setValue(value: T) {

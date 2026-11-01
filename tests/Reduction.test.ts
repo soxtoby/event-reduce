@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, test, type Mock } from "bun:test"
-import { createModel, event, events, IReduction, ISignal, reduce, signal } from 'event-reduce'
-import { InvalidStateError } from "event-reduce/lib/observable"
+import { createModel, derive, event, events, IReduction, ISignal, reduce, signal } from 'event-reduce'
+import { InvalidStateError, SourcesChangedTogetherError } from "event-reduce/lib/observable"
 import { CircularSubscriptionError } from "event-reduce/lib/reduction"
 import { CircularDependencyError, collectAccessedSources } from "event-reduce/lib/tracking"
 import { dispose } from "event-reduce/lib/utils"
@@ -13,7 +13,7 @@ describe("reduce", () => {
 
         beforeEach(() => {
             subscriber = new MockObserver<number>()
-            sut = createModel(() => reduce(1, 'sut'))
+            sut = createModel(() => ({ sut: reduce(1, 'sut') })).sut
             sut.subscribe(subscriber)
         })
 
@@ -65,7 +65,7 @@ describe("reduce", () => {
             let observable: ISignal<number>
 
             beforeEach(() => {
-                other = createModel(() => reduce(0))
+                other = createModel(() => ({ other: reduce(0) })).other
                 observable = signal(0, 'test')
                 sut.on(observable, () => other.value)
             })
@@ -118,7 +118,7 @@ describe("reduce", () => {
 
         beforeEach(() => {
             eventsObj = {}
-            sut = createModel(() => reduce(1, eventsObj))
+            sut = createModel(() => ({ sut: reduce(1, eventsObj) })).sut
         })
 
         afterEach(() => {
@@ -160,6 +160,88 @@ describe("reduce", () => {
 
         expect(tracker.accessed).toContain(sut.r1 as any)
         expect(tracker.accessed).toContain(sut.r2 as any)
+    })
+
+    test("when read by an observed derivation before handling an event, derivation isn't recalculated when the event fires again without changes", () => {
+        let update = event<number>('update')
+        using sut = createModel(() => ({
+            first: reduce(0, 'first').on(update, (_, value) => value),
+            later: reduce(0, 'later').on(update, (_, value) => value * 10), // Read by derivation before handling update
+        }))
+        let calculation = mock(() => sut.first.value + sut.later.value)
+        let derivation = derive(calculation, 'derivation')
+        derivation.subscribe(new MockObserver())
+        update(1)
+        calculation.mockClear()
+
+        update(1)
+
+        expect(calculation).not.toHaveBeenCalled()
+    })
+
+    test("when subscribed to a derivation that's stale, doesn't reduce the change from before subscribing", () => {
+        let source = signal(1, 'source')
+        let derivation = derive(() => source.value * 10, 'derivation')
+        derivation.value // Calculated before the change, so it's stale rather than never calculated
+        source.setValue(2)
+        using sut = createModel(() => ({ reduction: reduce(0, 'reduction').on(derivation, (_, value) => value) }))
+
+        expect(sut.reduction.value).toBe(0)
+    })
+
+    test("when two sources change in the same update, throws", () => {
+        let update = event<number>('update')
+        using _ = createModel(() => {
+            let first = reduce(0, 'first').on(update, (_, value) => value)
+            let second = reduce(0, 'second').on(update, (_, value) => value * 10)
+            return { first, second, both: reduce(0, 'both').on(first, (_, value) => value).on(second, (_, value) => value) }
+        })
+
+        expect(() => update(1)).toThrow(SourcesChangedTogetherError)
+    })
+
+    test("when sources are filters of the same event and only one passes, reduces its change", () => {
+        let update = event<number>('update')
+        using sut = createModel(() => ({
+            reduction: reduce(0, 'reduction')
+                .on(update.filter(value => value > 0), (_, value) => value)
+                .on(update.filter(value => value < 0), (_, value) => -value)
+        }))
+
+        update(-2)
+
+        expect(sut.reduction.value).toBe(2)
+    })
+
+    test("when a reducer reads another of its sources that the same update changes, throws", () => {
+        let update = event<number>('update')
+        using _ = createModel(() => {
+            let other = reduce(0, 'other')
+            let sut = reduce(0, 'sut')
+                .on(update, () => other.value) // Notified before other
+                .on(other, (_, value) => value)
+            other.on(update, (_, value) => value)
+            return { other, sut }
+        })
+
+        expect(() => update(1)).toThrow(SourcesChangedTogetherError)
+    })
+
+    test("when given a new source while that source is notifying, doesn't reduce its change", () => {
+        let first = event<number>('first')
+        let second = event<number>('second')
+        using sut = createModel(() => ({ reduction: reduce(0, 'reduction').on(first, (_, value) => value) }))
+        first(1)
+        using _ = createModel(() => ({
+            adder: reduce(0, 'adder').on(second, count => {
+                sut.reduction.on(second, (_, value) => value * 10)
+                return count + 1
+            })
+        }))
+
+        second(2)
+
+        expect(sut.reduction.value).toBe(1)
     })
 
     test("when reducer returns an event, throws", () => {

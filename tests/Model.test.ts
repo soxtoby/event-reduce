@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test"
-import { asyncEvent, derive, derived, event, events, model, reduce, reduced, state } from "event-reduce"
-import { EventsMarkedAsStateError, MissingModelDecoratorError } from "event-reduce/lib/models"
+import { asyncEvent, createModel, derive, derived, event, events, model, reduce, reduced, state } from "event-reduce"
+import { EventsMarkedAsStateError, MissingModelDecoratorError, ObservableModelError } from "event-reduce/lib/models"
 import { decrement, ExtendedModel } from "./Model.test/ExtendedModel"
 import { increment, TestModel } from "./Model.test/TestModel"
 
@@ -86,6 +86,23 @@ describe("models", () => {
             expect(parentModel.child).toBeInstanceOf(TestModel)
         })
 
+        test("when reducer creates a new model that observes the same event that created it, new model doesn't reduce that event", () => {
+            @model
+            class Parent {
+                @reduced
+                get child() {
+                    return reduce(null as TestModel | null)
+                        .on(increment, () => new TestModel())
+                        .value
+                }
+            }
+            let parentModel = new Parent()
+
+            increment(undefined)
+
+            expect(parentModel.child!.property).toBe(1)
+        })
+
         test("when event is marked as state, throws when constructed", () => {
             @model
             class BadModel {
@@ -132,6 +149,11 @@ describe("models", () => {
             }
 
             expect(() => new Bad()).toThrow(MissingModelDecoratorError)
+        })
+
+        test("createModel, when given an observable, throws", () => {
+            // @ts-expect-error Observables can't be models
+            expect(() => createModel(() => reduce(1))).toThrow(ObservableModelError)
         })
 
         test("when base class defines toJSON, model decorator does not override it", () => {

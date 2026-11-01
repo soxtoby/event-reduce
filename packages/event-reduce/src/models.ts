@@ -26,12 +26,14 @@ let getterCache = new WeakMap<object, Map<Function, IObservable<any>>>()
 let registeredInstanceProperties = new WeakMap<object, ModelProperty[]>()
 
 
-/** Creates a loose model object. Not required if your model is already decorated with \@{@link model}. */
-export function createModel<T extends object>(create: () => T): T & Model {
+/** Creates a loose model object from a plain object with observable properties. Not required if your model is already decorated with \@{@link model}. */
+export function createModel<T extends object>(create: () => NotObservable<T>): T & Model {
     let sourceCreation = trackManagedObservableCreation()
     let accesses = collectAccessedSources(null) // Don't want anything accessed during construction to become a source for whatever is creating this
     try {
         let instance = create()
+        if (process.env.NODE_ENV !== 'production' && isObservable(instance))
+            throw new ObservableModelError(instance) // Would be wrapped in a model, which observable methods would then store their state on
         if (isModel(instance))
             return instance
         let model = Object.create(instance, {
@@ -59,6 +61,9 @@ export function createModel<T extends object>(create: () => T): T & Model {
         sourceCreation[dispose]()
     }
 }
+
+/** Models hold observables in their properties, rather than being observables themselves. */
+type NotObservable<T> = T extends IObservable<any> ? never : T
 
 export function disposeModel(model: object) {
     if (isModel(model))
@@ -495,6 +500,14 @@ export class InvalidDerivedPropertyError extends Error {
         public property: PropertyKey
     ) {
         super(`@derived property ${String(property)} must have a getter or be set to the value of a derivation.`)
+    }
+}
+
+export class ObservableModelError extends Error {
+    constructor(
+        public observable: IObservable<any>
+    ) {
+        super(`Tried to create a model from ${observable.displayName}. Models must be plain objects with observable properties, e.g. createModel(() => ({ count: reduce(0) })).`)
     }
 }
 

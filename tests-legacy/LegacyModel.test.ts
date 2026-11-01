@@ -51,7 +51,7 @@ describe("legacy models", () => {
 
         @model
         class ExtendedModel extends TestModel {
-            override legacyField: number = extendReduce(this.property)
+            override legacyField: number = extendReduce(this.legacyField)
                 .on(decrement, c => c - 1)
                 .value
 

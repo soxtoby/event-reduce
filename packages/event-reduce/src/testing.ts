@@ -120,7 +120,7 @@ export function eventProxy(createEvent: () => any = event) {
     return new Proxy(event, {
         get(target: any, key: PropertyKey) {
             if (typeof key == 'string')
-                return target[key] || (target[key] = eventProxy(createEvent))
+                return key in target ? target[key] : (target[key] = eventProxy(createEvent))
             else if (key == targetAccessor)
                 return target
         },

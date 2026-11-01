@@ -5,6 +5,7 @@ import { disposeGarbage } from "./ownership"
 import { dispose, nullDisposable } from "./utils"
 
 export let currentIteration = 0
+export let lastChangeIteration = -1 // Not every iteration changes something (e.g. renders)
 export let iterationSource: IObservable<any> | Effect<any> | null = null
 let transitionEffectQueue = [] as (() => void)[]
 
@@ -36,6 +37,20 @@ export function beginTransition(source: IObservable<any> | Effect<any>, trigger?
 
 export function queueTransitionEffect(effect: () => void) {
     transitionEffectQueue.push(effect)
+}
+
+export function recordChange() {
+    lastChangeIteration = currentIteration
+}
+
+/** Reads an observable's value without the current observer depending on it. */
+export function untrackedValue<T>(observable: IObservable<T>) {
+    let untracked = collectAccessedSources(null)
+    try {
+        return (observable as Observable<T>).value
+    } finally {
+        untracked[dispose]()
+    }
 }
 
 export function collectAccessedSources(observer: IObserver<any> | null) {

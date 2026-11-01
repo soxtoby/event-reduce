@@ -17,9 +17,10 @@ describe("subscription cleanup", () => {
         let model = new Model(0)
         let unsubscribe = spyOnDispose(model, 'reducedProp')
         let createNewModel = event()
-        using _ = createModel(() =>
-            reduce(model)
-                .on(createNewModel, () => new Model(1)))
+        using _ = createModel(() => ({
+            reduction: reduce(model)
+                .on(createNewModel, () => new Model(1))
+        }))
 
         createNewModel()
 
@@ -30,8 +31,10 @@ describe("subscription cleanup", () => {
         let modelInstance = new Model(0)
         let unsubscribe = spyOnDispose(modelInstance, 'reducedProp')
         let returnSameModel = event()
-        using _ = createModel(() => reduce(modelInstance)
-            .on(returnSameModel, () => modelInstance))
+        using _ = createModel(() => ({
+            reduction: reduce(modelInstance)
+                .on(returnSameModel, () => modelInstance)
+        }))
 
         returnSameModel()
 
@@ -109,9 +112,10 @@ describe("subscription cleanup", () => {
         let addModel = event()
         let modelInstance = new Model(0)
         let disposeModelSpy = spyOnDispose(modelInstance, 'reducedProp')
-        using _ = createModel(() =>
-            reduce([modelInstance])
-                .on(addModel, ms => ms.concat(new Model(1))))
+        using _ = createModel(() => ({
+            reduction: reduce([modelInstance])
+                .on(addModel, ms => ms.concat(new Model(1)))
+        }))
 
         addModel()
 
@@ -125,9 +129,10 @@ describe("subscription cleanup", () => {
             let model2 = new Model(2)
             let dispose1 = spyOnDispose(model1, 'reducedProp')
             let dispose2 = spyOnDispose(model2, 'reducedProp')
-            using _ = createModel(() =>
-                reduce([model1, model2])
-                    .on(removeModel, ms => ms.slice(0, -1)))
+            using _ = createModel(() => ({
+                reduction: reduce([model1, model2])
+                    .on(removeModel, ms => ms.slice(0, -1))
+            }))
 
             removeModel()
 
@@ -141,9 +146,10 @@ describe("subscription cleanup", () => {
             let model2 = new Model(2)
             let dispose1 = spyOnDispose(model1, 'reducedProp')
             let dispose2 = spyOnDispose(model2, 'reducedProp')
-            using _ = createModel(() =>
-                reduce([model1, model2])
-                    .on(removeModel, ms => ms.slice(0, -1)))
+            using _ = createModel(() => ({
+                reduction: reduce([model1, model2])
+                    .on(removeModel, ms => ms.slice(0, -1))
+            }))
 
             signal(model2, 'other value')
 
@@ -158,9 +164,10 @@ describe("subscription cleanup", () => {
         let replaceArray = event()
         let modelInstance = new Model(0)
         let disposeModelSpy = spyOnDispose(modelInstance, 'reducedProp')
-        using _ = createModel(() =>
-            reduce([modelInstance] as Model[] | null)
-                .on(replaceArray, () => null))
+        using _ = createModel(() => ({
+            reduction: reduce([modelInstance] as Model[] | null)
+                .on(replaceArray, () => null)
+        }))
 
         replaceArray()
 
@@ -171,9 +178,10 @@ describe("subscription cleanup", () => {
         let addModel = event()
         let modelInstance = new Model(0)
         let disposeModelSpy = spyOnDispose(modelInstance, 'reducedProp')
-        using _ = createModel(() =>
-            reduce({ oldModel: modelInstance })
-                .on(addModel, ms => ({ ...ms, newModel: new Model(1) })))
+        using _ = createModel(() => ({
+            reduction: reduce({ oldModel: modelInstance })
+                .on(addModel, ms => ({ ...ms, newModel: new Model(1) }))
+        }))
 
         addModel()
 
@@ -187,12 +195,13 @@ describe("subscription cleanup", () => {
             let model2 = new Model(2)
             let dispose1 = spyOnDispose(model1, 'reducedProp')
             let dispose2 = spyOnDispose(model2, 'reducedProp')
-            using _ = createModel(() =>
-                reduce({ model1, model2 } as Record<string, Model | undefined>)
+            using _ = createModel(() => ({
+                reduction: reduce({ model1, model2 } as Record<string, Model | undefined>)
                     .on(removeModel, ms => {
                         let { model2, ...remaining } = ms
                         return remaining
-                    }))
+                    })
+            }))
 
             removeModel()
 
@@ -206,12 +215,13 @@ describe("subscription cleanup", () => {
             let model2 = new Model(2)
             let dispose1 = spyOnDispose(model1, 'reducedProp')
             let dispose2 = spyOnDispose(model2, 'reducedProp')
-            using _ = createModel(() =>
-                reduce({ model1, model2 } as Record<string, Model | undefined>)
+            using _ = createModel(() => ({
+                reduction: reduce({ model1, model2 } as Record<string, Model | undefined>)
                     .on(removeModel, ms => {
                         let { model2, ...remaining } = ms
                         return remaining
-                    }))
+                    })
+            }))
 
             signal(model2, 'other value')
 
@@ -228,9 +238,10 @@ describe("subscription cleanup", () => {
         let model2 = new Model(2)
         let dispose1 = spyOnDispose(model1, 'reducedProp')
         let dispose2 = spyOnDispose(model2, 'reducedProp')
-        using _ = createModel(() =>
-            reduce({ model1, model2 } as Record<string, Model | undefined>)
-                .on(removeModel, ms => ({ ...ms, model2: new Model(3) })))
+        using _ = createModel(() => ({
+            reduction: reduce({ model1, model2 } as Record<string, Model | undefined>)
+                .on(removeModel, ms => ({ ...ms, model2: new Model(3) }))
+        }))
 
         removeModel()
 
@@ -242,9 +253,10 @@ describe("subscription cleanup", () => {
         let replaceObject = event()
         let modelInstance = new Model(0)
         let disposeModelSpy = spyOnDispose(modelInstance, 'reducedProp')
-        using _ = createModel(() =>
-            reduce({ model: modelInstance } as Record<string, Model> | null)
-                .on(replaceObject, () => null))
+        using _ = createModel(() => ({
+            reduction: reduce({ model: modelInstance } as Record<string, Model> | null)
+                .on(replaceObject, () => null)
+        }))
 
         replaceObject()
 

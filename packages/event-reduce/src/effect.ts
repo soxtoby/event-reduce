@@ -1,11 +1,13 @@
 import type { IObservable, IObserver } from "./observable"
-import { collectAccessedSources, currentIteration } from "./tracking"
+import { collectAccessedSources, currentIteration, lastChangeIteration } from "./tracking"
 import { dispose } from "./utils"
 
 export class Effect<T> implements IObserver<any> {
     private readonly _sources = new Set<IObservable<any>>()
     private _attached = false
     private _lastRun = -1 // Stale from the start
+    private _lastChecked = -1 // Running or checking brings sources up to date, so they can't change again in the same iteration
+    private _checkingSources = false
     invalidatingSource?: IObservable<any>
 
     constructor(
@@ -19,8 +21,11 @@ export class Effect<T> implements IObserver<any> {
     attach() {
         if (!this._attached) {
             this._attached = true
-            for (let source of this._sources)
+            for (let source of this._sources) {
                 source.subscribe(this)
+                if (source.lastChanged > this._lastRun) // Changed while detached, so this wasn't notified
+                    this.invalidatingSource = source
+            }
         }
     }
 
@@ -33,7 +38,7 @@ export class Effect<T> implements IObserver<any> {
     }
 
     sourceUpdated<S>(source: IObservable<S>, value: S): void {
-        if (source.lastUpdated > this._lastRun) {
+        if (source.lastChanged > this._lastRun) {
             this.invalidatingSource = source
             this._onSourceUpdatedSinceLastRun(source)
         }
@@ -41,13 +46,28 @@ export class Effect<T> implements IObserver<any> {
 
     get isStale() {
         if (this._lastRun < 0
-            || this.invalidatingSource?.lastUpdated! > this._lastRun) // Fast-track for the most common case
+            || this.invalidatingSource?.lastChanged! > this._lastRun) // Fast-track for the most common case
             return true
 
-        for (let source of this._sources)
-            if (source.lastUpdated > this._lastRun)
-                return true
+        if (lastChangeIteration <= this._lastChecked // Nothing has changed since sources were last checked
+            || this._attached && lastChangeIteration < currentIteration // Attached, so notified of changes from earlier iterations
+            || this._checkingSources) // Re-entered through circular sources
+            return false
 
+        this._checkingSources = true
+        try {
+            for (let source of this._sources) { // Not using .values().some(), since it's much slower on this hot path
+                source.updateIfStale()
+                if (source.lastChanged > this._lastRun) {
+                    this.invalidatingSource = source
+                    return true
+                }
+            }
+        } finally {
+            this._checkingSources = false
+        }
+
+        this._lastChecked = currentIteration
         return false
     }
 
@@ -56,7 +76,7 @@ export class Effect<T> implements IObserver<any> {
      * @param effect Optional function to use to run the effect. If not provided, the original effect function will be used.
      **/
     run(effect?: () => T) {
-        this._lastRun = currentIteration
+        this._lastRun = this._lastChecked = currentIteration
         delete this.invalidatingSource
 
         let result: T
