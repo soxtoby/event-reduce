@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.9.0
+
 ### Breaking
 - `IObservable.lastUpdated` is replaced by `lastChanged`, the iteration the observable's value last changed in. `IObservable` also has a new `updateIfStale()` method, so custom implementations need both. Classes extending `Observable` already have them.
 
