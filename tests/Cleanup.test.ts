@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, spyOn, test, type Mock } from "bun:test"
 import { createModel, derive, derived, event, ISignal, model, reduce, reduced, signal, state } from "event-reduce"
 import { getModelProperties } from "event-reduce/lib/models"
+import { DisposedObservableError } from "event-reduce/lib/observable"
 import { isModel } from "event-reduce/lib/symbols"
 import { dispose } from "event-reduce/lib/utils"
 
@@ -336,4 +337,44 @@ describe("subscription cleanup", () => {
         }
         throw new Error(`Property ${String(property)} is not a disposable observable value on the provided model`)
     }
+})
+
+describe("reading after disposal", () => {
+    test("reduction, when read after being disposed, throws", () => {
+        let model = createModel(() => ({ reduction: reduce(1, 'reduction') }))
+        let reduction = model.reduction
+        model[dispose]()
+
+        expect(() => reduction.value).toThrow(DisposedObservableError)
+    })
+
+    test("derivation, when read after being disposed, throws", () => {
+        let model = createModel(() => ({ derivation: derive(() => 1, 'derivation') }))
+        let derivation = model.derivation
+        model[dispose]()
+
+        expect(() => derivation.value).toThrow(DisposedObservableError)
+    })
+
+    test("signal, when read after being disposed, throws", () => {
+        let sut = signal(1, 'sut')
+        sut[dispose]()
+
+        expect(() => sut.value).toThrow(DisposedObservableError)
+    })
+
+    test("model property, when read after the model is replaced in its owner, throws", () => {
+        @model
+        class Child {
+            @reduced
+            get value() { return reduce(1).value }
+        }
+        let replace = event('replace')
+        let { owner } = createModel(() => ({ owner: reduce(new Child(), 'owner').on(replace, () => new Child()) }))
+        let replaced = owner.value
+
+        replace()
+
+        expect(() => replaced.value).toThrow(DisposedObservableError)
+    })
 })

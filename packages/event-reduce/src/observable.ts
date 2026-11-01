@@ -37,6 +37,7 @@ export abstract class Observable<T> implements IObservable<T> {
     protected readonly _observers = new Set<IObserver<T>>()
     protected _value!: T
     protected _lastChanged = -1
+    protected declare _isDisposed?: true // Only set in development, and declared so that production observables don't carry the field
 
     constructor(public displayName: string) { }
 
@@ -51,6 +52,9 @@ export abstract class Observable<T> implements IObservable<T> {
     getSources() { return emptyArray as Iterable<IObservable<any>> }
 
     get value() {
+        if (process.env.NODE_ENV !== 'production' && this._isDisposed)
+            throw new DisposedObservableError(this)
+
         startSourceAccessed(this)
         endSourceAccessed(this)
         return this._value
@@ -106,6 +110,8 @@ export abstract class Observable<T> implements IObservable<T> {
         this.updateChildren(this._value, undefined!)
         this._value = undefined!
         this._observers.clear()
+        if (process.env.NODE_ENV !== 'production')
+            this._isDisposed = true
     }
 }
 
@@ -223,6 +229,15 @@ export class SourcesChangedTogetherError extends Error {
     ) {
         super(`'${observable.displayName}' was updated by both '${firstSource.displayName}' and '${secondSource.displayName}' in response to '${iterationSource?.displayName}'. `
             + "Sources of a merge or reduction mustn't change in the same update, since the order they're handled in isn't reliable.")
+    }
+}
+
+export class DisposedObservableError extends Error {
+    constructor(
+        public observable: IObservable<any>
+    ) {
+        super(`Tried to read '${observable.displayName}' after it was disposed. `
+            + 'This usually means something is still using a model that has been removed from its owner.')
     }
 }
 
