@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed
+- In development, a derivation or reducer throws `UnownedModelError` when a model it creates has no owner, such as a model in an array inside a returned object. A derivation or reduction only owns models in its value that are the value itself, in an array, or a property of an object.
+
 ### Fixed
 - In development, React's props diff no longer throws `DisposedObservableError` when a re-rendered component's previous props hold a model that has since been disposed, such as an item removed from an array prop.
 

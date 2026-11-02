@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, spyOn, test, type Mock } from "bun:test"
 import { createModel, derive, derived, disposeModel, event, ISignal, model, reduce, reduced, signal, state } from "event-reduce"
 import { getModelProperties } from "event-reduce/lib/models"
 import { DisposedObservableError } from "event-reduce/lib/observable"
+import { UnownedModelError } from "event-reduce/lib/ownership"
 import { isModel } from "event-reduce/lib/symbols"
 import { dispose } from "event-reduce/lib/utils"
 import { reactive } from "event-reduce-react"
@@ -433,5 +434,44 @@ describe("disposeModel", () => {
 
         expect(readDuringTransition).toBe(1)
         expect(() => sut.value).toThrow(DisposedObservableError)
+    })
+})
+
+describe("unowned model detection", () => {
+    @model
+    class Child {
+        @reduced
+        get value() { return reduce(1).value }
+    }
+
+    @model
+    @state('child')
+    class Parent {
+        constructor(public child: Child) { }
+    }
+
+    test("derivation, when a model it creates is nested too deep to be owned, throws", () => {
+        let sut = derive(() => ({ byKey: { a: [new Child()] } }), 'sut')
+
+        expect(() => sut.value).toThrow(UnownedModelError)
+    })
+
+    test("derivation, when a loose model it creates is nested too deep to be owned, throws", () => {
+        let sut = derive(() => ({ byKey: { a: [createModel(() => ({ value: reduce(1) }))] } }), 'sut')
+
+        expect(() => sut.value).toThrow(UnownedModelError)
+    })
+
+    test("derivation, when a model it creates is owned by another model in its value, doesn't throw", () => {
+        let sut = derive(() => new Parent(new Child()), 'sut')
+
+        expect(sut.value.child.value).toBe(1)
+    })
+
+    test("reduction, when a model its reducer creates is nested too deep to be owned, throws", () => {
+        let add = event('add')
+        createModel(() => ({ sut: reduce({ byKey: {} as Record<string, Child[]> }, 'sut').on(add, () => ({ byKey: { a: [new Child()] } })) }))
+
+        expect(() => add()).toThrow(UnownedModelError)
     })
 })

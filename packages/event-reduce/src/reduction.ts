@@ -1,7 +1,7 @@
 import { Derivation } from "./derivation"
 import { startLogging } from "./logging"
 import { allSources, disposedValue, IObservable, IObserver, isObservable, NoUnderlyingObservableError, Observable, SourcesChangedTogetherError } from "./observable"
-import { managedObservableCreated, updateChildren } from "./ownership"
+import { managedObservableCreated, trackManagedObservableCreation, updateChildren } from "./ownership"
 import { ModelJSON, modelJSON } from "./state"
 import { collectAccessedSources, currentIteration, endSourceAccessed, getUnderlyingObservable, startSourceAccessed, untrackedValue } from "./tracking"
 import { dispose, emptyArray } from "./utils"
@@ -102,13 +102,16 @@ export class Reduction<T, Events = void> extends Observable<T> implements IReduc
 
                 try {
                     let tracker = collectAccessedSources(this) // Required for detecting circular references in reducers
+                    let observableCreation = trackManagedObservableCreation(this)
                     try {
                         nextValue = reduce(this._value, value)
                     } finally {
+                        observableCreation[dispose]()
                         tracker[dispose]()
                     }
 
                     this.setValue(nextValue)
+                    observableCreation.verifyObservableManagement() // Scope already closed, so observers notified by setValue don't create into it
                 } finally {
                     logging[dispose]()
                 }

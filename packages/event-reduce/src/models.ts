@@ -1,6 +1,6 @@
 import { Derivation, derive, IDerivation } from "./derivation"
 import { IObservable, isObservable, Observable } from "./observable"
-import { disposeGarbage, getChildNodes, trackManagedObservableCreation, updateChildren } from "./ownership"
+import { disposeGarbage, getChildNodes, managedModelCreated, trackManagedObservableCreation, updateChildren } from "./ownership"
 import { IReduction, Reduction } from "./reduction"
 import { modelJSON } from "./state"
 import { EventsClass, isEvent, isEventsClass, isModel, markEventsClass, modelBrand, modelProperties, statePropertyBrand } from "./symbols"
@@ -28,6 +28,12 @@ let registeredInstanceProperties = new WeakMap<object, ModelProperty[]>()
 
 /** Creates a loose model object from a plain object with observable properties. Not required if your model is already decorated with \@{@link model}. */
 export function createModel<T extends object>(create: () => NotObservable<T>): T & Model {
+    let model = createModelInstance(create)
+    managedModelCreated(model)
+    return model
+}
+
+function createModelInstance<T extends object>(create: () => NotObservable<T>): T & Model {
     let sourceCreation = trackManagedObservableCreation()
     let accesses = collectAccessedSources(null) // Don't want anything accessed during construction to become a source for whatever is creating this
     try {
@@ -146,6 +152,8 @@ export function model<Class extends new (...args: any[]) => object>(target: Clas
                     accesses[dispose]()
                     sourceCreation[dispose]()
                 }
+
+                managedModelCreated(this as any as Model)
             }
         }
     }[className]

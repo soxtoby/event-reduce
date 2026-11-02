@@ -12,7 +12,13 @@ let parentRegistry = new WeakMap<GraphNode, Map<GraphNode, string>>()
 let childSnapshots = new WeakMap<object, ReadonlyMap<GraphNode, string>>()
 let garbage = new Set<GraphNode & Disposable>()
 
-let currentCreationScope: Set<GraphNode & IObservable<any>> | null = null
+interface CreationScope {
+    observables: Set<GraphNode & IObservable<any>>
+    /** Null if models created in this scope aren't checked for an owner. */
+    models: Set<Model> | null
+}
+
+let currentCreationScope: CreationScope | null = null
 
 export function updateChildren(parent: GraphNode, previousValue: unknown, nextValue: unknown, parentPath = '') {
     if (Object.is(previousValue, nextValue))
@@ -114,14 +120,25 @@ export interface IManagedObservableTracker extends Disposable {
     verifyObservableManagement(): void
 }
 
-export function trackManagedObservableCreation(): IManagedObservableTracker {
+/**
+ * Tracks observables, and optionally models, created until the tracker is disposed.
+ * @param modelCreator - The derivation or reduction whose value should own the models created in this scope. If not provided, models aren't checked.
+ */
+export function trackManagedObservableCreation(modelCreator?: IObservable<any>): IManagedObservableTracker {
     let previousScope = currentCreationScope
-    let currentScope = currentCreationScope = new Set()
+    let currentScope = currentCreationScope = {
+        observables: new Set(),
+        models: process.env.NODE_ENV !== 'production' && modelCreator ? new Set() : null
+    }
     return {
         verifyObservableManagement() {
-            for (let object of currentScope)
+            for (let object of currentScope.observables)
                 if (!parentRegistry.has(object))
                     throw new UntrackedObservableError(object)
+
+            for (let model of currentScope.models ?? emptyArray)
+                if (!parentRegistry.has(model))
+                    throw new UnownedModelError(model, modelCreator!)
         },
         [dispose]() { currentCreationScope = previousScope }
     }
@@ -130,7 +147,12 @@ export function trackManagedObservableCreation(): IManagedObservableTracker {
 export function managedObservableCreated(observable: GraphNode & IObservable<any>) {
     if (!currentCreationScope)
         throw new UntrackedObservableError(observable)
-    currentCreationScope.add(observable)
+    currentCreationScope.observables.add(observable)
+}
+
+/** Called once a model has finished constructing, so the scope it was created in can check that something owns it. */
+export function managedModelCreated(model: Model) {
+    currentCreationScope?.models?.add(model)
 }
 
 export function getPath(node: GraphNode): string {
@@ -150,6 +172,16 @@ export class UntrackedObservableError extends Error {
     constructor(observable: IObservable<any>) {
         super(`Leak detected: ${nameOfFunction(observable.constructor)} '${observable.displayName}' created without an owner.
 Make sure reductions are defined on a model, and that the model is either a class decorated with @model, or created using createModel().`)
+    }
+}
+
+export class UnownedModelError extends Error {
+    constructor(
+        public model: Model,
+        public creator: IObservable<any>
+    ) {
+        super(`Leak detected: ${getName(model)} created in '${creator.path}' has no owner.
+'${creator.displayName}' only owns models in its value that are the value itself, in an array, or a property of an object. Models nested any deeper aren't owned.`)
     }
 }
 
