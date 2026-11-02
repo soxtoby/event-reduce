@@ -22,6 +22,8 @@
 - Disposing a model made by `createModel` no longer disposes observables it shares with other models.
 - Reduced and derived properties overridden with `mutable` keep their override when their sources change.
 - Assigning an event or events class to a `modelProxy` property no longer throws `InvalidStateError`.
+- With `enableDevTools`, a render or derivation triggered by a change to a derivation or another observable no longer throws. It sends the changed observable's path as `trigger`.
+- `enableDevTools` no longer overwrites the `type` of an event's value.
 
 ## v0.8.0
 

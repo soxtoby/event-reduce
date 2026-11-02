@@ -1,4 +1,6 @@
+import { isObservable } from "./observable"
 import { ModelJSON, modelJSON } from "./state"
+import { isObject } from "./utils"
 
 let modelDevTools = new Map<object, any>()
 
@@ -21,16 +23,27 @@ export function enableDevTools<Model extends object>(model: Model, { restoreStat
     return () => { }
 }
 
-export function sendEvent(name: string, arg: object) {
+export function sendEvent(name: string, trigger: object) {
     if (process.env.NODE_ENV !== 'production') {
         if (modelDevTools.size) {
-            let event = modelJSON(arg) as any
-            if ('type' in event)
-                event['.type'] = event.type
-            event.type = name
+            let event = { ...eventFields(trigger), type: name }
             modelDevTools.forEach((dev, model) => dev.send(event, modelJSON(model)))
         }
     }
+}
+
+function eventFields(trigger: object): object {
+    if (isObservable(trigger)) // A changed source, which may have no JSON of its own, since derivations are left out of state
+        return { trigger: trigger.path }
+
+    let json = modelJSON(trigger)
+    if (!isObject(json) || Array.isArray(json))
+        return { value: json }
+
+    let { type, ...fields } = json as Record<string, unknown>
+    return 'type' in json
+        ? { '.type': type, ...fields }
+        : fields
 }
 
 /**
