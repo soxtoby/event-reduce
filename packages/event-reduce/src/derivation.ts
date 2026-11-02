@@ -1,6 +1,6 @@
 import { Effect } from "./effect"
 import { startLogging } from "./logging"
-import { DisposedObservableError, IObservable, IObserver, Observable } from "./observable"
+import { disposedValue, IObservable, IObserver, Observable } from "./observable"
 import { trackManagedObservableCreation } from "./ownership"
 import { includeDerivedState, ModelJSON, modelJSON } from "./state"
 import { beginTransition, endSourceAccessed, iterationSource, startSourceAccessed } from "./tracking"
@@ -75,7 +75,7 @@ export class Derivation<T> extends Observable<T> implements IDerivation<T> {
 
     override get value() {
         if (process.env.NODE_ENV !== 'production' && this._isDisposed)
-            throw new DisposedObservableError(this)
+            return disposedValue(this)
 
         // Notifying tracker before checking for updates so circular reference is detected early
         startSourceAccessed(this)

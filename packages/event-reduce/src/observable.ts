@@ -53,7 +53,7 @@ export abstract class Observable<T> implements IObservable<T> {
 
     get value() {
         if (process.env.NODE_ENV !== 'production' && this._isDisposed)
-            throw new DisposedObservableError(this)
+            return disposedValue(this)
 
         startSourceAccessed(this)
         endSourceAccessed(this)
@@ -198,6 +198,16 @@ export class BoundObservable<In, Out> extends Observable<Out> {
     protected override updateChildren(previousValue: Out, nextValue: Out) { } // Value won't be held onto
 
     protected override skipUpdate(value: Out) { return this._predicate?.(value) == false }
+}
+
+/**
+ * Throws a DisposedObservableError, unless the read comes from React's development-only props diff.
+ * React diffs the previous props of every re-rendered component, which can hold models that have since been disposed.
+ */
+export function disposedValue<T>(observable: IObservable<T>): T {
+    if (!/addObject(Diff)?ToProperties/.test(new Error().stack ?? ''))
+        throw new DisposedObservableError(observable)
+    return undefined!
 }
 
 export function* allSources(observable: IObservable<any>): Generator<IObservable<any>> {

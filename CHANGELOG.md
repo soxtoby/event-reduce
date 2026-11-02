@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- In development, React's props diff no longer throws `DisposedObservableError` when a re-rendered component's previous props hold a model that has since been disposed, such as an item removed from an array prop.
+
 ## v0.9.0
 
 ### Breaking

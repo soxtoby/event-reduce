@@ -1,9 +1,12 @@
+import { act, render } from "@testing-library/react"
 import { beforeEach, describe, expect, spyOn, test, type Mock } from "bun:test"
 import { createModel, derive, derived, disposeModel, event, ISignal, model, reduce, reduced, signal, state } from "event-reduce"
 import { getModelProperties } from "event-reduce/lib/models"
 import { DisposedObservableError } from "event-reduce/lib/observable"
 import { isModel } from "event-reduce/lib/symbols"
 import { dispose } from "event-reduce/lib/utils"
+import { reactive } from "event-reduce-react"
+import { createElement } from "react"
 
 describe("subscription cleanup", () => {
     @model
@@ -376,6 +379,26 @@ describe("reading after disposal", () => {
         replace()
 
         expect(() => replaced.value).toThrow(DisposedObservableError)
+    })
+
+    test("model in a component's previous props, when removed and the component re-renders, doesn't throw from React's props diff", () => {
+        expect(console.timeStamp).toBeFunction() // React only diffs props when it can log them to the performance timeline
+
+        @model
+        class Item {
+            @reduced
+            get count() { return reduce(1).value }
+        }
+        let removeFirst = event('removeFirst')
+        let { items } = createModel(() => ({ items: reduce([new Item(), new Item()], 'items').on(removeFirst, items => items.slice(1)) }))
+        let ItemCount = ({ items }: { items: readonly Item[] }) => createElement('div', null, items.length)
+        let List = reactive(function List() { return createElement(ItemCount, { items: items.value }) })
+        let sut = render(createElement(List))
+
+        act(() => removeFirst())
+
+        expect(sut.container.textContent).toBe('1')
+        sut.unmount()
     })
 })
 
