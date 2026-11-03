@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- Bun now loads the compiled `lib` files, like other runtimes, instead of the packages' TypeScript sources.
+
 ## v0.9.1
 
 ### Changed

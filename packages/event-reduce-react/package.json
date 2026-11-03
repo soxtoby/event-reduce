@@ -15,12 +15,10 @@
   "exports": {
     ".": {
       "types": "./lib/index.d.ts",
-      "bun": "./src/index.ts",
       "default": "./lib/index.js"
     },
     "./lib/*": {
       "types": "./lib/*.d.ts",
-      "bun": "./src/*.ts",
       "default": "./lib/*.js"
     },
     "./package.json": "./package.json"

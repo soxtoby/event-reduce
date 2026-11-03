@@ -16,7 +16,11 @@
         "outDir": "./dist",
         "rootDir": ".",
         "experimentalDecorators": true,
-        "useDefineForClassFields": false
+        "useDefineForClassFields": false,
+        "paths": {
+            "event-reduce": ["../packages/event-reduce/src/index.ts"],
+            "event-reduce/lib/*": ["../packages/event-reduce/src/*"]
+        }
     },
     "references": [
         {

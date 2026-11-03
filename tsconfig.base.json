@@ -10,6 +10,12 @@
     "sourceMap": true,
     "inlineSources": true,
     "skipLibCheck": true,
-    "types": ["bun"]
+    "types": ["bun"],
+    "paths": {
+      "event-reduce": ["./packages/event-reduce/src/index.ts"],
+      "event-reduce/lib/*": ["./packages/event-reduce/src/*"],
+      "event-reduce-react": ["./packages/event-reduce-react/src/index.ts"],
+      "event-reduce-react/lib/*": ["./packages/event-reduce-react/src/*"]
+    }
   }
 }
