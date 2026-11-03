@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- Removing many models at once, such as clearing a long list, no longer throws `RangeError: Maximum call stack size exceeded`.
+
 ## v0.9.2
 
 ### Changed

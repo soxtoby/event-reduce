@@ -11,6 +11,7 @@ let parentRegistry = new WeakMap<GraphNode, Map<GraphNode, string>>()
 /** Value -> node -> path. */
 let childSnapshots = new WeakMap<object, ReadonlyMap<GraphNode, string>>()
 let garbage = new Set<GraphNode & Disposable>()
+let disposingGarbage = false
 /** Only populated in development, to catch disposed nodes being given a new owner. */
 let disposedNodes = new WeakSet<GraphNode>()
 
@@ -110,13 +111,18 @@ function removeParent(node: GraphNode, parent: GraphNode) {
 
 /** Does nothing during a transition, since the transition disposes garbage when it ends. */
 export function disposeGarbage() {
-    if (!iterationSource) {
-        for (let node of garbage) {
-            garbage.delete(node) // Disposing can dispose more garbage, which shouldn't include this again
-            if (!parentRegistry.has(node)) {
-                log('🗑️ (dispose)', getName(node), emptyArray, () => ({ Path: getPath(node) }))
-                node[dispose]()
+    if (!iterationSource && !disposingGarbage) {
+        disposingGarbage = true
+        try {
+            for (let node of garbage) {
+                garbage.delete(node) // Disposing can add more garbage, which shouldn't include this again
+                if (!parentRegistry.has(node)) {
+                    log('🗑️ (dispose)', getName(node), emptyArray, () => ({ Path: getPath(node) }))
+                    node[dispose]()
+                }
             }
+        } finally {
+            disposingGarbage = false
         }
     }
 }

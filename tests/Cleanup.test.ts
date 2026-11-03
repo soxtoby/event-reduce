@@ -333,6 +333,20 @@ describe("subscription cleanup", () => {
         expect(disposeExternallyOwnedPropValue).not.toHaveBeenCalled()
     })
 
+    test("when many models are removed at once, disposes them all without overflowing the stack", () => {
+        let clear = event('clear')
+        let models = Array.from({ length: 20_000 }, (_, i) => new Model(i))
+        let { list } = createModel(() => ({ list: reduce(models, 'list').on(clear, () => []) }))
+        let disposeFirst = spyOnDispose(models[0], 'reducedProp')
+        let disposeLast = spyOnDispose(models.at(-1)!, 'reducedProp')
+
+        clear()
+
+        expect(list.value).toEqual([])
+        expect(disposeFirst).toHaveBeenCalled()
+        expect(disposeLast).toHaveBeenCalled()
+    })
+
     function spyOnDispose<T>(model: T, property: keyof T) {
         if (isModel(model)) {
             let observableValue = getModelProperties(model)[property]!
