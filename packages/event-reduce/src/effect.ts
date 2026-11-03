@@ -1,6 +1,6 @@
 import type { IObservable, IObserver } from "./observable"
 import { collectAccessedSources, currentIteration, lastChangeIteration } from "./tracking"
-import { dispose } from "./utils"
+import { dispose, noop } from "./utils"
 
 export class Effect<T> implements IObserver<any> {
     private readonly _sources = new Set<IObservable<any>>()
@@ -105,5 +105,9 @@ export class Effect<T> implements IObserver<any> {
     [dispose]() {
         this.detach()
         this._sources.clear()
+        delete this.invalidatingSource
+        // Callbacks often reference models, which shouldn't be kept alive by this
+        this._effect = noop as () => T
+        this._onSourceUpdatedSinceLastRun = noop
     }
 }

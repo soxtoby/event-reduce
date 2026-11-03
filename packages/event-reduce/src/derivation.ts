@@ -1,6 +1,6 @@
 import { Effect } from "./effect"
 import { startLogging } from "./logging"
-import { disposedValue, IObservable, IObserver, Observable } from "./observable"
+import { IObservable, IObserver, Observable } from "./observable"
 import { trackManagedObservableCreation } from "./ownership"
 import { includeDerivedState, ModelJSON, modelJSON } from "./state"
 import { beginTransition, endSourceAccessed, iterationSource, startSourceAccessed } from "./tracking"
@@ -74,8 +74,8 @@ export class Derivation<T> extends Observable<T> implements IDerivation<T> {
     sourceUpdated<S>(source: IObservable<S>, value: S) { this._derive.sourceUpdated(source, value) }
 
     override get value() {
-        if (process.env.NODE_ENV !== 'production' && this._isDisposed)
-            return disposedValue(this)
+        if (this.isDisposed)
+            return super.value
 
         // Notifying tracker before checking for updates so circular reference is detected early
         startSourceAccessed(this)
@@ -97,6 +97,9 @@ export class Derivation<T> extends Observable<T> implements IDerivation<T> {
     protected override skipUpdate(nextValue: T) { return this._skipUpdate(this._value, nextValue) }
 
     update(deriveValue?: () => T, reason?: string) {
+        if (this.isDisposed)
+            return // Would own any models it created, and nothing would dispose them
+
         let previousValue = this._value
         let nextValue!: T
         let trigger = this._derive.invalidatingSource
@@ -120,8 +123,8 @@ export class Derivation<T> extends Observable<T> implements IDerivation<T> {
     }
 
     override[dispose]() {
+        // The JSON derivation is kept so the last value can still be serialized
         this._derive[dispose]()
-        this._json?.[dispose]()
         super[dispose]()
     }
 }

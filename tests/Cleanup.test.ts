@@ -1,13 +1,13 @@
 import { act, render } from "@testing-library/react"
-import { beforeEach, describe, expect, spyOn, test, type Mock } from "bun:test"
+import { beforeEach, describe, expect, mock, spyOn, test, type Mock } from "bun:test"
 import { createModel, derive, derived, disposeModel, event, ISignal, model, reduce, reduced, signal, state } from "event-reduce"
+import { reactive } from "event-reduce-react"
 import { getModelProperties } from "event-reduce/lib/models"
-import { DisposedObservableError } from "event-reduce/lib/observable"
-import { UnownedModelError } from "event-reduce/lib/ownership"
+import { StoredAfterDisposalError, UnownedModelError } from "event-reduce/lib/ownership"
 import { isModel } from "event-reduce/lib/symbols"
 import { dispose } from "event-reduce/lib/utils"
-import { reactive } from "event-reduce-react"
 import { createElement } from "react"
+import { MockObserver } from "./MockObserver"
 
 describe("subscription cleanup", () => {
     @model
@@ -344,30 +344,49 @@ describe("subscription cleanup", () => {
 })
 
 describe("reading after disposal", () => {
-    test("reduction, when read after being disposed, throws", () => {
-        let model = createModel(() => ({ reduction: reduce(1, 'reduction') }))
-        let reduction = model.reduction
+    test("reduction, when read after being disposed, returns its last value", () => {
+        let increment = event('increment')
+        let model = createModel(() => ({ reduction: reduce(1, 'reduction').on(increment, count => count + 1) }))
+        let sut = model.reduction
+        increment()
+
         model[dispose]()
 
-        expect(() => reduction.value).toThrow(DisposedObservableError)
+        expect(sut.value).toBe(2)
     })
 
-    test("derivation, when read after being disposed, throws", () => {
-        let model = createModel(() => ({ derivation: derive(() => 1, 'derivation') }))
-        let derivation = model.derivation
+    test("derivation, when read after being disposed, returns its last value", () => {
+        let source = signal(1, 'source')
+        let model = createModel(() => ({ derivation: derive(() => source.value * 2, 'derivation') }))
+        let sut = model.derivation
+        sut.value
+
         model[dispose]()
 
-        expect(() => derivation.value).toThrow(DisposedObservableError)
+        expect(sut.value).toBe(2)
     })
 
-    test("signal, when read after being disposed, throws", () => {
+    test("derivation, when its source changed before it was disposed, returns its last value", () => {
+        let source = signal(1, 'source')
+        let model = createModel(() => ({ derivation: derive(() => source.value * 2, 'derivation') }))
+        let sut = model.derivation
+        sut.value
+        source.setValue(2)
+
+        model[dispose]()
+
+        expect(sut.value).toBe(2)
+    })
+
+    test("signal, when read after being disposed, returns its last value", () => {
         let sut = signal(1, 'sut')
+
         sut[dispose]()
 
-        expect(() => sut.value).toThrow(DisposedObservableError)
+        expect(sut.value).toBe(1)
     })
 
-    test("model property, when read after the model is replaced in its owner, throws", () => {
+    test("model property, when read after the model is replaced in its owner, returns its last value", () => {
         @model
         class Child {
             @reduced
@@ -379,7 +398,17 @@ describe("reading after disposal", () => {
 
         replace()
 
-        expect(() => replaced.value).toThrow(DisposedObservableError)
+        expect(replaced.value).toBe(1)
+    })
+
+    test("observable, when read by a derivation after being disposed, isn't a source of the derivation", () => {
+        let disposed = signal(1, 'disposed')
+        disposed[dispose]()
+        let sut = derive(() => disposed.value, 'sut')
+
+        sut.value
+
+        expect([...sut.getSources()]).not.toContain(disposed)
     })
 
     test("model in a component's previous props, when removed and the component re-renders, doesn't throw from React's props diff", () => {
@@ -404,36 +433,95 @@ describe("reading after disposal", () => {
 })
 
 describe("disposeModel", () => {
+    let increment = event('increment')
+
+    @model
+    class Child {
+        @reduced
+        get value() { return reduce(1).on(increment, count => count + 1).value }
+    }
+
+    test("outside a transition, stops the model updating straight away", () => {
+        let sut = new Child()
+
+        disposeModel(sut)
+        increment()
+
+        expect(sut.value).toBe(1)
+    })
+
+    test("during a transition, stops the model updating once the transition ends", () => {
+        let sut = new Child()
+        let disposeChild = event('disposeChild')
+        using _ = createModel(() => ({
+            disposer: reduce(0, 'disposer').on(disposeChild, count => {
+                disposeModel(sut)
+                return count + 1
+            })
+        }))
+
+        disposeChild()
+        increment()
+
+        expect(sut.value).toBe(1)
+    })
+})
+
+describe("mapped observable disposal", () => {
+    let source: ISignal<number>
+    let transform: Mock<(value: number) => number>
+
+    beforeEach(() => {
+        source = signal(1, 'source')
+        transform = mock((value: number) => value)
+    })
+
+    test("mapped observable, when disposed while observed, stops observing its source", () => {
+        let sut = source.map(transform, 'sut')
+        sut.subscribe(new MockObserver())
+
+        sut[dispose]()
+        source.setValue(2)
+
+        expect(transform).not.toHaveBeenCalled()
+    })
+
+    test("mapped observable, when subscribed to after being disposed, doesn't observe its source", () => {
+        let sut = source.map(transform, 'sut')
+        sut[dispose]()
+
+        sut.subscribe(new MockObserver())
+        source.setValue(2)
+
+        expect(transform).not.toHaveBeenCalled()
+    })
+})
+
+describe("disposed model reuse", () => {
     @model
     class Child {
         @reduced
         get value() { return reduce(1).value }
     }
 
-    test("outside a transition, disposes the model straight away", () => {
-        let sut = new Child()
+    let disposed: Child
 
-        disposeModel(sut)
-
-        expect(() => sut.value).toThrow(DisposedObservableError)
+    beforeEach(() => {
+        disposed = new Child()
+        disposeModel(disposed)
     })
 
-    test("during a transition, disposes the model when the transition ends", () => {
-        let sut = new Child()
-        let disposeChild = event('disposeChild')
-        let readDuringTransition: number | undefined
-        using _ = createModel(() => ({
-            disposer: reduce(0, 'disposer').on(disposeChild, count => {
-                disposeModel(sut)
-                readDuringTransition = sut.value
-                return count + 1
-            })
-        }))
+    test("reduction, when it stores a disposed model, throws", () => {
+        let store = event('store')
+        createModel(() => ({ sut: reduce(null as Child | null, 'sut').on(store, () => disposed) }))
 
-        disposeChild()
+        expect(() => store()).toThrow(StoredAfterDisposalError)
+    })
 
-        expect(readDuringTransition).toBe(1)
-        expect(() => sut.value).toThrow(DisposedObservableError)
+    test("derivation, when it returns a disposed model, throws", () => {
+        let sut = derive(() => disposed, 'sut')
+
+        expect(() => sut.value).toThrow(StoredAfterDisposalError)
     })
 })
 

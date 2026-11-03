@@ -4,6 +4,7 @@ export const emptyMap = Object.freeze(new Map()) as ReadonlyMap<any, any>
 
 export function constant<T>(value: T) { return identity.bind(null, value) as () => T }
 export function identity<T>(value: T) { return value }
+export function noop() { }
 
 export function scopedName(baseName: string, scope: object) {
     return `${baseName}.scoped({ ${Object.entries(scope).map(([k, v]) => `${k}: ${v}`).join(', ')} })`

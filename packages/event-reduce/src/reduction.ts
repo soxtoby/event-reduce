@@ -1,6 +1,6 @@
 import { Derivation } from "./derivation"
 import { startLogging } from "./logging"
-import { allSources, disposedValue, IObservable, IObserver, isObservable, NoUnderlyingObservableError, Observable, SourcesChangedTogetherError } from "./observable"
+import { allSources, IObservable, IObserver, isObservable, NoUnderlyingObservableError, Observable, SourcesChangedTogetherError } from "./observable"
 import { managedObservableCreated, trackManagedObservableCreation, updateChildren } from "./ownership"
 import { ModelJSON, modelJSON } from "./state"
 import { collectAccessedSources, currentIteration, endSourceAccessed, getUnderlyingObservable, startSourceAccessed, untrackedValue } from "./tracking"
@@ -125,8 +125,8 @@ export class Reduction<T, Events = void> extends Observable<T> implements IReduc
     }
 
     override get value() {
-        if (process.env.NODE_ENV !== 'production' && this._isDisposed)
-            return disposedValue(this)
+        if (this.isDisposed)
+            return super.value
 
         startSourceAccessed(this) // Notifying tracker before checking for updates so circular reference is detected early
 
@@ -168,6 +168,7 @@ export class Reduction<T, Events = void> extends Observable<T> implements IReduc
 
     override[dispose]() {
         this.detach()
+        this._events = undefined // Often another model's events, which shouldn't be kept alive by this
         super[dispose]()
     }
 }

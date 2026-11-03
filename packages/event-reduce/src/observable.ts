@@ -1,5 +1,5 @@
 import type { IEventFunction } from "./events"
-import { getPath, updateChildren } from "./ownership"
+import { getPath, markDisposed, updateChildren } from "./ownership"
 import { isEventsClass } from "./symbols"
 import { currentIteration, endSourceAccessed, iterationSource, recordChange, startSourceAccessed, untrackedValue } from "./tracking"
 import type { ObservedValue } from "./types"
@@ -34,10 +34,9 @@ export function isObservable(value: any): value is IObservable<any> {
 }
 
 export abstract class Observable<T> implements IObservable<T> {
-    protected readonly _observers = new Set<IObserver<T>>()
+    protected _observers: Set<IObserver<T>> = new Set()
     protected _value!: T
     protected _lastChanged = -1
-    protected declare _isDisposed?: true // Only set in development, and declared so that production observables don't carry the field
 
     constructor(public displayName: string) { }
 
@@ -52,13 +51,14 @@ export abstract class Observable<T> implements IObservable<T> {
     getSources() { return emptyArray as Iterable<IObservable<any>> }
 
     get value() {
-        if (process.env.NODE_ENV !== 'production' && this._isDisposed)
-            return disposedValue(this)
-
-        startSourceAccessed(this)
-        endSourceAccessed(this)
+        if (!this.isDisposed) // Disposed observables don't change, so nothing needs to depend on them
+            startSourceAccessed(this)
+        endSourceAccessed(this) // Still needed when disposed, otherwise valueChanged could match the previously read observable by value
         return this._value
     }
+
+    /** Disposed observables keep their last value, but can't change or be subscribed to. */
+    protected get isDisposed() { return this._observers == disposedObservers }
 
     setValue(newValue: T) {
         if (process.env.NODE_ENV !== 'production') {
@@ -106,12 +106,11 @@ export abstract class Observable<T> implements IObservable<T> {
 
     unsubscribe(observer: IObserver<T>) { this._observers.delete(observer) }
 
+    /** Releases everything except the last value, which is kept for anything that reads this late, such as a deferred render. */
     [dispose]() {
-        this.updateChildren(this._value, undefined!)
-        this._value = undefined!
-        this._observers.clear()
-        if (process.env.NODE_ENV !== 'production')
-            this._isDisposed = true
+        this.updateChildren(this._value, undefined!) // Children are disposed too, unless something else owns them
+        this._observers = disposedObservers
+        markDisposed(this)
     }
 }
 
@@ -198,16 +197,16 @@ export class BoundObservable<In, Out> extends Observable<Out> {
     protected override updateChildren(previousValue: Out, nextValue: Out) { } // Value won't be held onto
 
     protected override skipUpdate(value: Out) { return this._predicate?.(value) == false }
-}
 
-/**
- * Throws a DisposedObservableError, unless the read comes from React's development-only props diff.
- * React diffs the previous props of every re-rendered component, which can hold models that have since been disposed.
- */
-export function disposedValue<T>(observable: IObservable<T>): T {
-    if (!/addObject(Diff)?ToProperties/.test(new Error().stack ?? ''))
-        throw new DisposedObservableError(observable)
-    return undefined!
+    override[dispose]() {
+        if (this._observers.size)
+            this._sources.forEach(source => source.unsubscribe(this))
+        // Callbacks often reference models, which shouldn't be kept alive by this
+        this._sources = emptyArray as IObservable<In>[]
+        this._transform = identity as (value: In) => Out
+        this._predicate = undefined
+        super[dispose]()
+    }
 }
 
 export function* allSources(observable: IObservable<any>): Generator<IObservable<any>> {
@@ -242,15 +241,6 @@ export class SourcesChangedTogetherError extends Error {
     }
 }
 
-export class DisposedObservableError extends Error {
-    constructor(
-        public observable: IObservable<any>
-    ) {
-        super(`Tried to read '${observable.displayName}' after it was disposed. `
-            + 'This usually means something is still using a model that has been removed from its owner.')
-    }
-}
-
 export class StateChangeOutsideTransitionError extends Error {
     constructor(
         public source: IObservable<any>
@@ -259,3 +249,13 @@ export class StateChangeOutsideTransitionError extends Error {
             + 'This usually means a bug in event-reduce, or in a custom observable implementation.')
     }
 }
+
+/**
+ * Ignores new observers, since a disposed observable will never notify them.
+ * Doubles as the disposed flag, so observables don't carry a separate field.
+ */
+class DisposedObservers extends Set<IObserver<any>> {
+    override add() { return this }
+}
+
+let disposedObservers = new DisposedObservers()

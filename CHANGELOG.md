@@ -2,7 +2,13 @@
 
 ## Unreleased
 
+### Changed
+- Reading a reduction, derivation, or signal after it's disposed returns its last value, instead of throwing `DisposedObservableError` in development. This means removed models can still be read, such as by a deferred render or a log. A disposed observable no longer updates, and reading it doesn't make it a source.
+- In development, storing a disposed model or observable in a reduction, derivation, signal, or model throws `StoredAfterDisposalError`, since it no longer updates.
+
 ### Fixed
+- A disposed observable no longer keeps its sources or callbacks alive, so it can't keep other models alive just because something still holds it.
+- A mapped, filtered, or merged observable disposed while it has observers stops observing its sources.
 - Bun now loads the compiled `lib` files, like other runtimes, instead of the packages' TypeScript sources.
 
 ## v0.9.1

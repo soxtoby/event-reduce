@@ -11,6 +11,8 @@ let parentRegistry = new WeakMap<GraphNode, Map<GraphNode, string>>()
 /** Value -> node -> path. */
 let childSnapshots = new WeakMap<object, ReadonlyMap<GraphNode, string>>()
 let garbage = new Set<GraphNode & Disposable>()
+/** Only populated in development, to catch disposed nodes being given a new owner. */
+let disposedNodes = new WeakSet<GraphNode>()
 
 interface CreationScope {
     observables: Set<GraphNode & IObservable<any>>
@@ -83,6 +85,9 @@ function isGraphNode(value: unknown): value is GraphNode {
 }
 
 function addParent(object: GraphNode, owner: GraphNode, path: string) {
+    if (process.env.NODE_ENV !== 'production' && disposedNodes.has(object))
+        throw new StoredAfterDisposalError(object, owner)
+
     let parents = parentRegistry.get(object)
 
     if (!parents)
@@ -114,6 +119,11 @@ export function disposeGarbage() {
             }
         }
     }
+}
+
+export function markDisposed(node: GraphNode) {
+    if (process.env.NODE_ENV !== 'production')
+        disposedNodes.add(node)
 }
 
 export interface IManagedObservableTracker extends Disposable {
@@ -182,6 +192,16 @@ export class UnownedModelError extends Error {
     ) {
         super(`Leak detected: ${getName(model)} created in '${creator.path}' has no owner.
 '${creator.displayName}' only owns models in its value that are the value itself, in an array, or a property of an object. Models nested any deeper aren't owned.`)
+    }
+}
+
+export class StoredAfterDisposalError extends Error {
+    constructor(
+        public disposed: GraphNode,
+        public owner: GraphNode
+    ) {
+        super(`Tried to store ${getName(disposed)} in '${getPath(owner)}' after it was disposed. `
+            + "A disposed model or observable keeps its last value but no longer updates, so this usually means something held onto it after it was removed from its owner, then put it back.")
     }
 }
 
