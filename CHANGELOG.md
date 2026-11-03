@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.9.2
+
 ### Changed
 - Reading a reduction, derivation, or signal after it's disposed returns its last value, instead of throwing `DisposedObservableError` in development. This means removed models can still be read, such as by a deferred render or a log. A disposed observable no longer updates, and reading it doesn't make it a source.
 - In development, storing a disposed model or observable in a reduction, derivation, signal, or model throws `StoredAfterDisposalError`, since it no longer updates.
