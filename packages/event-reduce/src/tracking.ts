@@ -1,4 +1,3 @@
-import { sendEvent } from "./devtools"
 import { Effect } from "./effect"
 import { type IObservable, type IObserver, NoUnderlyingObservableError, Observable } from "./observable"
 import { disposeGarbage } from "./ownership"
@@ -8,6 +7,8 @@ export let currentIteration = 0
 export let lastChangeIteration = -1 // Not every iteration changes something (e.g. renders)
 export let iterationSource: IObservable<any> | Effect<any> | null = null
 let transitionEffectQueue = [] as (() => void)[]
+
+let transitionEndListeners = new Set<TransitionEndListener>()
 
 let currentAccessTracker: AccessTracker | null = null
 let lastSourceAccessed: IObservable<any> | null = null
@@ -27,12 +28,22 @@ export function beginTransition(source: IObservable<any> | Effect<any>, trigger?
                     effect()
                 iterationSource = null
                 disposeGarbage()
-                sendEvent(source.displayName, trigger)
+                for (let listener of transitionEndListeners)
+                    listener(source, trigger)
             }
         }
     } else {
         return nullDisposable
     }
+}
+
+/** Called once a transition has finished, with what started it and the value that triggered it. */
+export type TransitionEndListener = (source: IObservable<any> | Effect<any>, trigger: object) => void
+
+/** Calls the listener at the end of every transition, until disposed. */
+export function onTransitionEnd(listener: TransitionEndListener): Disposable {
+    transitionEndListeners.add(listener)
+    return { [dispose]() { transitionEndListeners.delete(listener) } }
 }
 
 export function queueTransitionEffect(effect: () => void) {

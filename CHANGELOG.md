@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- Importing certain internal modules before the main `event-reduce` entry point no longer throws because of an undefined constructor.
+
 ## v0.9.3
 
 ### Fixed

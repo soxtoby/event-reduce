@@ -1,35 +1,31 @@
 import { isObservable } from "./observable"
 import { ModelJSON, modelJSON } from "./state"
-import { isObject } from "./utils"
+import { onTransitionEnd } from "./tracking"
+import { dispose, isObject } from "./utils"
 
-let modelDevTools = new Map<object, any>()
+let modelsWithDevTools = new Set<object>()
 
 export function enableDevTools<Model extends object>(model: Model, { restoreState, ...options }: IDevToolsOptions<Model> = {}) {
-    if (process.env.NODE_ENV !== 'production') {
-        if (!modelDevTools.has(model) && (window as any).__REDUX_DEVTOOLS_EXTENSION__) {
-            let dev = (window as any).__REDUX_DEVTOOLS_EXTENSION__.connect(options)
-            modelDevTools.set(model, dev)
-            dev.init(modelJSON(model))
-            let unsubscribe = dev.subscribe((event: any) => {
-                if (event.type == 'DISPATCH')
-                    restoreState?.(model, JSON.parse(event.state))
-            })
-            return () => {
-                modelDevTools.delete(model)
-                unsubscribe()
-            }
+    if (process.env.NODE_ENV !== 'production'
+        && !modelsWithDevTools.has(model)
+        && (window as any).__REDUX_DEVTOOLS_EXTENSION__
+    ) {
+        let dev = (window as any).__REDUX_DEVTOOLS_EXTENSION__.connect(options)
+        modelsWithDevTools.add(model)
+        dev.init(modelJSON(model))
+        let transitions = onTransitionEnd((source, trigger) =>
+            dev.send({ ...eventFields(trigger), type: source.displayName }, modelJSON(model)))
+        let unsubscribe = dev.subscribe((event: any) => {
+            if (event.type == 'DISPATCH')
+                restoreState?.(model, JSON.parse(event.state))
+        })
+        return () => {
+            modelsWithDevTools.delete(model)
+            transitions[dispose]()
+            unsubscribe()
         }
     }
     return () => { }
-}
-
-export function sendEvent(name: string, trigger: object) {
-    if (process.env.NODE_ENV !== 'production') {
-        if (modelDevTools.size) {
-            let event = { ...eventFields(trigger), type: name }
-            modelDevTools.forEach((dev, model) => dev.send(event, modelJSON(model)))
-        }
-    }
 }
 
 function eventFields(trigger: object): object {
