@@ -1,10 +1,82 @@
 import { renderHook, RenderHookResult } from "@testing-library/react"
 import { beforeEach, describe, expect, test } from "bun:test"
-import { useAsyncEvent, useDerived, useEvent, useReduced } from "event-reduce-react"
+import { useAsyncEvent, useDerived, useEvent, useModel, useReduced } from "event-reduce-react"
 import { event, IEvent, model, reduce, reduced, type AsyncResult } from "event-reduce"
+import { Activity, createElement, type ReactNode, StrictMode } from "react"
 import { mutable } from "event-reduce/lib/testing"
 import { IDerivation } from "event-reduce"
 import { MockObserver } from "./MockObserver"
+
+describe("useModel", () => {
+    let added: ReturnType<typeof event<number>>
+    @model class CounterModel { @reduced get count() { return reduce(1).on(added, (current, addedVal) => current + addedVal).value } }
+
+    beforeEach(() => {
+        added = event<number>()
+    })
+
+    test("returns a model that updates", () => {
+        let sut = renderHook(() => useModel(() => new CounterModel()))
+
+        added(2)
+
+        expect(sut.result.current.count).toBe(3)
+    })
+
+    test("in strict mode, returns a model that updates", () => {
+        let sut = renderHook(() => useModel(() => new CounterModel()), { wrapper: StrictMode })
+
+        added(2)
+
+        expect(sut.result.current.count).toBe(3)
+    })
+
+    test("when rendered again, returns the same model instance", () => {
+        let sut = renderHook(() => useModel(() => new CounterModel()))
+        let initialResult = sut.result.current
+
+        sut.rerender()
+
+        expect(sut.result.current).toBe(initialResult)
+    })
+
+    test("when dependencies change, returns a new model and disposes the old one", () => {
+        let sut = renderHook(({ key }) => useModel(() => new CounterModel(), [key]), { initialProps: { key: 1 } })
+        let initialResult = sut.result.current
+
+        sut.rerender({ key: 2 })
+        added(2)
+
+        expect(sut.result.current).not.toBe(initialResult)
+        expect(sut.result.current.count).toBe(3)
+        expect(initialResult.count).toBe(1)
+    })
+
+    test("when unmounted, disposes the model", () => {
+        let sut = renderHook(() => useModel(() => new CounterModel()))
+        let result = sut.result.current
+
+        sut.unmount()
+        added(2)
+
+        expect(result.count).toBe(1)
+    })
+
+    test("when hidden and shown again by an activity, returns a model that updates", () => {
+        let mode: 'visible' | 'hidden' = 'visible'
+        let sut = renderHook(() => useModel(() => new CounterModel()), {
+            wrapper: ({ children }: { children: ReactNode }) => createElement(Activity, { mode, children })
+        })
+
+        mode = 'hidden'
+        sut.rerender()
+        mode = 'visible'
+        sut.rerender()
+        added(2)
+
+        expect(sut.result.current.count).toBe(3)
+    })
+})
 
 describe("useEvent", () => {
     let sut: RenderHookResult<ReturnType<typeof useEvent<number>>, unknown>
@@ -109,5 +181,14 @@ describe("useReduced", () => {
         sut.rerender()
 
         expect(sut.result.current).toBe(initialResult)
+    })
+
+    test("in strict mode, returns a reduction that updates", () => {
+        let strictSut = renderHook(() => useReduced(1)
+            .on(added, (current, addedVal) => current + addedVal), { wrapper: StrictMode })
+
+        added(2)
+
+        expect(strictSut.result.current.value).toBe(3)
     })
 })

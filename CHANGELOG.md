@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- `useModel` and `useReduced` no longer stop updating when React cleans up their effects and runs them again, such as in Strict Mode or when an `<Activity>` is hidden and shown again. They create a new model or reduction instead, so state isn't kept while an `<Activity>` is hidden.
+
 ## v0.9.4
 
 ### Fixed

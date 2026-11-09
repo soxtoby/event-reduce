@@ -1,20 +1,21 @@
 import { asyncEvent, derive, event, type IDerivation, type IReduction, reduce, signal } from "event-reduce"
 import { trackManagedObservableCreation } from "event-reduce/lib/ownership"
-import { Reduction } from "event-reduce/lib/reduction"
 import { isModel } from "event-reduce/lib/symbols"
 import { dispose, emptyArray } from "event-reduce/lib/utils"
-import { DependencyList, useEffect, useMemo, useState } from "react"
+import { DependencyList, useEffect, useMemo, useReducer, useRef, useState } from "react"
 
 /**
- * Creates a model that persists across renders of the component.
+ * Creates a model that persists across renders of the component, and disposes it when the component unmounts.
+ * The model's state isn't kept while the component is hidden by an `<Activity>`: the model is disposed, and a new one is created when it's visible again.
  * @param unobservableDependencies - A list of dependencies that are not observable. The model will be re-created when any of these change.
 */
 export function useModel<T extends object>(createModel: () => T, unobservableDependencies?: DependencyList): T {
-    let model = useMemo(createModel, unobservableDependencies ?? emptyArray)
-    if (!isModel(model))
-        throw new InvalidModelError()
-    useEffect(() => () => model[dispose]?.(), unobservableDependencies ?? emptyArray)
-    return model
+    return useDisposable(() => {
+        let model = createModel()
+        if (!isModel(model))
+            throw new InvalidModelError()
+        return model
+    }, unobservableDependencies ?? emptyArray)
 }
 
 export function useEvent<T>(name?: string) {
@@ -44,16 +45,46 @@ export function useDerived<T>(getValue: () => T, nameOrUnobservableDependencies?
     return derived
 }
 
+/**
+ * Creates a reduction that persists across renders of the component, and disposes it when the component unmounts.
+ * The reduction's value isn't kept while the component is hidden by an `<Activity>`: the reduction is disposed, and a new one is created when it's visible again.
+ */
 export function useReduced<T>(initial: T, name?: string): IReduction<T> {
-    let sourceCreation = trackManagedObservableCreation() // It's fine for this reduction to be loose, because it will be disposed on unmount
-    let reduction = useState(() => reduce(initial, name))[0]
-    sourceCreation[dispose]()
-    useEffect(() => () => (reduction as Reduction<T>)[dispose]?.(), [])
-    return reduction
+    return useDisposable(() => {
+        let sourceCreation = trackManagedObservableCreation() // It's fine for this reduction to be loose, because it will be disposed on unmount
+        try {
+            return reduce(initial, name)
+        } finally {
+            sourceCreation[dispose]()
+        }
+    }, emptyArray)
 }
 
 export function useSignal<T>(initialValue: T, name: string = '(anonymous signal)') {
     return useState(() => signal(initialValue, name))[0]
+}
+
+/**
+ * Creates a value that persists across renders, and disposes it when the component unmounts or the dependencies change.
+ * React can clean up effects and then run them again without re-rendering, such as Strict Mode's simulated unmount,
+ * or when an <Activity> is hidden and shown again, so a value that has been disposed is replaced with a new one.
+ */
+function useDisposable<T extends Disposable>(create: () => T, dependencies: DependencyList): T {
+    let [generation, recreate] = useReducer((n: number) => n + 1, 0)
+    let value = useMemo(create, [generation, ...dependencies])
+    let disposedValue = useRef<T>(undefined)
+
+    useEffect(() => {
+        if (disposedValue.current == value)
+            recreate()
+        else
+            return () => {
+                disposedValue.current = value
+                value[dispose]()
+            }
+    }, [value])
+
+    return value
 }
 
 class InvalidModelError extends Error {
