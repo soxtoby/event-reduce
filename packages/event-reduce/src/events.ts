@@ -199,6 +199,7 @@ export interface IAsyncObservable<Result, Context> extends IObservable<AsyncValu
 }
 
 export interface IAsyncEvent<Result, Context> extends IEventFunction<AsyncValue<Result, Context>, [promise: PromiseLike<Result>, context: Context]>, IAsyncObservable<Result, Context> {
+    <P extends PromiseLike<Result>>(promise: P, context: Context): P
     scope<Scope extends Partial<Context>>(scope: Scope): IAsyncEvent<Result, Scoped<Context, Scope>>
 }
 

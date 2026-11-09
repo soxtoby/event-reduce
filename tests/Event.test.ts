@@ -112,6 +112,22 @@ describe("asyncEvent", () => {
             sut(promise, context)
         })
 
+        test("returns the promise it was given, with the same type", () => {
+            let returned: Promise<Result> = sut(promise, context)
+            let scopedReturned: Promise<Result> = sut.scope({ bar: 'context' })(promise, {})
+
+            expect(returned).toBe(promise)
+            expect(scopedReturned).toBe(promise)
+        })
+
+        test("with void context, can be called with just the promise", () => {
+            let voidContextEvent = asyncEvent<Result>()
+
+            let returned: Promise<Result> = voidContextEvent(promise)
+
+            expect(returned).toBe(promise)
+        })
+
         test("started event fired", () => expect(started.sourceUpdated).toHaveBeenCalledWith(sut.started, expect.objectContaining({ phase: 'started', promise, context })))
 
         test("when promise resolved, resolved event fired", async () => {
