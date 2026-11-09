@@ -26,14 +26,14 @@
     },
     "packages/event-reduce": {
       "name": "event-reduce",
-      "version": "0.9.4",
+      "version": "0.9.5",
       "devDependencies": {
         "typescript": "~6.0.3",
       },
     },
     "packages/event-reduce-react": {
       "name": "event-reduce-react",
-      "version": "0.9.4",
+      "version": "0.9.5",
       "dependencies": {
         "event-reduce": "workspace:^",
         "use-sync-external-store": "1.6.0",

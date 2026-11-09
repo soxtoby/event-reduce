@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.9.5
+
 ### Fixed
 - Calling an `IAsyncEvent` returns the same promise type that was passed in, such as `Promise<T>`, instead of `PromiseLike<T>`.
 - `useModel` and `useReduced` no longer stop updating when React cleans up their effects and runs them again, such as in Strict Mode or when an `<Activity>` is hidden and shown again. They create a new model or reduction instead, so state isn't kept while an `<Activity>` is hidden.
