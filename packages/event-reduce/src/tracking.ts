@@ -127,9 +127,10 @@ class AccessTracker implements IAccessTracker {
         let path = [source]
         let tracker: AccessTracker | null = this
         do {
-            path.unshift(tracker._observer as any as IObservable<any>)
+            if (tracker._observer)
+                path.unshift(tracker._observer as any as IObservable<any>)
             tracker = tracker._previous
-        } while (tracker && tracker._observer != source as any as IObserver<any>)
+        } while (tracker && path[0] != source)
         return path
     }
 

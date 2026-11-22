@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, mock, test, type Mock } from "
 import { createModel, derive, event, events, IReduction, ISignal, reduce, signal } from 'event-reduce'
 import { InvalidStateError, SourcesChangedTogetherError } from "event-reduce/lib/observable"
 import { CircularSubscriptionError } from "event-reduce/lib/reduction"
-import { CircularDependencyError, collectAccessedSources } from "event-reduce/lib/tracking"
+import { CircularDependencyError, collectAccessedSources, untrackedValue } from "event-reduce/lib/tracking"
 import { dispose } from "event-reduce/lib/utils"
 import { MockObserver } from "./MockObserver"
 
@@ -160,6 +160,20 @@ describe("reduce", () => {
 
         expect(tracker.accessed).toContain(sut.r1 as any)
         expect(tracker.accessed).toContain(sut.r2 as any)
+    })
+
+    test("circular reducers reached through an untracked read report the full cycle", () => {
+        let update = event("update")
+        using model = createModel(() => ({
+            first: reduce(0, "first"),
+            second: reduce(0, "second"),
+            third: reduce(0, "third"),
+        }))
+        model.first.on(update, () => untrackedValue(model.second))
+        model.second.on(update, () => model.third.value)
+        model.third.on(update, () => model.first.value)
+
+        expect(() => update()).toThrow("Circular dependency detected: first -> second -> third -> first.")
     })
 
     test("when read by an observed derivation before handling an event, derivation isn't recalculated when the event fires again without changes", () => {

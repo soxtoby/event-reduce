@@ -7,6 +7,7 @@
 
 ### Fixed
 - `useReactive` can now be called inside a `reactive` component.
+- Circular dependency errors show the full cycle, including when it passes through an untracked read.
 
 ## v0.9.5
 
