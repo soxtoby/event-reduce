@@ -1,8 +1,37 @@
 import { describe, expect, test } from "bun:test"
-import { getState, stringifyState } from "event-reduce"
+import { getState, model, state, stringifyState } from "event-reduce"
+import { mutable } from "event-reduce/lib/testing"
 import { TestModel } from "./State.test/TestModel"
 
 describe("state", () => {
+    test("state fields and constructor properties reject reassignment after construction", () => {
+        let sut = new TestModel('ctor')
+
+        expect(() => { sut.mergedModel = sut.modelArray[0] }).toThrow(TypeError)
+        expect(() => { sut.constructorProperty = 'changed' }).toThrow(TypeError)
+        expect(getState(sut).mergedModel).toEqual({ value: 'merged' })
+    })
+
+    test("state accessors keep the value assigned during construction", () => {
+        @model
+        class AccessorModel {
+            @state accessor value = 'initial'
+
+            constructor() { this.value = 'final' }
+        }
+
+        let sut = new AccessorModel()
+
+        expect(() => { sut.value = 'changed' }).toThrow(TypeError)
+        expect(sut.value).toBe('final')
+    })
+
+    test("mutable allows overriding a state property", () => {
+        let sut = new TestModel('ctor')
+        mutable(sut).constructorProperty = 'changed'
+        expect(getState(sut).constructorProperty).toBe('changed')
+    })
+
     test("getState copies the correct properties", () => {
         let testModel = new TestModel('ctor')
         let result = getState(testModel)

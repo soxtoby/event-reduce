@@ -48,6 +48,11 @@ describe("legacy state", () => {
         sut = new TestModel('ctor')
     })
 
+    test("state fields and constructor parameters reject reassignment after construction", () => {
+        expect(() => { sut.mergedModel = sut.modelArray[0] }).toThrow(TypeError)
+        expect(() => { sut.constructorProperty = 'changed' }).toThrow(TypeError)
+    })
+
     test("getState copies the correct properties", () => {
         let result = getState(sut)
         expect(JSON.stringify(result)).toBe(JSON.stringify({

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Breaking
+- `@state` properties are read-only after model construction. Use `@reduced` for values that change in response to events. Tests can still override `@state` with `mutable(model)`.
+
 ## v0.9.5
 
 ### Fixed

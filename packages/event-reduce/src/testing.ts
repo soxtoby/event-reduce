@@ -37,6 +37,8 @@ export function mutable<T>(model: T): Mutable<T> {
                     enumerable: Object.getOwnPropertyDescriptor(model, key)?.enumerable ?? true,
                     configurable: true
                 })
+            } else {
+                Object.defineProperty(model, key, { writable: true })
             }
         }
 

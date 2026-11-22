@@ -408,12 +408,14 @@ export class StateProperty implements Disposable {
         private _instance: any,
         public readonly key: PropertyKey
     ) {
+        let value = this.value
         if (process.env.NODE_ENV !== 'production') {
-            if (isEvent(this.value) || isEventsClass(this.value))
+            if (isEvent(value) || isEventsClass(value))
                 throw new EventsMarkedAsStateError(_instance, this.key)
         }
 
-        updateChildren(_instance, null, this.value)
+        Object.defineProperty(_instance, key, { value, writable: false, configurable: true })
+        updateChildren(_instance, null, value)
     }
 
     toJSON() { return modelJSON(this.value) }

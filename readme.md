@@ -128,7 +128,7 @@ class MyModel {
     }
 
     @state // Unobservable state that you want to save
-    id: string;
+    readonly id: string;
 
     @reduced // Will be saved
     count = reduce(0)
