@@ -1,7 +1,8 @@
-import { act, renderHook } from "@testing-library/react"
+import { act, render, renderHook } from "@testing-library/react"
 import { beforeEach, describe, expect, mock, test, type Mock } from "bun:test"
 import { ISignal, signal } from "event-reduce"
-import { useReactive } from "event-reduce-react"
+import { reactive, useReactive } from "event-reduce-react"
+import { createElement } from "react"
 
 describe('useReactive', () => {
     let observable: ISignal<string>
@@ -38,4 +39,22 @@ describe('useReactive', () => {
 
         test("returns updated result", () => expect(sut.result.current).toBe('new value'))
     })
+})
+
+test("reactive component using useReactive updates when either signal changes", () => {
+    let inner = signal("inner")
+    let outer = signal("outer")
+    let Component = reactive(() => {
+        let value = useReactive(() => inner.value)
+        return createElement("span", null, value + "/" + outer.value)
+    })    
+    let sut = render(createElement(Component))
+    
+    expect(sut.container.textContent).toBe("inner/outer")
+
+    act(() => inner.setValue("changed"))
+    expect(sut.container.textContent).toBe("changed/outer")
+
+    act(() => outer.setValue("updated"))
+    expect(sut.container.textContent).toBe("changed/updated")
 })

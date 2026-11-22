@@ -1,7 +1,7 @@
 import { Effect, log, startLogging } from "event-reduce"
 import { LogValue } from "event-reduce/lib/logging"
 import { IObservable } from "event-reduce/lib/observable"
-import { beginTransition, queueTransitionEffect } from "event-reduce/lib/tracking"
+import { beginTransition, iterationSource, queueTransitionEffect } from "event-reduce/lib/tracking"
 import { constant, dispose, emptyArray, nameOfFunction } from "event-reduce/lib/utils"
 import { Children, Fragment, ReactElement, ReactNode, createElement, isValidElement, useState } from "react"
 import { useSyncExternalStore } from "use-sync-external-store/shim"
@@ -70,7 +70,7 @@ class RenderEffect<T> extends Effect<T> {
         let trigger = this._trigger
         this._trigger = null
 
-        let transition = beginTransition(this, trigger ?? { trigger: 'render' })
+        let transition = beginTransition(this, iterationSource instanceof RenderEffect ? undefined : trigger ?? { trigger: 'render' })
         let logging = startLogging('⚛️ (render)', this.displayName, emptyArray, () => ({
             Trigger: trigger?.path ?? 'render',
             Previous: loggedReactValue(previousValue),
